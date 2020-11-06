@@ -23,7 +23,7 @@ def handler(ctx, data: io.BytesIO=None):
         eventtime = body.get("eventTime")
 
         source = "Oracle Cloud" #adding a source name.
-        service = "OCI Logs" #adding a servicen name.
+        service = "OCI Logs" #adding a service name.
 
         datafile = request_one_object(namespace, bucket, obj)
         data = str(datafile,'utf-8')
