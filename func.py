@@ -22,6 +22,9 @@ def handler(ctx, data: io.BytesIO=None):
         obj = data.get("resourceName")
         eventtime = body.get("eventTime")
 
+        source = "Oracle Cloud" #adding a source name.
+        service = "OCI Logs" #adding a servicen name.
+
         datafile = request_one_object(namespace, bucket, obj)
         data = str(datafile,'utf-8')
 
@@ -33,7 +36,13 @@ def handler(ctx, data: io.BytesIO=None):
             payload = {}
             payload.update({"host":obj})
             payload.update({"time": eventtime})
+
+            payload.update({"ddsource":source}) 
+            payload.update({"service":service})
+
             payload.update({"event":lines})
+
+            
  
         headers = {'Content-type': 'application/json', 'DD-API-KEY': datadogtoken}
         x = requests.post(datadoghost, data = json.dumps(payload), headers=headers)
