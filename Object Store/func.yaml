@@ -7,4 +7,4 @@ memory: 1024
 timeout: 120
 config:
   DATADOG_HOST: https://http-intake.logs.datadoghq.com/v1/input
-  DATADOG_TOKEN: 
+  DATADOG_TOKEN: <DATADOG_API_TOKEN>
