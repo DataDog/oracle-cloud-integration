@@ -1,4 +1,0 @@
-fdk
-datetime
-requests
-oci
