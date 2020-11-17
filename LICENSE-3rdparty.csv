@@ -1,0 +1,5 @@
+Component,Origin,License,Copyright
+fdk, https://github.com/fnproject/fdk-python, Apache-2.0,
+datetime, https://pypi.org/project/DateTime/, Zope Public License (ZPL 2.1),
+requests, https://pypi.org/project/requests/, Apache-2.0,
+oci, https://github.com/oracle/oci-python-sdk, Apache-2.0,
