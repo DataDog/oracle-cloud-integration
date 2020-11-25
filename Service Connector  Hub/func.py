@@ -35,7 +35,8 @@ def handler(ctx, data: io.BytesIO=None):
         datadoghost = os.environ['DATADOG_HOST']
         datadogtoken = os.environ['DATADOG_TOKEN']
 
-        #Invoke Datadog API with the payload. If the payload contains more than one log this will be ingested as once. headers = {'Content-type': 'application/json', 'DD-API-KEY': datadogtoken}
+        #Invoke Datadog API with the payload. If the payload contains more than one log this will be ingested as once. 
+        headers = {'Content-type': 'application/json', 'DD-API-KEY': datadogtoken}
         x = requests.post(datadoghost, data = json.dumps(payload), headers=headers) 
         logging.getLogger().info(x.text)
 
