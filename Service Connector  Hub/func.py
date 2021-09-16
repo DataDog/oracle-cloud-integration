@@ -10,13 +10,8 @@ import time
 import gzip
 from fdk import response
 
-"""
-This function receives the logging json and invokes the Datadog endpoint for ingesting logs. https://docs.cloud.oracle.com/en-us/iaas/Content/Logging/Reference/top_level_logging_format. htm#top_level_logging_format
-If this Function is invoked with more than one log the function go over each log and invokes the Datadog endpoint for ingesting one by one.
-"""
-def handler(ctx, data: io.BytesIO=None):
+def process(body):
     try:
-        body = json.loads(data.getvalue())
         data = body.get("data", {}) 
         source = body.get("source") 
         time = body.get("time")
@@ -40,6 +35,23 @@ def handler(ctx, data: io.BytesIO=None):
         x = requests.post(datadoghost, data = json.dumps(payload), headers=headers) 
         logging.getLogger().info(x.text)
 
-        except (Exception, ValueError) as ex: 
-            logging.getLogger().info(str(ex)) 
-            return
+    except (Exception, ValueError) as ex:
+        logging.getLogger().error(str(ex))
+
+
+"""
+This function receives the logging json and invokes the Datadog endpoint for ingesting logs. https://docs.cloud.oracle.com/en-us/iaas/Content/Logging/Reference/top_level_logging_format. htm#top_level_logging_format
+If this Function is invoked with more than one log the function go over each log and invokes the Datadog endpoint for ingesting one by one.
+"""
+def handler(ctx, data: io.BytesIO=None):
+    try:
+        body = json.loads(data.getvalue())
+        if isinstance(body, list):
+            # Batch of CloudEvents format
+            for b in body:
+                process(b)
+        else:
+            # Single CloudEvent
+            process(body)
+    except (Exception, ValueError) as ex:
+        logging.getLogger().error(str(ex))
