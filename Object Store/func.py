@@ -1,67 +1,72 @@
 import io
-import oci
-import re
 import os
-import json
-import sys
-import requests
-import logging
-import time
 import gzip
+import json
+import logging
 
-from fdk import response
+import oci
+import requests
 
 
-def handler(ctx, data: io.BytesIO=None):
+def handler(ctx, data: io.BytesIO = None):
     try:
         body = json.loads(data.getvalue())
-        data = body.get("data", {})
-        additional_details = data.get("additionalDetails", {})
-        namespace = additional_details.get("namespace")
-        bucket = additional_details.get("bucketName")
-        obj = data.get("resourceName")
-        eventtime = body.get("eventTime")
-
-        source = "Oracle Cloud" #adding a source name.
-        service = "OCI Logs" #adding a servicen name.
-
-        datafile = request_one_object(namespace, bucket, obj)
-        data = str(datafile,'utf-8')
-
-        datadoghost = os.environ['DATADOG_HOST']
-        datadogtoken = os.environ['DATADOG_TOKEN']
-
-        for lines in data.splitlines():
-            logging.getLogger().info("lines " + lines)
-            payload = {}
-            payload.update({"host":obj})
-            payload.update({"time": eventtime})
-
-            payload.update({"ddsource":source}) 
-            payload.update({"service":service})
-
-            payload.update({"event":lines})
-
-            
- 
-        headers = {'Content-type': 'application/json', 'DD-API-KEY': datadogtoken}
-        x = requests.post(datadoghost, data = json.dumps(payload), headers=headers)
-        logging.getLogger().info(x.text)
-        print(x.text)
-
     except (Exception, ValueError) as ex:
-#        print(str(ex))
         logging.getLogger().info(str(ex))
         return
 
+    data = body.get("data", {})
+    additional_details = data.get("additionalDetails", {})
 
-def request_one_object(namespace, bucket, obj):
-    assert bucket and obj
-    signer = oci.auth.signers.get_resource_principals_signer()
-    object_storage_client = oci.object_storage.ObjectStorageClient(config={}, signer=signer)
-    namespace = namespace
-    bucket_name = bucket
-    object_name = obj
-    get_obj = object_storage_client.get_object(namespace, bucket_name, object_name)
+    namespace = additional_details.get("namespace")
+    if not namespace:
+        logging.getLogger().error("No namespace provided")
+        return
+        
+    bucket = additional_details.get("bucketName")
+    if not bucket:
+        logging.getLogger().error("No bucket provided")
+        return
+
+    resource_name = data.get("resourceName")
+    if not resource_name:
+        logging.getLogger().error("No obj provided")
+        return
+
+    event_time = body.get("eventTime")
+
+    source = "Oracle Cloud"  # Adding a source name.
+    service = "OCI Logs"     # Adding a service name.
+
+    datafile = request_one_object(namespace, bucket, resource_name)
+    data = str(datafile, 'utf-8')
+
+    dd_host = os.environ['DATADOG_HOST']
+    dd_token = os.environ['DATADOG_TOKEN']
+
+    for lines in data.splitlines():
+        logging.getLogger().info("lines %s", lines)
+        payload = {}
+        payload.update({"host": resource_name})
+        payload.update({"time": event_time})
+
+        payload.update({"ddsource": source})
+        payload.update({"service": service})
+
+        payload.update({"event": lines})
+
+    headers = {'Content-type': 'application/json', 'DD-API-KEY': dd_token}
+    req = requests.post(dd_host, data=json.dumps(payload), headers=headers)
+    logging.getLogger().info(req.text)
+
+
+def request_one_object(namespace: str, bucket: str, resource_name: str):
+    """
+    Calls OCI to request object from Object Storage Client and decompress
+    """
+    oci_signer = oci.auth.signers.get_resource_principals_signer()
+    os_client = oci.object_storage.ObjectStorageClient(config={},
+                                                       signer=oci_signer)
+    get_obj = os_client.get_object(namespace, bucket, resource_name)
     bytes_read = gzip.decompress(get_obj.data.content)
     return bytes_read

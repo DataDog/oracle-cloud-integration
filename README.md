@@ -1,2 +1,2 @@
 # Oracle_Logs_Integration
-Houses code for OCI's log collections pipeline.
+Houses code for OCI's log collection pipeline.
