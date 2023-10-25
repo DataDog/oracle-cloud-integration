@@ -26,11 +26,14 @@ def process(body: dict):
     try:
         dd_host = os.environ['DATADOG_HOST']
         dd_token = os.environ['DATADOG_TOKEN']
+        dd_tags = os.environ.get('DATADOG_TAGS', '')
     except KeyError:
         err_msg = "Could not find environment variables, \
                    please ensure DATADOG_HOST and DATADOG_TOKEN \
                    are set as environment variables."
         logging.getLogger().error(err_msg)
+    if dd_tags:
+        payload.update({'ddtags': dd_tags})
 
     # Invoke Datadog API with the payload.
     # If the payload contains more than one log
