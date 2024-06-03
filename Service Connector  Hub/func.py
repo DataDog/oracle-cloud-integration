@@ -5,21 +5,25 @@ import logging
 
 import requests
 
+logger = logging.getLogger(__name__)
 
-def process(body: dict):
+DD_SOURCE = "Oracle Cloud"  # Adding a source name.
+DD_SERVICE = "OCI Logs"  # Adding a service name.
+DD_TIMEOUT = 10 * 60  # Adding a timeout for the Datadog API call.
+
+
+def process(body: dict) -> None:
     data = body.get("data", {})
     source = body.get("source")
     time = body.get("time")
-    dd_source = "oracle_cloud"
-    service = "OCI Logs"
 
     # Get json data, time, and source information
     payload = {}
     payload.update({"source": source})
     payload.update({"time": time})
     payload.update({"data": data})
-    payload.update({"ddsource": dd_source})
-    payload.update({"service": service})
+    payload.update({"ddsource": DD_SERVICE})
+    payload.update({"service": DD_SERVICE})
 
     # Datadog endpoint URL and token to call the REST interface.
     # These are defined in the func.yaml file.
@@ -31,7 +35,7 @@ def process(body: dict):
         err_msg = "Could not find environment variables, \
                    please ensure DATADOG_HOST and DATADOG_TOKEN \
                    are set as environment variables."
-        logging.getLogger().error(err_msg)
+        logger.error(err_msg)
     if dd_tags:
         payload.update({'ddtags': dd_tags})
 
@@ -40,13 +44,14 @@ def process(body: dict):
     # this will be ingested at once.
     try:
         headers = {'Content-type': 'application/json', 'DD-API-KEY': dd_token}
-        x = requests.post(dd_host, data=json.dumps(payload), headers=headers)
-        logging.getLogger().info(x.text)
-    except (Exception, ValueError) as ex:
-        logging.getLogger().error(str(ex))
+        res = requests.post(dd_host, data=json.dumps(payload), headers=headers,
+                            timeout=DD_TIMEOUT)
+        logger.info(res.text)
+    except Exception as ex:
+        logger.exception(ex)
 
 
-def handler(ctx, data: io.BytesIO = None):
+def handler(ctx, data: io.BytesIO = None) -> None:
     """
     This function receives the logging json and invokes the Datadog endpoint
     for ingesting logs. https://docs.cloud.oracle.com/en-us/iaas/Content/Logging/Reference/top_level_logging_format.htm#top_level_logging_format
@@ -62,5 +67,5 @@ def handler(ctx, data: io.BytesIO = None):
         else:
             # Single CloudEvent
             process(body)
-    except (Exception, ValueError) as ex:
-        logging.getLogger().error(str(ex))
+    except Exception as ex:
+        logger.exception(ex)

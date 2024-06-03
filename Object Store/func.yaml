@@ -8,4 +8,4 @@ timeout: 120
 config:
   DATADOG_HOST: https://http-intake.logs.datadoghq.com/v1/input     # DD Log Intake Host
   DATADOG_TOKEN: <DATADOG_API_TOKEN>                                # DD API Token
-  # DATADOG_TAGS: prod                                                # Tags associated with logs
+  # DATADOG_TAGS: "prod:true"                                        # Tags associated with logs
