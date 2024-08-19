@@ -36,6 +36,7 @@ def process(body: dict) -> None:
                    please ensure DATADOG_HOST and DATADOG_TOKEN \
                    are set as environment variables."
         logger.error(err_msg)
+
     if dd_tags:
         payload.update({'ddtags': dd_tags})
 
@@ -43,7 +44,9 @@ def process(body: dict) -> None:
     # If the payload contains more than one log
     # this will be ingested at once.
     try:
-        headers = {'Content-type': 'application/json', 'DD-API-KEY': dd_token}
+        headers = {"Content-type": "application/json",
+                   "Content-encoding": "gzip",
+                   "DD-API-KEY": dd_token}
         res = requests.post(dd_host, data=json.dumps(payload), headers=headers,
                             timeout=DD_TIMEOUT)
         logger.info(res.text)
