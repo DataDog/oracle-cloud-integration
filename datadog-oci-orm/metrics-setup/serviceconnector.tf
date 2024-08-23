@@ -13,15 +13,16 @@ resource "oci_sch_service_connector" "metrics_service_connector" {
       #Optional
       compartment_id = var.tenancy_ocid
       namespace_details {
-        #Required
         kind = "selected"
-        namespaces {
-          #Required
-          metrics {
-            #Required
-            kind = "all"
+        dynamic "namespaces" {
+          for_each = local.connector_metric_namespaces
+          content {
+            metrics {
+              #Required
+              kind = "all"
+            }
+            namespace = namespaces.value
           }
-          namespace = "oci_computeagent"
         }
       }
     }
