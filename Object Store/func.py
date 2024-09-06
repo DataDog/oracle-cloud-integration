@@ -70,7 +70,9 @@ def handler(ctx, data: io.BytesIO = None) -> None:
         payload.update({"event": lines})
 
     try:
-        headers = {"Content-type": "application/json", "DD-API-KEY": dd_token}
+        headers = {"Content-type": "application/json",
+                   "Content-encoding": "gzip",
+                   "DD-API-KEY": dd_token}
         res = requests.post(dd_host, data=json.dumps(payload), headers=headers,
                             timeout=DD_TIMEOUT)
         logger.info(res.text)
