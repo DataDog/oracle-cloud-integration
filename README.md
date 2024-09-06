@@ -13,5 +13,3 @@ The setup creates an OCI resource manager (ORM) stack which uses terraform to:
 * Create policies in order to allow connector hub to read metrics from different compartments of the tenancy
 
 [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/Datadog/oracle-cloud-integration/releases/latest/download/datadog-oci-orm.zip)
-
-

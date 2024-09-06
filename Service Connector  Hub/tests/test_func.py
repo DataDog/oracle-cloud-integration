@@ -1,11 +1,14 @@
 import os
+
 from io import BytesIO
 from func import handler
 from unittest import TestCase, mock
 
+
 def to_BytesIO(str):
     """ Helper function to turn string test data into expected BytesIO asci encoded bytes """
     return BytesIO(bytes(str, 'ascii'))
+
 
 class TestLogForwarderFunction(TestCase):
     """ Test simple and batch format json CloudEvent payloads """
@@ -40,10 +43,40 @@ class TestLogForwarderFunction(TestCase):
         handler(ctx=None, data=to_BytesIO(payload))
         mock_post.assert_called_once()
         self.assertEqual(mock_post.mock_calls[0].kwargs['data'],
-                        '{"source": "/mycontext", "time": "2018-04-05T17:31:00Z", "data": '
-                        '{"appinfoA": "abc", "appinfoB": 123, "appinfoC": true}, "ddsource": '
-                        '"oracle_cloud", "service": "OCI Logs"}'
-                        )
+                         '{"source": "/mycontext", "time": "2018-04-05T17:31:00Z", "data": '
+                         '{"appinfoA": "abc", "appinfoB": 123, "appinfoC": true}, "ddsource": '
+                         '"oracle_cloud", "service": "OCI Logs"}'
+                         )
+
+    @mock.patch("requests.post")
+    def testSimpleDataTags(self, mock_post, ):
+        """ Test single CloudEvent payload with Tags enabled """
+
+        payload = """
+        {
+            "specversion" : "1.0",
+            "type" : "com.example.someevent",
+            "source" : "/mycontext",
+            "id" : "C234-1234-1234",
+            "time" : "2018-04-05T17:31:00Z",
+            "comexampleextension1" : "value",
+            "comexampleothervalue" : 5,
+            "datacontenttype" : "application/json",
+            "data" : {
+                "appinfoA" : "abc",
+                "appinfoB" : 123,
+                "appinfoC" : true
+            }
+        }
+        """
+        os.environ['DATADOG_TAGS'] = "prod:true"
+        handler(ctx=None, data=to_BytesIO(payload))
+        mock_post.assert_called_once()
+        self.assertEqual(mock_post.mock_calls[0].kwargs['data'],
+                         '{"source": "/mycontext", "time": "2018-04-05T17:31:00Z", "data": '
+                         '{"appinfoA": "abc", "appinfoB": 123, "appinfoC": true}, "ddsource": '
+                         '"oracle_cloud", "service": "OCI Logs", "ddtags": "prod:true"}'
+                         )
 
     @mock.patch("requests.post")
     def testBatchFormat(self, mock_post):
@@ -80,10 +113,9 @@ class TestLogForwarderFunction(TestCase):
         """
         handler(ctx=None, data=to_BytesIO(batch))
         self.assertEqual(mock_post.call_count, 2, "Data was not successfully submitted for entire batch")
-        self.assertEqual(
-                        [arg.kwargs['data'] for arg in mock_post.call_args_list],
-                        ['{"source": "/mycontext/4", "time": "2018-04-05T17:31:00Z", "data": {}, '
-                                '"ddsource": "oracle_cloud", "service": "OCI Logs"}',
-                            '{"source": "/mycontext/9", "time": "2018-04-05T17:31:05Z", "data": '
-                                '{"appinfoA": "potatoes", "appinfoB": 123, "appinfoC": true}, "ddsource": '
-                                '"oracle_cloud", "service": "OCI Logs"}'])
+        self.assertEqual([arg.kwargs['data'] for arg in mock_post.call_args_list],
+                         ['{"source": "/mycontext/4", "time": "2018-04-05T17:31:00Z", "data": {}, '
+                          '"ddsource": "oracle_cloud", "service": "OCI Logs"}',
+                          '{"source": "/mycontext/9", "time": "2018-04-05T17:31:05Z", "data": '
+                          '{"appinfoA": "potatoes", "appinfoB": 123, "appinfoC": true}, "ddsource": '
+                          '"oracle_cloud", "service": "OCI Logs"}'])
