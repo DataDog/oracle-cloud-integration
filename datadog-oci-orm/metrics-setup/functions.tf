@@ -18,6 +18,13 @@ resource "oci_functions_application" "metrics_function_app" {
   subnet_ids = [
     data.oci_core_subnet.input_subnet.id,
   ]
+
+  lifecycle {
+    ignore_changes = [
+      defined_tags["Oracle-Tags.CreatedBy"],
+      defined_tags["Oracle-Tags.CreatedOn"],
+    ]
+  }
 }
 
 resource "oci_functions_function" "metrics_function" {

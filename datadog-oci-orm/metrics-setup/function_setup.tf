@@ -15,6 +15,13 @@ resource "oci_artifacts_container_repository" "function_repo" {
   is_public      = false
   defined_tags   = {}
   freeform_tags  = local.freeform_tags
+
+  lifecycle {
+    ignore_changes = [
+      defined_tags["Oracle-Tags.CreatedBy"],
+      defined_tags["Oracle-Tags.CreatedOn"],
+    ]
+  }
 }
 
 # ### build the function into a container image and push that image to the repository in the OCI Container Image Registry
