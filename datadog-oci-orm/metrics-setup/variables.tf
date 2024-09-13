@@ -66,6 +66,23 @@ variable "service_connector_target_batch_size_in_kbs" {
   default     = "5000"
 }
 
+variable "connector_metric_source_compartments" {
+  type    = list(string)
+  description = "The list of compartments for which the connector will pull metrics from"
+}
+
+variable "connector_metric_namespaces" {
+  type = list(string)
+  description = "The list of namespaces to subscribe to for the connector"
+  default = [
+    "oci_autonomous_database", "oci_blockstore", "oci_compute_infrastructure_health", "oci_computeagent",
+    "oci_computecontainerinstance", "oci_database", "oci_database_cluster", "oci_dynamic_routing_gateway", "oci_faas",
+    "oci_fastconnect", "oci_filestorage", "oci_gpu_infrastructure_health", "oci_lbaas", "oci_mysql_database",
+    "oci_nat_gateway", "oci_nlb", "oci_objectstorage", "oci_oke", "oci_queue", "oci_rdma_infrastructure_health",
+    "oci_service_connector_hub", "oci_service_gateway", "oci_vcn", "oci_vpn", "oci_waf", "oracle_oci_database"
+  ]
+}
+
 #*************************************
 #         TF auth Requirements
 #*************************************
@@ -81,4 +98,3 @@ variable "compartment_ocid" {
   type        = string
   description = "The compartment OCID to deploy resources to"
 }
-
