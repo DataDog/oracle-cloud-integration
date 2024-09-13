@@ -31,4 +31,11 @@ resource "oci_functions_function" "metrics_function" {
   defined_tags  = {}
   freeform_tags = local.freeform_tags
   image         = local.user_image_provided ? local.custom_image_path : local.docker_image_path
+
+  lifecycle {
+    ignore_changes = [
+      defined_tags["Oracle-Tags.CreatedBy"],
+      defined_tags["Oracle-Tags.CreatedOn"]
+    ]
+  }
 }

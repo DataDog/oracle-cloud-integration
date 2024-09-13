@@ -47,4 +47,11 @@ resource "oci_sch_service_connector" "metrics_service_connector" {
   defined_tags  = {}
   description   = "Terraform created connector hub to distribute metrics"
   freeform_tags = local.freeform_tags
+
+  lifecycle {
+    ignore_changes = [
+      defined_tags["Oracle-Tags.CreatedBy"],
+      defined_tags["Oracle-Tags.CreatedOn"]
+    ]
+  }
 }
