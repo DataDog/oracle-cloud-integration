@@ -8,25 +8,29 @@ resource "oci_sch_service_connector" "metrics_service_connector" {
     kind = "monitoring"
 
     #Optional
-    monitoring_sources {
+    dynamic "monitoring_sources" {
       for_each = var.connector_metric_source_compartments
-      #Optional
-      compartment_id = each.value
 
-      namespace_details {
-        kind = "selected"
-        dynamic "namespaces" {
-          for_each = var.connector_metric_namespaces
-          content {
-            metrics {
-              #Required
-              kind = "all"
+      content {
+        #Optional
+        compartment_id = monitoring_sources.value
+
+        namespace_details {
+          kind = "selected"
+          dynamic "namespaces" {
+            for_each = var.connector_metric_namespaces
+            content {
+              metrics {
+                #Required
+                kind = "all"
+              }
+              namespace = namespaces.value
             }
-            namespace = namespaces.value
           }
         }
       }
     }
+
   }
   target {
     #Required
