@@ -12,10 +12,6 @@ data "oci_identity_tenancy" "tenancy_metadata" {
   tenancy_id = var.tenancy_ocid
 }
 
-provider "oci" {
-  tenancy_ocid = var.tenancy_ocid
-}
-
 locals {
   tenancy_home_region = data.oci_identity_tenancy.tenancy_metadata.home_region_key
   freeform_tags = {
