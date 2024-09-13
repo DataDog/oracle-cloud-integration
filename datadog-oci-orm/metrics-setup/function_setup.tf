@@ -29,25 +29,25 @@ resource "null_resource" "FnImagePushToOCIR" {
   # remove function image (if it exists) from local container registry
   provisioner "local-exec" {
     command     = "image=$(docker images | grep ${local.function_name} | awk -F ' ' '{print $3}') ; docker rmi -f $image &> /dev/null ; echo $image"
-    working_dir = "metrics-function"
+    working_dir = "${path.module}/metrics-function"
   }
 
   # build and tag the image from the docker file
   provisioner "local-exec" {
     command     = "docker build -t ${local.docker_image_path} . --no-cache"
-    working_dir = "metrics-function"
+    working_dir = "${path.module}/metrics-function"
   }
 
   # Push the docker image to the OCI registry
   provisioner "local-exec" {
     command     = "docker push ${local.docker_image_path}"
-    working_dir = "metrics-function"
+    working_dir = "${path.module}/metrics-function"
   }
 
   # remove function image (if it exists) from local container registry
   provisioner "local-exec" {
     command     = "docker rmi -f `docker images | grep ${local.function_name} | awk -F ' ' '{print $3}'`> /dev/null"
-    working_dir = "metrics-function"
+    working_dir = "${path.module}/metrics-function"
   }
 
 }
