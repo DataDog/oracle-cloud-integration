@@ -29,6 +29,13 @@ resource "oci_identity_dynamic_group" "serviceconnector_group" {
   #Optional
   defined_tags  = {}
   freeform_tags = local.freeform_tags
+
+  lifecycle {
+    ignore_changes = [
+      defined_tags["Oracle-Tags.CreatedBy"],
+      defined_tags["Oracle-Tags.CreatedOn"],
+    ]
+  }
 }
 
 resource "oci_identity_policy" "metrics_policy" {
@@ -42,4 +49,11 @@ resource "oci_identity_policy" "metrics_policy" {
   ]
   defined_tags  = {}
   freeform_tags = local.freeform_tags
+
+  lifecycle {
+    ignore_changes = [
+      defined_tags["Oracle-Tags.CreatedBy"],
+      defined_tags["Oracle-Tags.CreatedOn"],
+    ]
+  }
 }
