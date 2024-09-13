@@ -51,7 +51,7 @@ resource "oci_sch_service_connector" "metrics_service_connector" {
   lifecycle {
     ignore_changes = [
       defined_tags["Oracle-Tags.CreatedBy"],
-      defined_tags["Oracle-Tags.CreatedOn"]
+      defined_tags["Oracle-Tags.CreatedOn"],
       oci_sch_service_connector.metrics_service_connector.target.compartment_id
     ]
   }
