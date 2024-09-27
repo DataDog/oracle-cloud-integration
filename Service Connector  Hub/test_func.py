@@ -1,7 +1,7 @@
 import os
 
 from io import BytesIO
-
+from func import handler
 from unittest import TestCase, mock
 
 
@@ -40,7 +40,7 @@ class TestLogForwarderFunction(TestCase):
             }
         }
         """
-        # handler(ctx=None, data=to_BytesIO(payload))
+        handler(ctx=None, data=to_BytesIO(payload))
         mock_post.assert_called_once()
         self.assertEqual(mock_post.mock_calls[0].kwargs['data'],
                          '{"source": "/mycontext", "time": "2018-04-05T17:31:00Z", "data": '
