@@ -7,7 +7,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-DD_SOURCE = "Oracle Cloud"  # Adding a source name.
+DD_SOURCE = "oracle_cloud"  # Adding a source name.
 DD_SERVICE = "OCI Logs"  # Adding a service name.
 DD_TIMEOUT = 10 * 60  # Adding a timeout for the Datadog API call.
 
@@ -22,7 +22,7 @@ def process(body: dict) -> None:
     payload.update({"source": source})
     payload.update({"time": time})
     payload.update({"data": data})
-    payload.update({"ddsource": DD_SERVICE})
+    payload.update({"ddsource": DD_SOURCE})
     payload.update({"service": DD_SERVICE})
 
     # Datadog endpoint URL and token to call the REST interface.

@@ -7,7 +7,7 @@ import logging
 import oci
 import requests
 
-DD_SOURCE = "Oracle Cloud"  # Adding a source name.
+DD_SOURCE = "oracle_cloud"  # Adding a source name.
 DD_SERVICE = "OCI Logs"  # Adding a service name.
 DD_TIMEOUT = 10 * 60  # Adding a timeout for the Datadog API call.
 
