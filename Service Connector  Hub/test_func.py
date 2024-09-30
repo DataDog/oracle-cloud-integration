@@ -1,5 +1,5 @@
 import os
-
+import gzip
 from io import BytesIO
 from func import handler
 from unittest import TestCase, mock
@@ -9,6 +9,12 @@ def to_bytes_io(inp : str):
     """ Helper function to turn string test data into expected BytesIO asci encoded bytes """
     return BytesIO(bytes(inp, 'ascii'))
 
+def _decompress_string(compressed_string):
+    """Decompresses a gzip-compressed string."""
+    return gzip.decompress(compressed_string).decode()
+
+def to_decompressed_dict(data) -> dict :
+    return eval(_decompress_string(data))
 
 class TestLogForwarderFunction(TestCase):
     """ Test simple and batch format json CloudEvent payloads """
@@ -55,6 +61,7 @@ class TestLogForwarderFunction(TestCase):
         os.environ['DATADOG_TOKEN'] = "VERY-SECRET-TOKEN-2000"
         return super().setUp()
 
+
     @mock.patch("requests.post")
     def test_simple_data(self, mock_post, ):
         """ Test single CloudEvent payload """
@@ -64,8 +71,13 @@ class TestLogForwarderFunction(TestCase):
         mock_post.assert_called_once()
         self.assertDictEqual(
             TestLogForwarderFunction.SAMPLE_OUTPUT,
-            eval(mock_post.mock_calls[0].kwargs['data'])
+            to_decompressed_dict(mock_post.mock_calls[0].kwargs['data'])
         )
+        self.assertEqual(
+            "gzip",
+            mock_post.mock_calls[0].kwargs['headers']['Content-encoding']
+        )
+
 
     @mock.patch("requests.post")
     def test_simple_data_tags(self, mock_post, ):
@@ -79,7 +91,7 @@ class TestLogForwarderFunction(TestCase):
         mock_post.assert_called_once()
         self.assertDictEqual(
             expected_output,
-            eval(mock_post.mock_calls[0].kwargs['data'])
+            to_decompressed_dict(mock_post.mock_calls[0].kwargs['data'])
         )
 
 
@@ -97,5 +109,5 @@ class TestLogForwarderFunction(TestCase):
         self.assertEqual(batch_count, mock_post.call_count, "Data was successfully submitted for the entire batch")
         self.assertEqual(
             expected_output,
-            [eval(arg.kwargs['data']) for arg in mock_post.call_args_list]
+            [to_decompressed_dict(arg.kwargs['data']) for arg in mock_post.call_args_list]
         )

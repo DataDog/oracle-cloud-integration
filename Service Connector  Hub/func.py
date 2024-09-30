@@ -2,6 +2,7 @@ import io
 import os
 import json
 import logging
+import gzip
 
 import requests
 
@@ -10,6 +11,14 @@ logger = logging.getLogger(__name__)
 DD_SOURCE = "oracle_cloud"  # Adding a source name.
 DD_SERVICE = "OCI Logs"  # Adding a service name.
 DD_TIMEOUT = 10 * 60  # Adding a timeout for the Datadog API call.
+
+def _compress_payload(payload : dict) :
+    compressed_payload = payload
+    try:
+        compressed_payload = gzip.compress(json.dumps(payload).encode())
+    except:
+        logger.error("Could not compress payload to gzip")
+    return compressed_payload
 
 
 def process(body: dict) -> None:
@@ -46,10 +55,14 @@ def process(body: dict) -> None:
     # If the payload contains more than one log
     # this will be ingested at once.
     try:
-        headers = {"Content-type": "application/json",
-                   "Content-encoding": "gzip",
-                   "DD-API-KEY": dd_token}
-        res = requests.post(dd_host, data=json.dumps(payload), headers=headers,
+        headers = {
+            "Content-type": "application/json",
+            "DD-API-KEY": dd_token
+        }
+        compressed_payload = _compress_payload(payload=payload)
+        if isinstance(compressed_payload, bytes):
+            headers["Content-encoding"] = "gzip"
+        res = requests.post(dd_host, data=compressed_payload, headers=headers,
                             timeout=DD_TIMEOUT)
         logger.info(res.text)
     except Exception as ex:
