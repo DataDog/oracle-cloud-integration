@@ -1,0 +1,20 @@
+{
+  "data": {
+    "level": "INFO",
+    "message": "Hello World",
+    "messageType": "CONNECTOR_RUN_COMPLETED"
+  },
+  "id": "6b9819cf-d004-4dbc-9978-b713e743ad08",
+  "oracle": {
+    "compartmentid": "comp",
+    "ingestedtime": "2024-09-29T20:04:45.926Z",
+    "loggroupid": "lgid",
+    "logid": "lid",
+    "resourceid": "rid",
+    "tenantid": "tid"
+  },
+  "source": "Log_Connector",
+  "specversion": "1.0",
+  "time": "2024-09-29T18:10:45.130Z",
+  "type": "com.oraclecloud.sch.serviceconnector.runlog"
+}

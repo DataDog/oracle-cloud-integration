@@ -16,8 +16,9 @@ def _compress_payload(payload : dict) :
     compressed_payload = payload
     try:
         compressed_payload = gzip.compress(json.dumps(payload).encode())
-    except:
-        logger.error("Could not compress payload to gzip")
+    except Exception as ex:
+        logger.error("Could not compress payload to gzip",
+                     extra={'Exception' : ex})
     return compressed_payload
 
 
