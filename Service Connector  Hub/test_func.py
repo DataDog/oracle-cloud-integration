@@ -5,9 +5,9 @@ from func import handler
 from unittest import TestCase, mock
 
 
-def to_BytesIO(str):
+def to_bytes_io(inp : str):
     """ Helper function to turn string test data into expected BytesIO asci encoded bytes """
-    return BytesIO(bytes(str, 'ascii'))
+    return BytesIO(bytes(inp, 'ascii'))
 
 
 class TestLogForwarderFunction(TestCase):
@@ -56,11 +56,11 @@ class TestLogForwarderFunction(TestCase):
         return super().setUp()
 
     @mock.patch("requests.post")
-    def testSimpleData(self, mock_post, ):
+    def test_simple_data(self, mock_post, ):
         """ Test single CloudEvent payload """
 
         payload = TestLogForwarderFunction.SAMPLE_INPUT
-        handler(ctx=None, data=to_BytesIO(payload))
+        handler(ctx=None, data=to_bytes_io(payload))
         mock_post.assert_called_once()
         self.assertDictEqual(
             TestLogForwarderFunction.SAMPLE_OUTPUT,
@@ -68,12 +68,12 @@ class TestLogForwarderFunction(TestCase):
         )
 
     @mock.patch("requests.post")
-    def testSimpleDataTags(self, mock_post, ):
+    def test_simple_data_tags(self, mock_post, ):
         """ Test single CloudEvent payload with Tags enabled """
 
         payload = TestLogForwarderFunction.SAMPLE_INPUT
         os.environ['DATADOG_TAGS'] = "prod:true"
-        handler(ctx=None, data=to_BytesIO(payload))
+        handler(ctx=None, data=to_bytes_io(payload))
         expected_output = dict(TestLogForwarderFunction.SAMPLE_OUTPUT)
         expected_output['ddtags'] = os.environ['DATADOG_TAGS']
         mock_post.assert_called_once()
@@ -84,7 +84,7 @@ class TestLogForwarderFunction(TestCase):
 
 
     @mock.patch("requests.post")
-    def testBatchFormat(self, mock_post):
+    def test_batch_format(self, mock_post):
         """ Test batch format case, where we get an array of 'CloudEvents' """
         batch_count = 10
         payload = f"""
@@ -93,7 +93,7 @@ class TestLogForwarderFunction(TestCase):
         ]
         """
         expected_output = [dict(TestLogForwarderFunction.SAMPLE_OUTPUT)] * batch_count
-        handler(ctx=None, data=to_BytesIO(payload))
+        handler(ctx=None, data=to_bytes_io(payload))
         self.assertEqual(batch_count, mock_post.call_count, "Data was successfully submitted for the entire batch")
         self.assertEqual(
             expected_output,
