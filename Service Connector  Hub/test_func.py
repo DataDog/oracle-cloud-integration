@@ -37,7 +37,7 @@ class TestLogForwarderFunction(TestCase):
 
     SAMPLE_OUTPUT = {
         "source": "Log_Connector",
-        "time": "2024-09-25T20:04:45.130Z",
+        "timestamp": "2024-09-25T20:04:45.130Z",
         "data":
         {
             "level": "INFO",

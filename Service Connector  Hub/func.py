@@ -18,15 +18,17 @@ def process(body: dict) -> None:
     time = body.get("time")
 
     # Get json data, time, and source information
-    payload = {}
-    payload.update({"source": source})
-    payload.update({"time": time})
-    payload.update({"data": data})
-    payload.update({"ddsource": DD_SOURCE})
-    payload.update({"service": DD_SERVICE})
+    payload = {
+        "source" : source,
+        "timestamp" : time,
+        "data" : data,
+        "ddsource" : DD_SOURCE,
+        "service" : DD_SERVICE,
+    }
 
     # Datadog endpoint URL and token to call the REST interface.
     # These are defined in the func.yaml file.
+    dd_tags = None
     try:
         dd_host = os.environ['DATADOG_HOST']
         dd_token = os.environ['DATADOG_TOKEN']
@@ -38,7 +40,7 @@ def process(body: dict) -> None:
         logger.error(err_msg)
 
     if dd_tags:
-        payload.update({'ddtags': dd_tags})
+        payload['ddtags'] = dd_tags
 
     # Invoke Datadog API with the payload.
     # If the payload contains more than one log
