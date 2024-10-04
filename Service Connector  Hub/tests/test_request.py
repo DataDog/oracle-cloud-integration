@@ -27,12 +27,12 @@ def set_environment_variables(config: dict) -> None:
 
 
 def read_input_file(file_path: str) -> str:
-    with open(file_path, 'r') as file:
+    with open(file_path) as file:
         return file.read()
 
 
 def read_config_file(config_path: str) -> dict:
-    with open(config_path, 'r') as file:
+    with open(config_path) as file:
         config = yaml.safe_load(file)['config']
     return config
 
