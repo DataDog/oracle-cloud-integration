@@ -3,6 +3,10 @@ from io import BytesIO
 import os
 import yaml
 import argparse
+
+# Add the directory containing func.py to the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
+
 from func import handler
 
 
@@ -32,6 +36,7 @@ def read_config_file(config_path: str) -> dict:
         config = yaml.safe_load(file)['config']
     return config
 
+
 def main():
     args = parse_arguments()
     count = 1
@@ -42,7 +47,7 @@ def main():
         else:
             count = args.count
 
-    input_file_path = 'input.json'  # Replace with your input file path
+    input_file_path = 'tests/input.json'  # Replace with your input file path
     config_file_path = 'func.yaml'  # Replace with your config file path
 
     input_event = read_input_file(input_file_path)

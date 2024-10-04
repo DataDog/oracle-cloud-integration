@@ -1,6 +1,10 @@
-import os
+import os,sys
 import gzip
 from io import BytesIO
+
+# Add the directory containing func.py to the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
+
 from func import handler
 from unittest import TestCase, mock
 

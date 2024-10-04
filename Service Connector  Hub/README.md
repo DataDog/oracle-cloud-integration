@@ -23,10 +23,10 @@ You can optionally add tags as well by updating `DATADOG_TAGS` field.
 Ensure that the `input.json` file contains the message you want to send. The message should include a `time` field. You will need to update this field to be within 18 hours of the current time.
 
 ### Step 4: Send Test Log Events
-You can now send test log events using the `make_test_request.py` script. You can pass an optional parameter `--count` to indicate the number of messages to be produced. The message will be published the specified number of times.
+You can now send test log events using the `make_test_request.py` script. You can pass an optional parameter `--count` to indicate the number of messages to be produced. The message will be published the specified number of times. `cd` into the current directory.
 
 ```commandline
-python make_test_request.py --count <count>
+python tests/make_test_request.py --count=<count>
 ```
 **Notes**
 - Ensure that the `time` field in the message in `input.json` is updated to be within 18 hours of the current time before running the script. 
