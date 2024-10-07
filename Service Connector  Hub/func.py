@@ -3,7 +3,6 @@ import os
 import json
 import logging
 import gzip
-
 import requests
 
 logger = logging.getLogger(__name__)
@@ -11,51 +10,44 @@ logger = logging.getLogger(__name__)
 DD_SOURCE = "oracle_cloud"  # Adding a source name.
 DD_SERVICE = "OCI Logs"  # Adding a service name.
 DD_TIMEOUT = 10 * 60  # Adding a timeout for the Datadog API call.
+DD_BATCH_SIZE = 1000  # Adding a batch size for the Datadog API call.
 
-def _compress_payload(payload : dict) :
-    compressed_payload = payload
+
+def _compress_payload(payload: list[dict]):
     try:
-        compressed_payload = gzip.compress(json.dumps(payload).encode())
+        return gzip.compress(json.dumps(payload).encode())
     except Exception as ex:
-        logger.error("Could not compress payload to gzip",
-                     extra={'Exception' : ex})
-    return compressed_payload
+        logger.error("Could not compress payload to gzip", extra={'Exception': ex})
+        return payload
 
 
-def process(body: dict) -> None:
-    data = body.get("data", {})
-    source = body.get("source")
-    time = body.get("time")
-
-    # Get json data, time, and source information
-    payload = {
-        "source" : source,
-        "timestamp" : time,
-        "data" : data,
-        "ddsource" : DD_SOURCE,
-        "service" : DD_SERVICE,
-    }
-
-    # Datadog endpoint URL and token to call the REST interface.
-    # These are defined in the func.yaml file.
-    dd_tags = None
+def _process(body: list[dict]) -> None:
+    """
+    Processes a list of log entries and sends them to the Datadog API.
+    This function retrieves the Datadog endpoint URL and token from environment variables,
+    processes each log entry in the provided list, compresses the payload, and sends it
+    to the Datadog API.
+    
+    Args:
+        body (list[dict]): A list of log entries, where each log entry is represented as a dictionary.
+    
+    Raises:
+        KeyError: If the required environment variables 'DATADOG_HOST' or 'DATADOG_TOKEN' are not set.
+        Exception: If there is an error during the API request or payload processing.
+    """
     try:
         dd_host = os.environ['DATADOG_HOST']
         dd_token = os.environ['DATADOG_TOKEN']
-        dd_tags = os.environ.get('DATADOG_TAGS', '')
     except KeyError:
-        err_msg = "Could not find environment variables, \
-                   please ensure DATADOG_HOST and DATADOG_TOKEN \
-                   are set as environment variables."
+        err_msg = (
+            "Could not find environment variables, please ensure DATADOG_HOST and DATADOG_TOKEN "
+            "are set as environment variables."
+        )
         logger.error(err_msg)
+        raise KeyError(err_msg)
 
-    if dd_tags:
-        payload['ddtags'] = dd_tags
-
-    # Invoke Datadog API with the payload.
-    # If the payload contains more than one log
-    # this will be ingested at once.
     try:
+        payload = [_process_single_log(b) for b in body]
         headers = {
             "Content-type": "application/json",
             "DD-API-KEY": dd_token
@@ -63,11 +55,32 @@ def process(body: dict) -> None:
         compressed_payload = _compress_payload(payload=payload)
         if isinstance(compressed_payload, bytes):
             headers["Content-encoding"] = "gzip"
-        res = requests.post(dd_host, data=compressed_payload, headers=headers,
-                            timeout=DD_TIMEOUT)
+            res = requests.post(dd_host, data=compressed_payload, headers=headers, timeout=DD_TIMEOUT)
+        else:
+            res = requests.post(dd_host, json=compressed_payload, headers=headers, timeout=DD_TIMEOUT)
         logger.info(res.text)
     except Exception as ex:
         logger.exception(ex)
+
+
+def _process_single_log(body: dict) -> dict:
+    data = body.get("data", {})
+    source = body.get("source")
+    time = body.get("time")
+
+    payload = {
+        "source": source,
+        "timestamp": time,
+        "data": data,
+        "ddsource": DD_SOURCE,
+        "service": DD_SERVICE,
+    }
+
+    dd_tags = os.environ.get('DATADOG_TAGS', '')
+    if dd_tags:
+        payload['ddtags'] = dd_tags
+
+    return payload
 
 
 def handler(ctx, data: io.BytesIO = None) -> None:
@@ -76,15 +89,15 @@ def handler(ctx, data: io.BytesIO = None) -> None:
     for ingesting logs. https://docs.cloud.oracle.com/en-us/iaas/Content/Logging/Reference/top_level_logging_format.htm#top_level_logging_format
     If this Function is invoked with more than one log the function go over
     each log and invokes the Datadog endpoint for ingesting one by one.
+    Datadog Logs API: https://docs.datadoghq.com/api/latest/logs/#send-logs
     """
     try:
         body = json.loads(data.getvalue())
         if isinstance(body, list):
-            # Batch of CloudEvents format
-            for b in body:
-                process(b)
+            for i in range(0, len(body), DD_BATCH_SIZE):
+                batch = body[i:i + DD_BATCH_SIZE]
+                _process(batch)
         else:
-            # Single CloudEvent
-            process(body)
+            _process([body])
     except Exception as ex:
         logger.exception(ex)
