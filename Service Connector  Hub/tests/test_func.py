@@ -1,17 +1,64 @@
 import os
-
+import sys
+import gzip
 from io import BytesIO
+
+# Add the directory containing func.py to the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
+
 from func import handler
 from unittest import TestCase, mock
 
 
-def to_BytesIO(str):
+def to_bytes_io(inp : str):
     """ Helper function to turn string test data into expected BytesIO asci encoded bytes """
-    return BytesIO(bytes(str, 'ascii'))
+    return BytesIO(bytes(inp, 'ascii'))
 
+def _decompress_string(compressed_string):
+    """Decompresses a gzip-compressed string."""
+    return gzip.decompress(compressed_string).decode()
+
+def to_decompressed_dict(data) -> dict :
+    return eval(_decompress_string(data))
 
 class TestLogForwarderFunction(TestCase):
     """ Test simple and batch format json CloudEvent payloads """
+    SAMPLE_INPUT = """
+        {
+            "data": {
+              "level": "INFO",
+              "message": "Run succeeded - Read 0 messages from source and wrote 0 messages to target",
+              "messageType": "CONNECTOR_RUN_COMPLETED"
+            },
+            "id": "6b9819cf-d004-4dbc-9978-b713e743ad08",
+            "oracle": {
+              "compartmentid": "comp",
+              "ingestedtime": "2024-09-25T20:04:45.926Z",
+              "loggroupid": "lgid",
+              "logid": "lid",
+              "resourceid": "rid",
+              "tenantid": "tid"
+            },
+            "source": "Log_Connector",
+            "specversion": "1.0",
+            "time": "2024-09-25T20:04:45.130Z",
+            "type": "com.oraclecloud.sch.serviceconnector.runlog"
+        }
+    """
+
+    SAMPLE_OUTPUT = {
+        "source": "Log_Connector",
+        "timestamp": "2024-09-25T20:04:45.130Z",
+        "data":
+        {
+            "level": "INFO",
+            "message": "Run succeeded - Read 0 messages from source and wrote 0 messages to target",
+            "messageType": "CONNECTOR_RUN_COMPLETED"
+        },
+        "ddsource": "oracle_cloud",
+        "service": "OCI Logs"
+    }
+
 
     def setUp(self):
         # Set env variables expected by function
@@ -19,103 +66,53 @@ class TestLogForwarderFunction(TestCase):
         os.environ['DATADOG_TOKEN'] = "VERY-SECRET-TOKEN-2000"
         return super().setUp()
 
+
     @mock.patch("requests.post")
-    def testSimpleData(self, mock_post, ):
+    def test_simple_data(self, mock_post, ):
         """ Test single CloudEvent payload """
 
-        payload = """
-        {
-            "specversion" : "1.0",
-            "type" : "com.example.someevent",
-            "source" : "/mycontext",
-            "id" : "C234-1234-1234",
-            "time" : "2018-04-05T17:31:00Z",
-            "comexampleextension1" : "value",
-            "comexampleothervalue" : 5,
-            "datacontenttype" : "application/json",
-            "data" : {
-                "appinfoA" : "abc",
-                "appinfoB" : 123,
-                "appinfoC" : true
-            }
-        }
-        """
-        handler(ctx=None, data=to_BytesIO(payload))
+        payload = TestLogForwarderFunction.SAMPLE_INPUT
+        handler(ctx=None, data=to_bytes_io(payload))
         mock_post.assert_called_once()
-        self.assertEqual(mock_post.mock_calls[0].kwargs['data'],
-                         '{"source": "/mycontext", "time": "2018-04-05T17:31:00Z", "data": '
-                         '{"appinfoA": "abc", "appinfoB": 123, "appinfoC": true}, "ddsource": '
-                         '"oracle_cloud", "service": "OCI Logs"}'
-                         )
+        self.assertDictEqual(
+            TestLogForwarderFunction.SAMPLE_OUTPUT,
+            to_decompressed_dict(mock_post.mock_calls[0].kwargs['data'])
+        )
+        self.assertEqual(
+            "gzip",
+            mock_post.mock_calls[0].kwargs['headers']['Content-encoding']
+        )
+
 
     @mock.patch("requests.post")
-    def testSimpleDataTags(self, mock_post, ):
+    def test_simple_data_tags(self, mock_post, ):
         """ Test single CloudEvent payload with Tags enabled """
 
-        payload = """
-        {
-            "specversion" : "1.0",
-            "type" : "com.example.someevent",
-            "source" : "/mycontext",
-            "id" : "C234-1234-1234",
-            "time" : "2018-04-05T17:31:00Z",
-            "comexampleextension1" : "value",
-            "comexampleothervalue" : 5,
-            "datacontenttype" : "application/json",
-            "data" : {
-                "appinfoA" : "abc",
-                "appinfoB" : 123,
-                "appinfoC" : true
-            }
-        }
-        """
+        payload = TestLogForwarderFunction.SAMPLE_INPUT
         os.environ['DATADOG_TAGS'] = "prod:true"
-        handler(ctx=None, data=to_BytesIO(payload))
+        handler(ctx=None, data=to_bytes_io(payload))
+        expected_output = dict(TestLogForwarderFunction.SAMPLE_OUTPUT)
+        expected_output['ddtags'] = os.environ['DATADOG_TAGS']
         mock_post.assert_called_once()
-        self.assertEqual(mock_post.mock_calls[0].kwargs['data'],
-                         '{"source": "/mycontext", "time": "2018-04-05T17:31:00Z", "data": '
-                         '{"appinfoA": "abc", "appinfoB": 123, "appinfoC": true}, "ddsource": '
-                         '"oracle_cloud", "service": "OCI Logs", "ddtags": "prod:true"}'
-                         )
+        self.assertDictEqual(
+            expected_output,
+            to_decompressed_dict(mock_post.mock_calls[0].kwargs['data'])
+        )
+
 
     @mock.patch("requests.post")
-    def testBatchFormat(self, mock_post):
+    def test_batch_format(self, mock_post):
         """ Test batch format case, where we get an array of 'CloudEvents' """
-        batch = """
+        batch_count = 10
+        payload = f"""
         [
-            {
-                "specversion" : "1.0",
-                "type" : "com.example.someevent",
-                "source" : "/mycontext/4",
-                "id" : "B234-1234-1234",
-                "time" : "2018-04-05T17:31:00Z",
-                "comexampleextension1" : "value",
-                "comexampleothervalue" : 5,
-                "datacontenttype" : "application/vnd.apache.thrift.binary",
-                "data_base64" : "... base64 encoded string ..."
-            },
-            {
-                "specversion" : "1.0",
-                "type" : "com.example.someotherevent",
-                "source" : "/mycontext/9",
-                "id" : "C234-1234-1234",
-                "time" : "2018-04-05T17:31:05Z",
-                "comexampleextension1" : "value",
-                "comexampleothervalue" : 5,
-                "datacontenttype" : "application/json",
-                "data" : {
-                    "appinfoA" : "potatoes",
-                    "appinfoB" : 123,
-                    "appinfoC" : true
-                }
-            }
+            {",".join([TestLogForwarderFunction.SAMPLE_INPUT] * batch_count)}
         ]
         """
-        handler(ctx=None, data=to_BytesIO(batch))
-        self.assertEqual(mock_post.call_count, 2, "Data was not successfully submitted for entire batch")
-        self.assertEqual([arg.kwargs['data'] for arg in mock_post.call_args_list],
-                         ['{"source": "/mycontext/4", "time": "2018-04-05T17:31:00Z", "data": {}, '
-                          '"ddsource": "oracle_cloud", "service": "OCI Logs"}',
-                          '{"source": "/mycontext/9", "time": "2018-04-05T17:31:05Z", "data": '
-                          '{"appinfoA": "potatoes", "appinfoB": 123, "appinfoC": true}, "ddsource": '
-                          '"oracle_cloud", "service": "OCI Logs"}'])
+        expected_output = [dict(TestLogForwarderFunction.SAMPLE_OUTPUT)] * batch_count
+        handler(ctx=None, data=to_bytes_io(payload))
+        self.assertEqual(batch_count, mock_post.call_count, "Data was successfully submitted for the entire batch")
+        self.assertEqual(
+            expected_output,
+            [to_decompressed_dict(arg.kwargs['data']) for arg in mock_post.call_args_list]
+        )
