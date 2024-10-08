@@ -6,7 +6,7 @@ from io import BytesIO
 # Add the directory containing func.py to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
-from func import handler, DD_BATCH_SIZE
+from func import handler, DD_BATCH_SIZE, _should_compress_payload
 from unittest import TestCase, mock
 
 
@@ -21,7 +21,9 @@ def _decompress_string(compressed_string):
 
 
 def to_decompressed_data(data) -> list[dict] :
-    return eval(_decompress_string(data))
+    if _should_compress_payload():
+        return eval(_decompress_string(data))
+    return data
 
 
 class TestLogForwarderFunction(TestCase):
@@ -81,14 +83,16 @@ class TestLogForwarderFunction(TestCase):
         mock_post.reset_mock()
         handler(ctx=None, data=to_bytes_io(payload))
         mock_post.assert_called_once()
+        request_key = 'data' if _should_compress_payload() else 'json'
         self.assertEqual(
             TestLogForwarderFunction.SAMPLE_OUTPUT,
-            to_decompressed_data(mock_post.mock_calls[0].kwargs['data'])
+            to_decompressed_data(mock_post.mock_calls[0].kwargs[request_key])
         )
-        self.assertEqual(
-            "gzip",
-            mock_post.mock_calls[0].kwargs['headers']['Content-encoding']
-        )
+        if _should_compress_payload():
+            self.assertEqual(
+                "gzip",
+                mock_post.mock_calls[0].kwargs['headers']['Content-Encoding']
+            )
 
 
     @mock.patch("requests.post")
@@ -102,9 +106,10 @@ class TestLogForwarderFunction(TestCase):
         expected_output['ddtags'] = os.environ['DATADOG_TAGS']
         expected_output = [expected_output]
         mock_post.assert_called_once()
+        request_key = 'data' if _should_compress_payload() else 'json'
         self.assertEqual(
             expected_output,
-            to_decompressed_data(mock_post.mock_calls[0].kwargs['data'])
+            to_decompressed_data(mock_post.mock_calls[0].kwargs[request_key])
         )
 
 
@@ -112,6 +117,7 @@ class TestLogForwarderFunction(TestCase):
     def test_batch_format(self, mock_post):
         """Test batch format case, where we get an array of 'CloudEvents'."""
         batch_counts = [10, 999, 1000, 1001, 10000]
+        request_key = 'data' if _should_compress_payload() else 'json'
         for batch_count in batch_counts:
             with self.subTest(msg=f"Batch Count: {batch_count}"):
                 mock_post.reset_mock()  # Reset mock_post before each subtest
@@ -132,5 +138,5 @@ class TestLogForwarderFunction(TestCase):
                     expected_output = [dict(TestLogForwarderFunction.SAMPLE_OUTPUT[0])] * call_count
                     self.assertEqual(
                         expected_output,
-                        to_decompressed_data(mock_post.mock_calls[i].kwargs['data'])
+                        to_decompressed_data(mock_post.mock_calls[i].kwargs[request_key])
                     )
