@@ -13,6 +13,10 @@ DD_TIMEOUT = 10 * 60  # Adding a timeout for the Datadog API call.
 DD_BATCH_SIZE = 1000  # Adding a batch size for the Datadog API call.
 
 
+def _should_compress_payload() -> bool:
+    return os.environ.get("DD_COMPRESS", "true").lower() == "true"
+
+
 def _compress_payload(payload: list[dict]):
     try:
         return gzip.compress(json.dumps(payload).encode())
@@ -47,17 +51,22 @@ def _process(body: list[dict]) -> None:
         raise KeyError(err_msg)
 
     try:
+        dd_url = f"https://{dd_host}/api/v2/logs"
         payload = [_process_single_log(b) for b in body]
         headers = {
             "Content-type": "application/json",
             "DD-API-KEY": dd_token
         }
-        compressed_payload = _compress_payload(payload=payload)
+        compressed_payload = payload
+        if _should_compress_payload():
+            compressed_payload = _compress_payload(payload=payload)
+
         if isinstance(compressed_payload, bytes):
-            headers["Content-encoding"] = "gzip"
-            res = requests.post(dd_host, data=compressed_payload, headers=headers, timeout=DD_TIMEOUT)
+            headers["Content-Encoding"] = "gzip"
+            res = requests.post(dd_url, data=compressed_payload, headers=headers, timeout=DD_TIMEOUT)
         else:
-            res = requests.post(dd_host, json=compressed_payload, headers=headers, timeout=DD_TIMEOUT)
+            res = requests.post(dd_url, json=compressed_payload, headers=headers, timeout=DD_TIMEOUT)
+
         logger.info(res.text)
     except Exception as ex:
         logger.exception(ex)

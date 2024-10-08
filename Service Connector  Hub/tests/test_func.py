@@ -67,8 +67,9 @@ class TestLogForwarderFunction(TestCase):
 
     def setUp(self):
         # Set env variables expected by function
-        os.environ['DATADOG_HOST'] = "http://datadog.woof"
+        os.environ['DATADOG_HOST'] = "test-intake.logs.datadoghq.com"
         os.environ['DATADOG_TOKEN'] = "VERY-SECRET-TOKEN-2000"
+        os.environ['DD_COMPRESS'] = "true"
         return super().setUp()
 
 
