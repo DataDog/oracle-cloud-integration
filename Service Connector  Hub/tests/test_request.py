@@ -8,6 +8,7 @@ import argparse
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
 from func import handler
+import json
 
 
 def parse_arguments():
@@ -56,11 +57,17 @@ def main():
     #Set Input data
     input_data = input_event
     if count > 1:
+        log_events = []
+        for i in range(count):
+            event = json.loads(input_event)
+            event['data']['message'] = f"{i+1}: {event['data']['message']}"
+            log_events.append(json.dumps(event))
+
         input_data = f"""
-                [
-                    {",".join([input_event] * count)}
-                ]
-                """
+            [
+                {",".join(log_events)}
+            ]
+            """
 
     # Set environment variables
     set_environment_variables(config_data)

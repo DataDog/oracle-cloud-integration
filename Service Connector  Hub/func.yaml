@@ -6,6 +6,7 @@ entrypoint: /python/bin/fdk /function/func.py handler
 memory: 1024
 timeout: 120
 config:
-  DATADOG_HOST: https://http-intake.logs.datadoghq.com/api/v2/logs  # DD Log Intake Host
+  DATADOG_HOST: http-intake.logs.datadoghq.com                      # DD Log Intake Host
   DATADOG_TOKEN: <DATADOG_API_TOKEN>                                # DD API Token
+  DD_COMPRESS: "true"                                               # Enable Compression
   # DATADOG_TAGS: "prod:true"                                       # Tags associated with logs
