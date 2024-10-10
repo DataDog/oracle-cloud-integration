@@ -57,15 +57,15 @@ def main():
     #Set Input data
     input_data = input_event
     if count > 1:
-        input_events = []
+        log_events = []
         for i in range(count):
             event = json.loads(input_event)
             event['data']['message'] = f"{i+1}: {event['data']['message']}"
-            input_events.append(json.dumps(event))
+            log_events.append(json.dumps(event))
 
         input_data = f"""
             [
-                {",".join(input_events)}
+                {",".join(log_events)}
             ]
             """
 
