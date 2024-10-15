@@ -1,7 +1,7 @@
 # Title shown in Application Information tab.
 title: Datadog Metrics infra
 # Sub Title shown in Application Information tab.
-description: Setting up infra for sending OCI metrics to Datadog 
+description: Setting up infra for sending OCI metrics to Datadog
 schemaVersion: 1.1.0
 version: 1.0
 locale: en
@@ -41,7 +41,7 @@ variables:
     type: boolean
     default: true
 
-# VCN 
+# VCN
   vcnCompartment:
     # prepopulates available values for compartment
     type: oci:identity:compartment:id
@@ -74,11 +74,10 @@ variables:
     required: true
     enum:
       - ocimetrics-intake.datadoghq.com
-      - ocimetrics-intake.us5.datadoghq.com 
+      - ocimetrics-intake.us5.datadoghq.com
       - ocimetrics-intake.us3.datadoghq.com
       - ocimetrics-intake.datadoghq.eu
       - ocimetrics-intake.ap1.datadoghq.com
-      - ocimetrics-intake.ddog-gov.com
     allowMultiple: false
 
   # Function setup
