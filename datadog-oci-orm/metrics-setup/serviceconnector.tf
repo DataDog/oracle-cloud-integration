@@ -11,11 +11,11 @@ resource "oci_sch_service_connector" "metrics_service_connector" {
     monitoring_sources {
 
       #Optional
-      compartment_id = var.tenancy_ocid
+      compartment_id = var.compartment_ocid
       namespace_details {
         kind = "selected"
         dynamic "namespaces" {
-          for_each = local.connector_metric_namespaces
+          for_each = data.oci_monitoring_metrics.compartment_metrics.metrics[*].namespace
           content {
             metrics {
               #Required
