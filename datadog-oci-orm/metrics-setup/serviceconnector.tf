@@ -15,7 +15,7 @@ resource "oci_sch_service_connector" "metrics_service_connector" {
       namespace_details {
         kind = "selected"
         dynamic "namespaces" {
-          for_each = data.oci_monitoring_metrics.compartment_metrics.metrics[*].namespace
+          for_each = local.connector_metric_namespaces
           content {
             metrics {
               #Required

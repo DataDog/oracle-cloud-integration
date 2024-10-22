@@ -20,8 +20,3 @@ data "oci_core_subnet" "input_subnet" {
   #Required
   subnet_id = var.create_vcn ? module.vcn[0].subnet_id[local.subnet] : var.function_subnet_id
 }
-
-data "oci_monitoring_metrics" "compartment_metrics" {
-  compartment_id = var.compartment_ocid
-  group_by = [ "namespace" ]
-}
