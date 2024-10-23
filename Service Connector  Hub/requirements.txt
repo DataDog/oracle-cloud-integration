@@ -2,4 +2,4 @@ fdk
 datetime
 requests
 oci
-yaml
+pyyaml
