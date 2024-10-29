@@ -32,3 +32,28 @@ resource "oci_functions_function" "metrics_function" {
   freeform_tags = local.freeform_tags
   image         = local.user_image_provided ? local.custom_image_path : local.docker_image_path
 }
+
+### the log group for the function
+resource "oci_logging_log_group" "metrics_function_log_group" {
+  compartment_id = var.compartment_ocid
+  display_name = "${var.resource_name_prefix}-function-log-group"
+}
+
+
+### the log resource for the function
+resource "oci_logging_log" "metrics_function_log" {
+  depends_on = [oci_logging_log_group.metrics_function_log_group, oci_functions_application.metrics_function_app]
+  display_name = "${var.resource_name_prefix}-function-log"
+  log_group_id = oci_logging_log_group.metrics_function_log_group.id
+  log_type = "SERVICE"
+  configuration {
+      source {
+          category = "invoke"
+          resource = oci_functions_application.metrics_function_app.id
+          service = "functions"
+          source_type = "OCISERVICE"
+      }
+      compartment_id = var.compartment_ocid
+  }
+  is_enabled = true
+}
