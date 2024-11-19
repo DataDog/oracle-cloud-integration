@@ -1,5 +1,4 @@
 resource "null_resource" "Login2OCIR" {
-  count = local.user_image_provided ? 0 : 1
   provisioner "local-exec" {
     command = "echo '${var.oci_docker_password}' |  docker login ${local.oci_docker_repository} --username ${local.ocir_namespace}/${var.oci_docker_username} --password-stdin"
   }
@@ -9,7 +8,6 @@ resource "null_resource" "Login2OCIR" {
 resource "oci_artifacts_container_repository" "function_repo" {
   # note: repository = store for all images versions of a specific container image - so it included the function name
   depends_on     = [null_resource.Login2OCIR]
-  count          = local.user_image_provided ? 0 : 1
   compartment_id = var.compartment_ocid
   display_name   = "${local.ocir_repo_name}/${local.function_name}"
   is_public      = false
@@ -19,7 +17,6 @@ resource "oci_artifacts_container_repository" "function_repo" {
 
 # ### build the function into a container image and push that image to the repository in the OCI Container Image Registry
 resource "null_resource" "FnImagePushToOCIR" {
-  count      = local.user_image_provided ? 0 : 1
   depends_on = [oci_artifacts_container_repository.function_repo, oci_functions_application.metrics_function_app, null_resource.Login2OCIR]
 
   provisioner "local-exec" {

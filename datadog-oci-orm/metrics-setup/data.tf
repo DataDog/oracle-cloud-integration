@@ -15,6 +15,17 @@ data "oci_identity_tenancy" "tenancy_metadata" {
   tenancy_id = var.tenancy_ocid
 }
 
+data "oci_identity_compartments" "tenancy_compartments" {
+  compartment_id            = var.tenancy_ocid
+  compartment_id_in_subtree = true
+}
+
+data "oci_monitoring_metrics" "existing_namespaces" {
+  for_each       = local.metrics_compartments
+  compartment_id = each.key
+  group_by       = ["namespace"]
+}
+
 data "oci_core_subnet" "input_subnet" {
   depends_on = [module.vcn]
   #Required
