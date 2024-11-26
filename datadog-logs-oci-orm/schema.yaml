@@ -1,0 +1,77 @@
+# Title shown in Application Information tab.
+title: Datadog Log Forwarding Infrastructure
+# Sub Title shown in Application Information tab.
+description: Setting up infrastructure for sending OCI Logs to Datadog
+schemaVersion: 1.1.0
+version: 1.0
+locale: en
+variableGroups:
+  - title: "Tenancy"
+    variables:
+      - ${tenancy_ocid}
+      - ${region}
+      - ${compartment_ocid}
+  - title: "Network options"
+    variables:
+      - ${create_vcn}
+      - ${vcn_compartment}
+      - ${existing_vcn}
+      - ${subnet_ocid}
+
+variables:
+  tenancy_ocid:
+      type: oci:identity:compartment:id
+      required: true
+      title: Tenancy OCID
+
+  region:
+    type: oci:identity:region:name
+    required: true
+    title: Region
+
+  compartment_ocid:
+    type: oci:identity:compartment:id
+    required: true
+    title: Current Compartment OCID
+  
+  resource_name_prefix:
+    type: string
+    title: Resource prefix
+    description: The prefix for the name of all of the resources.
+    required: true
+    default: dd-logs
+
+
+# VCN
+  create_vcn:
+    title: Create VCN
+    description: Optional variable to create virtual network for the setup. Otherwise, choose an existing subnet from VCN
+    type: boolean
+    default: true
+  
+  vcn_compartment:
+    # prepopulates available values for compartment
+    type: oci:identity:compartment:id
+    title: VCN Compartment
+    description: The compartment to create the VCN in.
+    required: true
+    visible: ${create_vcn}
+
+  existing_vcn:
+    type: oci:core:vcn:id
+    title: Existing VCN
+    description: The VCN to be used if not creating a new one.
+    required: true
+    visible: ${!create_vcn}
+    depends_on:
+      compartment_id: ${vcn_compartment}
+
+  subnet_ocid:
+    title: Function Subnet OCID
+    type: oci:core:subnet:id
+    description: The OCID of the subnet to be used for the function app. Required if not creating the VCN.
+    required: true
+    visible: ${!create_vcn}
+    depends_on:
+      compartment_id: ${vcn_compartment}
+      vcn_id: ${existing_vcn}
