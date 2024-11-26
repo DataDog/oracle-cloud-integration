@@ -21,6 +21,11 @@ variableGroups:
       - ${vcnCompartment}
       - ${existingVcn}
       - ${function_subnet_id}
+  - title: "Metrics settings"
+    variables:
+      - ${metrics_namespaces}
+      - ${metrics_compartments}
+      - ${service_connector_target_batch_size_in_kbs}
   - title: "Function settings"
     variables:
       - ${function_app_shape}
@@ -37,9 +42,15 @@ variables:
     default: datadog-metrics
   create_vcn:
     title: Create VCN
-    description: Optional variable to create virtual network for the setup. Otherwise, choose an existing subnet from VCN
+    description: Create virtual network for the function setup. Otherwise, choose an existing subnet from VCN.
     type: boolean
     default: true
+
+  compartment_ocid:
+    # prepopulates available values for compartment
+    required: true
+    type: oci:identity:compartment:id
+    description: The compartment OCID to where the terraform stack is created and the resources deployed
 
 # VCN
   vcnCompartment:
@@ -52,7 +63,7 @@ variables:
   function_subnet_id:
     title: Function Subnet OCID
     type: oci:core:subnet:id
-    description: The OCID of the subnet to be used for the function app. Required if not creating the VCN.
+    description: The OCID of the subnet to be used for the function app. If create VCN is checked, then that will take precedence over the selection of the subnet.
     required: false
     dependsOn:
       compartmentId: ${vcnCompartment}
@@ -80,11 +91,83 @@ variables:
       - ocimetrics-intake.ap1.datadoghq.com
     allowMultiple: false
 
+# Metrics namespace and connector hub
+  metrics_compartments:
+    title: Metrics compartments
+    type: text
+    required: true
+    description: The list of metrics compartments. Enter comma separated list of OCID of compartments to monitor.
+    default: ${tenancy_ocid}
+    multiline: true
+
+  metrics_namespaces:
+    title: Metrics namespaces
+    type: enum
+    description: The list of namespaces to collect the metrics for the metrics compartments. Remove any unwanted namespaces.
+    required: true
+    additionalProps:
+      allowMultiple: true
+    default:
+      - "oci_autonomous_database"
+      - "oci_blockstore"
+      - "oci_compute_infrastructure_health"
+      - "oci_computeagent"
+      - "oci_computecontainerinstance"
+      - "oci_database"
+      - "oci_database_cluster"
+      - "oci_dynamic_routing_gateway"
+      - "oci_faas"
+      - "oci_fastconnect"
+      - "oci_filestorage"
+      - "oci_gpu_infrastructure_health"
+      - "oci_lbaas"
+      - "oci_mysql_database"
+      - "oci_nat_gateway"
+      - "oci_nlb"
+      - "oci_objectstorage"
+      - "oci_oke"
+      - "oci_queue"
+      - "oci_rdma_infrastructure_health"
+      - "oci_service_connector_hub"
+      - "oci_service_gateway"
+      - "oci_vcn"
+      - "oci_vpn"
+      - "oci_waf"
+      - "oracle_oci_database"   
+    enum:
+      - "oci_autonomous_database"
+      - "oci_blockstore"
+      - "oci_compute_infrastructure_health"
+      - "oci_computeagent"
+      - "oci_computecontainerinstance"
+      - "oci_database"
+      - "oci_database_cluster"
+      - "oci_dynamic_routing_gateway"
+      - "oci_faas"
+      - "oci_fastconnect"
+      - "oci_filestorage"
+      - "oci_gpu_infrastructure_health"
+      - "oci_lbaas"
+      - "oci_mysql_database"
+      - "oci_nat_gateway"
+      - "oci_nlb"
+      - "oci_objectstorage"
+      - "oci_oke"
+      - "oci_queue"
+      - "oci_rdma_infrastructure_health"
+      - "oci_service_connector_hub"
+      - "oci_service_gateway"
+      - "oci_vcn"
+      - "oci_vpn"
+      - "oci_waf"
+      - "oracle_oci_database"
+    
+
   # Function setup
   function_app_shape:
     title: Function Application shape
     type: enum
-    description: The shape of the function application. The docker image should be built accordingly. Use GENERIC_ARM if using Oracle Resource managaer stack.
+    description: The shape of the function application. The docker image should be built accordingly. Use GENERIC_ARM if using Oracle Resource manager stack.
     required: true
     enum:
       - GENERIC_ARM
@@ -103,9 +186,9 @@ variables:
     required: false
     sensitive: true
   oci_docker_password:
-    title: OCI Docker registry password
+    title: OCI Docker registry auth token
     type: password
-    description: The user password for the OCI docker container registry.
+    description: The user auth token for the OCI docker container registry. Used in creating function image.
     required: false
     sensitive: true
   service_connector_target_batch_size_in_kbs:
