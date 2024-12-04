@@ -13,6 +13,11 @@ variable "create_vcn" {
   description = "Optional variable to create virtual network for the setup. True by default"
 }
 
+variable "vcn_compartment" {
+  type        = string
+  description = "The OCID of the compartment where networking resources are created"
+}
+
 variable "subnet_ocid" {
   type        = string
   default     = ""
@@ -24,7 +29,7 @@ variable "subnet_ocid" {
 #*************************************
 variable "compartment_ocid" {
   type        = string
-  description = "The compartment OCID to deploy resources to"
+  description = "Compartment where terraform script is being executed"
 }
 variable "region" {
   type        = string

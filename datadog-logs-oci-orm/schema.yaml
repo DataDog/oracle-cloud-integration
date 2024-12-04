@@ -20,19 +20,13 @@ variableGroups:
 
 variables:
   tenancy_ocid:
-      type: oci:identity:compartment:id
-      required: true
-      title: Tenancy OCID
+      visible: false
 
   region:
-    type: oci:identity:region:name
-    required: true
-    title: Region
+    visible: false
 
   compartment_ocid:
-    type: oci:identity:compartment:id
-    required: true
-    title: Current Compartment OCID
+    visible: false
   
   resource_name_prefix:
     type: string
@@ -55,23 +49,26 @@ variables:
     title: VCN Compartment
     description: The compartment to create the VCN in.
     required: true
-    visible: ${create_vcn}
 
   existing_vcn:
     type: oci:core:vcn:id
     title: Existing VCN
     description: The VCN to be used if not creating a new one.
     required: true
-    visible: ${!create_vcn}
-    depends_on:
-      compartment_id: ${vcn_compartment}
+    visible:
+      not:
+        - ${create_vcn}
+    dependsOn:
+      compartmentId: ${vcn_compartment}
 
   subnet_ocid:
     title: Function Subnet OCID
     type: oci:core:subnet:id
     description: The OCID of the subnet to be used for the function app. Required if not creating the VCN.
     required: true
-    visible: ${!create_vcn}
-    depends_on:
-      compartment_id: ${vcn_compartment}
-      vcn_id: ${existing_vcn}
+    visible:
+      not:
+        - ${create_vcn}
+    dependsOn:
+      compartmentId: ${vcn_compartment}
+      vcnId: ${existing_vcn}
