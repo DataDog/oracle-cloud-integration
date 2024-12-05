@@ -39,6 +39,10 @@ variable "tenancy_ocid" {
   type        = string
   description = "OCI tenant OCID, more details can be found at https://docs.cloud.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm#five"
 }
+variable "current_user_ocid" {
+  type        = string
+  description = "OCID of the logged in user running the terraform script"
+}
 
 #*************************************
 #         Function Application Variables
@@ -51,6 +55,12 @@ variable "function_app_shape" {
     condition     = contains(["GENERIC_ARM", "GENERIC_X86", "GENERIC_X86_ARM"], var.function_app_shape)
     error_message = "Valid values are: GENERIC_ARM, GENERIC_X86, GENERIC_X86_ARM."
   }
+}
+
+variable "function_image_path" {
+  type        = string
+  default     = ""
+  description = "The full path of the function image. The image should be present in the container registry for the region"
 }
 
 #*************************************
@@ -74,4 +84,21 @@ variable "datadog_tags" {
   type        = string
   default     = ""
   description = "The tags to be sent with the logs. The tags should be in the format key1:value1,key2:value2"
+}
+
+#*************************************
+#         Container Registry Variables
+#*************************************
+
+variable "auth_token_description" {
+  description = "The description of the auth token to use for container registry login"
+  type        = string
+  default     = "datadog-auth-token"
+}
+
+variable "auth_token" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "The user auth token for docker login to OCI container registry."
 }
