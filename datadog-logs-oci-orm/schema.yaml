@@ -17,6 +17,15 @@ variableGroups:
       - ${vcn_compartment}
       - ${existing_vcn}
       - ${subnet_ocid}
+  - title: "Datadog Environment"
+    variables:
+      - ${datadog_endpoint}
+      - ${datadog_api_key}
+      - ${datadog_tags}
+  - title: "Function settings"
+    variables:
+      - ${function_app_shape}
+
 
 variables:
   tenancy_ocid:
@@ -72,3 +81,34 @@ variables:
     dependsOn:
       compartmentId: ${vcn_compartment}
       vcnId: ${existing_vcn}
+
+# Datadog Environment
+  datadog_endpoint:
+    title: Datadog Endpoint
+    type: enum
+    description: The endpoint to hit for sending the logs.
+    required: true
+    enum:
+      - http-intake.logs.datadoghq.com
+    allowMultiple: false
+
+  datadog_api_key:
+    title: Datadog API Key
+    type: string
+    description: The API key for sending message to datadog endpoints.
+    required: true
+    sensitive: true
+    password: true
+    confirmation: true
+
+# Function setup
+  function_app_shape:
+    title: Function Application shape
+    type: enum
+    description: The shape of the function application. The docker image should be built accordingly. Use GENERIC_ARM if using Oracle Resource manager stack.
+    required: true
+    enum:
+      - GENERIC_ARM
+      - GENERIC_X86
+      - GENERIC_X86_ARM
+    default: GENERIC_ARM

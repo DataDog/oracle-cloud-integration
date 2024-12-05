@@ -13,3 +13,8 @@ output "policy_details" {
   description = "Output of Log Forwarding Policy"
   value = module.policy.policy_details
 }
+
+output "function_app_details" {
+  description = "Output of Function Application Details"
+  value = module.functionapp.function_app_details
+}
