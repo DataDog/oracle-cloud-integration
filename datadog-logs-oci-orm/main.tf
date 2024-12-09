@@ -39,3 +39,12 @@ module "containerregistry" {
     freeform_tags = local.freeform_tags
     count = var.function_image_path == "" ? 1 : 0
 }
+
+module "function" {
+    depends_on = [module.containerregistry]
+    source = "./modules/function"
+    freeform_tags = local.freeform_tags
+    function_app_name = module.functionapp.function_app_details.function_app_name
+    function_app_ocid = module.functionapp.function_app_details.function_app_ocid
+    function_image_path = var.function_image_path == "" ? module.containerregistry[0].containerregistry_details.function_image_path : var.function_image_path
+}

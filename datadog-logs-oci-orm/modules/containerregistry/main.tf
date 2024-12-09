@@ -38,3 +38,10 @@ resource "null_resource" "FnImagePushToOCIR" {
     working_dir = "logs-function"
   }
 }
+
+resource "null_resource" "wait_for_image" {
+  depends_on = [null_resource.FnImagePushToOCIR]
+  provisioner "local-exec" {
+    command = "sleep 60"
+  }
+}

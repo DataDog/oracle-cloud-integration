@@ -3,5 +3,6 @@ output "containerregistry_details" {
   value       = {
     repository_ocid = oci_artifacts_container_repository.function_repo.id
     repository_name = oci_artifacts_container_repository.function_repo.display_name
+    function_image_path = "${local.docker_image_path}:latest"
   }
 }

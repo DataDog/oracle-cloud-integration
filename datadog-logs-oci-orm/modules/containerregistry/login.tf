@@ -48,8 +48,8 @@ resource "null_resource" "recreate_auth_token" {
                 --description "${var.auth_token_description}" --query "data.token" --raw-output)
 
             # Step 3: Sleep for 30 seconds to ensure token propagation
-            echo "Waiting for 30 seconds to ensure token availability..."
-            sleep 30
+            echo "Waiting for 60 seconds to ensure token availability..."
+            sleep 60
 
             echo $new_token_value > /tmp/new_auth_token.txt
         EOT
