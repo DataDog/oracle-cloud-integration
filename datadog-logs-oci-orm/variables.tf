@@ -99,6 +99,6 @@ variable "auth_token_description" {
 variable "auth_token" {
   type        = string
   default     = ""
-  sensitive   = true
+  #sensitive   = true
   description = "The user auth token for docker login to OCI container registry."
 }
