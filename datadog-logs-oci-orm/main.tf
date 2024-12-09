@@ -28,10 +28,14 @@ module "functionapp" {
 
 module "containerregistry" {
     source = "./modules/containerregistry"
+    region = var.region
     oci_region_key = local.oci_region_key
     tenancy_ocid = var.tenancy_ocid
     current_user_ocid = var.current_user_ocid
     auth_token_description = var.auth_token_description
     auth_token = var.auth_token
+    resource_name_prefix = var.resource_name_prefix
+    compartment_ocid = var.compartment_ocid
+    freeform_tags = local.freeform_tags
     count = var.function_image_path == "" ? 1 : 0
 }
