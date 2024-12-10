@@ -29,11 +29,6 @@ variable "region" {
   description = "OCI Region as documented at https://docs.cloud.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm"
 }
 
-variable "oci_region_key" {
-  type        = string
-  description = "The key of the OCI region where the resources will be deployed"
-}
-
 variable "auth_token_description" {
   description = "The description of the auth token to use for container registry login"
   type        = string

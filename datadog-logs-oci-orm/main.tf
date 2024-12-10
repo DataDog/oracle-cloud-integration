@@ -29,7 +29,6 @@ module "functionapp" {
 module "containerregistry" {
     source = "./modules/containerregistry"
     region = var.region
-    oci_region_key = local.oci_region_key
     tenancy_ocid = var.tenancy_ocid
     current_user_ocid = var.current_user_ocid
     auth_token_description = var.auth_token_description
