@@ -31,26 +31,29 @@ variable "compartment_ocid" {
   type        = string
   description = "Compartment where terraform script is being executed"
 }
+
 variable "region" {
   type        = string
   description = "OCI Region as documented at https://docs.cloud.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm"
 }
+
 variable "tenancy_ocid" {
   type        = string
   description = "OCI tenant OCID, more details can be found at https://docs.cloud.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm#five"
 }
+
 variable "current_user_ocid" {
   type        = string
   description = "OCID of the logged in user running the terraform script"
 }
 
-#*************************************
-#         Function Application Variables
-#*************************************
+#************************************
+#   Function Application Variables   
+#************************************
 variable "function_app_shape" {
   type        = string
   default     = "GENERIC_ARM"
-  description = "The shape of the function application. The docker image should be built accordingly. Use ARM if using Oracle Resource managaer stack"
+  description = "The shape of the function application. The docker image should be built accordingly. Use ARM if using Oracle Resource manager stack"
   validation {
     condition     = contains(["GENERIC_ARM", "GENERIC_X86", "GENERIC_X86_ARM"], var.function_app_shape)
     error_message = "Valid values are: GENERIC_ARM, GENERIC_X86, GENERIC_X86_ARM."
@@ -75,7 +78,7 @@ variable "datadog_endpoint" {
   type        = string
   description = "The endpoint to hit for sending the logs."
   validation {
-    condition = contains(["http-intake.logs.datadoghq.com"], var.datadog_endpoint)
+    condition     = contains(["http-intake.logs.datadoghq.com"], var.datadog_endpoint)
     error_message = "Valid values for var: datadog_endpoint are (http-intake.logs.datadoghq.com)."
   }
 }
@@ -86,10 +89,9 @@ variable "datadog_tags" {
   description = "The tags to be sent with the logs. The tags should be in the format key1:value1,key2:value2"
 }
 
-#*************************************
-#         Container Registry Variables
-#*************************************
-
+#************************************
+#    Container Registry Variables    
+#************************************
 variable "auth_token_description" {
   description = "The description of the auth token to use for container registry login"
   type        = string

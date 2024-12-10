@@ -14,9 +14,9 @@ variable "resource_name_prefix" {
   description = "The prefix for the name of all of the resources"
 }
 
-#*************************************
-#         Function Application Variables
-#*************************************
+#************************************
+#   Function Application Variables   
+#************************************
 variable "function_app_shape" {
   type        = string
   default     = "GENERIC_ARM"

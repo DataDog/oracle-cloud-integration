@@ -1,21 +1,3 @@
-resource "null_resource" "get_username" {
-    provisioner "local-exec" {
-        command = <<EOT
-            #!/bin/bash
-            set -e
-
-            # Obtain the username from the current_user_ocid
-            echo "Obtaining username from current_user_ocid..."
-            username=$(oci iam user get --user-id ${var.current_user_ocid} --query "data.name" --raw-output)
-
-            echo $username > /tmp/username.txt
-        EOT
-    }
-    triggers = {
-        always_run = "${timestamp()}"
-    }
-}
-
 resource "null_resource" "recreate_auth_token" {
     count = "${var.auth_token != "" ? 0 : 1}"
     provisioner "local-exec" {
@@ -60,23 +42,22 @@ resource "null_resource" "recreate_auth_token" {
 }
 
 resource "null_resource" "Login2OCIR" {
-    depends_on = [null_resource.get_username, null_resource.recreate_auth_token]
+    depends_on = [null_resource.recreate_auth_token]
     provisioner "local-exec" {
         command = <<EOT
             #!/bin/bash
             set -e
 
             # Run the current command
-            username=$(cat /tmp/username.txt && rm -f /tmp/username.txt)
             if [ "${var.auth_token}" != "" ]; then
                 auth_token="${var.auth_token}"
             else
                 auth_token=$(cat /tmp/new_auth_token.txt && rm -f /tmp/new_auth_token.txt)
             fi
             for i in {1..5}; do
-                echo "$auth_token" | docker login ${local.registry_domain} --username ${local.tenancy_namespace}/$username --password-stdin && break
+                echo "$auth_token" | docker login ${local.registry_domain} --username ${local.tenancy_namespace}/${local.username} --password-stdin && break
                 echo "Retrying Docker login... attempt $i"
-                sleep 5
+                sleep 10
             done
 
             # Check if login was successful
