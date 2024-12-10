@@ -12,9 +12,3 @@ provider "oci" {
   tenancy_ocid = var.tenancy_ocid
   region       = var.region
 }
-
-provider "oci" {
-  alias        = "home"
-  tenancy_ocid = var.tenancy_ocid
-  region       = local.tenancy_home_region
-}
