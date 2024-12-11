@@ -28,10 +28,22 @@ module "functionapp" {
 
 module "containerregistry" {
     source = "./modules/containerregistry"
-    oci_region_key = local.oci_region_key
+    region = var.region
     tenancy_ocid = var.tenancy_ocid
     user_ocid = var.service_user_ocid == "" ? var.current_user_ocid : var.service_user_ocid
     auth_token_description = var.auth_token_description
     auth_token = var.auth_token
+    resource_name_prefix = var.resource_name_prefix
+    compartment_ocid = var.compartment_ocid
+    freeform_tags = local.freeform_tags
     count = var.function_image_path == "" ? 1 : 0
+}
+
+module "function" {
+    depends_on = [module.containerregistry]
+    source = "./modules/function"
+    freeform_tags = local.freeform_tags
+    function_app_name = module.functionapp.function_app_details.function_app_name
+    function_app_ocid = module.functionapp.function_app_details.function_app_ocid
+    function_image_path = var.function_image_path == "" ? module.containerregistry[0].containerregistry_details.function_image_path : var.function_image_path
 }
