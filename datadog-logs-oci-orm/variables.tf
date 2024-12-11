@@ -104,3 +104,9 @@ variable "auth_token" {
   sensitive   = true
   description = "The user auth token for docker login to OCI container registry."
 }
+
+variable "service_user_ocid" {
+  type        = string
+  default     = ""
+  description = "The OCID of the service user to be used for Docker login and pushing images."
+}

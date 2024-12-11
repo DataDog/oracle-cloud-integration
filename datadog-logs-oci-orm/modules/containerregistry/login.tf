@@ -9,15 +9,15 @@ resource "null_resource" "recreate_auth_token" {
             else
                 # Step 1: List existing auth tokens
                 echo "Listing existing auth tokens..."
-                existing_token_ocid=$(oci iam auth-token list --user-id ${var.current_user_ocid} \
+                existing_token_ocid=$(oci iam auth-token list --user-id ${var.user_ocid} \
                     --query "data[?description=='${var.auth_token_description}'].id | [0]" --raw-output)
 
                 if [ "$existing_token_ocid" != "" ]; then
                     echo "Deleting existing auth token: $existing_token_ocid"
-                    oci iam auth-token delete --user-id ${var.current_user_ocid} --auth-token-id $existing_token_ocid --force
+                    oci iam auth-token delete --user-id ${var.user_ocid} --auth-token-id $existing_token_ocid --force
                 else
                     # Check the total number of existing tokens
-                    total_tokens=$(oci iam auth-token list --user-id ${var.current_user_ocid} --query "length(data)" --raw-output)
+                    total_tokens=$(oci iam auth-token list --user-id ${var.user_ocid} --query "length(data)" --raw-output)
                     
                     if [ "$total_tokens" -eq 2 ]; then
                         echo "Error: Total existing tokens are equal to 2. Cannot create a new token."
@@ -28,7 +28,7 @@ resource "null_resource" "recreate_auth_token" {
 
                 # Step 2: Create a new auth token
                 echo "Creating a new auth token..."
-                new_token_value=$(oci iam auth-token create --user-id ${var.current_user_ocid} \
+                new_token_value=$(oci iam auth-token create --user-id ${var.user_ocid} \
                     --description "${var.auth_token_description}" --query "data.token" --raw-output)
 
                 # Step 3: Sleep for 30 seconds to ensure token propagation

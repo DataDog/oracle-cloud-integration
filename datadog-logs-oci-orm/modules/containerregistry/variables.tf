@@ -3,9 +3,9 @@ variable "tenancy_ocid" {
   description = "OCI tenant OCID, more details can be found at https://docs.cloud.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm#five"
 }
 
-variable "current_user_ocid" {
+variable "user_ocid" {
   type        = string
-  description = "OCID of the logged in user running the terraform script"
+  description = "OCID of the user for managing docker images"
 }
 
 variable "oci_region_key" {

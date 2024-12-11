@@ -30,7 +30,7 @@ module "containerregistry" {
     source = "./modules/containerregistry"
     oci_region_key = local.oci_region_key
     tenancy_ocid = var.tenancy_ocid
-    current_user_ocid = var.current_user_ocid
+    user_ocid = var.service_user_ocid == "" ? var.current_user_ocid : var.service_user_ocid
     auth_token_description = var.auth_token_description
     auth_token = var.auth_token
     count = var.function_image_path == "" ? 1 : 0
