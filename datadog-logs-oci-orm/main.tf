@@ -30,7 +30,7 @@ module "containerregistry" {
     source = "./modules/containerregistry"
     region = var.region
     tenancy_ocid = var.tenancy_ocid
-    current_user_ocid = var.current_user_ocid
+    user_ocid = var.service_user_ocid == "" ? var.current_user_ocid : var.service_user_ocid
     auth_token_description = var.auth_token_description
     auth_token = var.auth_token
     resource_name_prefix = var.resource_name_prefix
