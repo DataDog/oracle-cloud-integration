@@ -1,13 +1,5 @@
 # Output the "list" of all subscribed regions.
 
-output "all_availability_domains_in_your_tenancy" {
-  value = data.oci_identity_region_subscriptions.subscriptions.region_subscriptions
-}
-
-output "tenancy_object_storage_namespace" {
-  value = local.ocir_namespace
-}
-
 output "vcn_network_details" {
   depends_on  = [module.vcn]
   description = "Output of the created network infra"
@@ -38,7 +30,17 @@ output "function_application_function" {
   value       = oci_functions_function.metrics_function.id
 }
 
+output "compartment_map" {
+  description = "Derived namespaces"
+  value       = local.final_namespaces
+}
+
+output "namespace_error" {
+  description = "Message in case of invalid namespace"
+  value       = length(local.derived_namespaces) > 0 ? "" : "Could not obtain any namespaces or compartments for which metrics should be sent. Make sure that the provided compartments contain the resources for the supported metrics namespaces."
+}
+
 output "connector_hub" {
   description = "Connector hub created for forwarding the data to the function"
-  value       = oci_sch_service_connector.metrics_service_connector.id
+  value       = [for v in oci_sch_service_connector.metrics_service_connector : { name = v.display_name, ocid = v.id }]
 }
