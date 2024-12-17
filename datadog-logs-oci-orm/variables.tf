@@ -39,3 +39,18 @@ variable "tenancy_ocid" {
   type        = string
   description = "OCI tenant OCID, more details can be found at https://docs.cloud.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm#five"
 }
+
+#***************
+#    Logging    
+#***************
+variable "exclude_services" {
+  type        = list(string)
+  default     = ["oacnativeproduction","apigateway","adm","apm","cloud_guard_query_results_prod","cloud_guard_raw_logs_prod","oke-k8s-cp-prod","contentdeliverynetwork","dataflow","dataintegration","datascience","delegateaccessprod","devops","emaildelivery","cloudevents","filestorage","goldengate","integration","loadbalancer","mediaflow","ocinetworkfirewall","postgresql","oci_c3_vpn","waa","waf","operatoraccessprod"]
+  description = "List of services to be excluded from logging"
+}
+
+variable "logging_compartments_csv" {
+  description = "Base64-encoded CSV file containing compartment IDs."
+  default = "Y29tcGFydG1lbnRfaWQsbmFtZQoib2NpZDEuY29tcGFydG1lbnQub2MxLi5hYWFhYWFhYWRiNHBoZXhtZXVsNGpvc3Nwd2ZkYzJzZmdoN2ZnczZudHl3cW9xZWVxZjVsZmljNnBuNHEiLCJzdmEtdGVzdC1jb21wYXJ0bWVudCI="
+  type        = string
+}

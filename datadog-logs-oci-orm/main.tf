@@ -1,3 +1,4 @@
+/*
 module "vcn" {
     source = "./modules/vcn"
     compartment_ocid = var.vcn_compartment
@@ -12,4 +13,12 @@ module "policy" {
     tenancy_ocid = var.tenancy_ocid
     resource_name_prefix = var.resource_name_prefix
     freeform_tags = local.freeform_tags
+}
+*/
+
+module "logging" {
+    for_each = toset(local.logging_compartment_ids)
+    source = "./modules/logging"
+    exclude_services = var.exclude_services
+    compartment_ocid = each.value
 }
