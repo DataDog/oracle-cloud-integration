@@ -14,9 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 OUTPUT_MESSAGE_VERSION = "v1.0"
-
-# Switch value to True to get payload logs 
-DETAILED_LOGGING_ENABLED = False
+DETAILED_LOGGING_ENABLED = os.environ.get("DD_DETAIL_LOGGING_ENABLED")
 
 _max_pool = int(os.environ.get("DD_MAX_POOL", 10))
 _session = requests.Session()
@@ -138,7 +136,7 @@ def handler(ctx: context.InvokeContext, data: io.BytesIO = None) -> response.Res
         )
 
         if DETAILED_LOGGING_ENABLED:
-            logger.info(f"Metric payload ={metrics_message}")
+            logger.info(f"Metric payload = {metrics_message}")
         
         result = _send_metrics_msg_to_datadog(metrics_message)
     except HTTPError as e:
