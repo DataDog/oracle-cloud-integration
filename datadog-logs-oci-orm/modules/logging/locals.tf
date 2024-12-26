@@ -1,3 +1,3 @@
 locals {
-    excluded_services = join(" ", var.exclude_services)
+    resource_type_names = join(",", [for rt in var.resource_types : rt.name])
 }

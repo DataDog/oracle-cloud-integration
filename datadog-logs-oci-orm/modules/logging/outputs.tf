@@ -1,3 +1,3 @@
 output "response" {
-  value = jsondecode(data.external.ensure_file.result["content"])
+  value = jsondecode(data.external.find_resources.result["content"])
 }

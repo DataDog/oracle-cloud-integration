@@ -17,8 +17,19 @@ module "policy" {
 */
 
 module "logging" {
-    for_each = toset(local.logging_compartment_ids)
-    source = "./modules/logging"
-    exclude_services = var.exclude_services
-    compartment_ocid = each.value
+  for_each = { for target in local.logging_targets : "${target.compartment_id}_${target.service_id}" => target }
+  source = "./modules/logging"
+  compartment_ocid = each.value.compartment_id
+  service_id       = each.value.service_id
+  resource_types   = each.value.resource_types
+}
+
+resource "null_resource" "cleanup_files" {
+  depends_on = [module.logging]
+  provisioner "local-exec" {
+    command = "rm -f oci_*.json"
+  }
+  triggers = {
+    always_run = "${timestamp()}"
+  }
 }

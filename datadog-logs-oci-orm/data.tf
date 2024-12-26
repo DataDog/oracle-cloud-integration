@@ -9,3 +9,7 @@ data "oci_identity_region_subscriptions" "subscriptions" {
 data "oci_identity_tenancy" "tenancy_metadata" {
   tenancy_id = var.tenancy_ocid
 }
+
+data "external" "logging_services" {
+    program = ["bash", "logging_services.sh"]
+}
