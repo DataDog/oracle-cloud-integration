@@ -1,4 +1,3 @@
-/*
 module "vcn" {
     source = "./modules/vcn"
     compartment_ocid = var.vcn_compartment
@@ -14,7 +13,6 @@ module "policy" {
     resource_name_prefix = var.resource_name_prefix
     freeform_tags = local.freeform_tags
 }
-*/
 
 module "logging" {
   for_each = { for target in local.logging_targets : "${target.compartment_id}_${target.service_id}" => target }
