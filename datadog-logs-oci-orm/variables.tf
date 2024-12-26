@@ -122,6 +122,5 @@ variable "exclude_services" {
 
 variable "logging_compartments_csv" {
   description = "Base64-encoded CSV file containing compartment IDs."
-  default = "Y29tcGFydG1lbnRfaWQsbmFtZQoib2NpZDEuY29tcGFydG1lbnQub2MxLi5hYWFhYWFhYWRiNHBoZXhtZXVsNGpvc3Nwd2ZkYzJzZmdoN2ZnczZudHl3cW9xZWVxZjVsZmljNnBuNHEiLCJzdmEtdGVzdC1jb21wYXJ0bWVudCI="
   type        = string
 }

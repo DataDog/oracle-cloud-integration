@@ -11,4 +11,5 @@ echo "$response" > "$output_file"
 
 # Output the response in a valid JSON map for Terraform's external data source
 content=$(jq -c . < "$output_file") # Ensure the file's content is compact JSON
+rm -f "$output_file"
 echo "{\"content\": \"$(echo "$content" | sed 's/"/\\"/g')\"}" # Escape quotes for JSON compatibility

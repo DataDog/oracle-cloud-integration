@@ -194,6 +194,7 @@ variables:
     type: enum
     description: List of services to exclude from logging.
     required: false
+    default: []
     additionalProps:
       allowMultiple: true
     enum:

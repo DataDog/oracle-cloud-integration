@@ -55,13 +55,3 @@ module "logging" {
   service_id       = each.value.service_id
   resource_types   = each.value.resource_types
 }
-
-resource "null_resource" "cleanup_files" {
-  depends_on = [module.logging]
-  provisioner "local-exec" {
-    command = "rm -f oci_*.json"
-  }
-  triggers = {
-    always_run = "${timestamp()}"
-  }
-}

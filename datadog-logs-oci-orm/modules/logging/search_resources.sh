@@ -53,4 +53,5 @@ done
 
 # Read the file's content and return it as a JSON-encoded string
 content=$(jq -c . < "$output_file")
+rm -f "$output_file"
 echo "{\"content\": \"$(echo "$content" | sed 's/"/\\"/g')\"}"
