@@ -7,6 +7,7 @@ resource "oci_functions_application" "metrics_function_app" {
     "DD_INTAKE_HOST" = var.datadog_environment
     "DD_INTAKE_LOGS" = "false"
     "DD_MAX_POOL"    = "20"
+    "DETAILED_LOGGING_ENABLED" = "false"
     "TENANCY_OCID"   = var.tenancy_ocid
   }
   defined_tags  = {}
