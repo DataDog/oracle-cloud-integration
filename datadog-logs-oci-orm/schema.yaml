@@ -11,18 +11,40 @@ variableGroups:
       - ${tenancy_ocid}
       - ${region}
       - ${compartment_ocid}
+      - ${current_user_ocid}
   - title: "Network options"
     variables:
       - ${create_vcn}
       - ${vcn_compartment}
       - ${existing_vcn}
       - ${subnet_ocid}
+  - title: "Datadog Environment"
+    variables:
+      - ${datadog_endpoint}
+      - ${datadog_api_key}
+      - ${datadog_tags}
+  - title: "Function settings"
+    variables:
+      - ${function_app_shape}
+      - ${create_new_function_image}
+      - ${function_image_path}
+  - title: "Container Registry"
+    variables:
+      - ${use_different_service_user}
+      - ${service_user_ocid}
+      - ${create_auth_token}
+      - ${auth_token_description}
+      - ${auth_token}
+    visible: ${create_new_function_image}
   - title: "Logging"
     variables:
       - ${exclude_services}
       - ${logging_compartments_csv}
 
 variables:
+  current_user_ocid:
+    visible: false
+  
   tenancy_ocid:
       visible: false
 
@@ -76,6 +98,95 @@ variables:
     dependsOn:
       compartmentId: ${vcn_compartment}
       vcnId: ${existing_vcn}
+
+# Datadog Environment
+  datadog_endpoint:
+    title: Datadog Endpoint
+    type: enum
+    description: The endpoint to hit for sending the logs.
+    required: true
+    enum:
+      - http-intake.logs.datadoghq.com
+    allowMultiple: false
+
+  datadog_api_key:
+    title: Datadog API Key
+    type: string
+    description: The API key for sending message to datadog endpoints.
+    required: true
+    sensitive: true
+    password: true
+    confirmation: true
+
+# Function setup
+  function_app_shape:
+    title: Function Application shape
+    type: enum
+    description: The shape of the function application. The docker image should be built accordingly. Use GENERIC_ARM if using Oracle Resource manager stack.
+    required: true
+    enum:
+      - GENERIC_ARM
+      - GENERIC_X86
+      - GENERIC_X86_ARM
+    default: GENERIC_ARM
+  
+  create_new_function_image:
+    title: Create New Function Image
+    description: Variable to create new function image. Otherwise, choose an existing image.
+    required: true
+    type: boolean
+    default: true
+
+  function_image_path:
+    title: Function Image Path
+    type: string
+    required: true
+    description: The full path of the function image. The image should be present in the container registry for the region and be compatible with the function application shape.
+    visible:
+      not:
+        - ${create_new_function_image}
+
+# Container Registry
+  use_different_service_user:
+    title: Use Different Service User
+    description: Option to use a different service user for Docker login and pushing images.
+    type: boolean
+    required: true
+    default: false
+
+  service_user_ocid:
+    title: Service User OCID
+    type: string
+    description: The OCID of the service user to be used for Docker login and pushing images.
+    required: true
+    default: ""
+    visible: ${use_different_service_user}
+
+  create_auth_token:
+    title: Create Auth Token
+    description: Variable to create auth token for the user. Otherwise, choose an existing auth token. If there are already 2 tokens, you need to delete one to create a new one.
+    type: boolean
+    required: true
+    default: false
+    visible: 
+      not:
+        - ${use_different_service_user}
+  
+  auth_token_description:
+    title: Auth Token Description
+    default: datadog-auth-token
+    required: true
+    visible: ${create_auth_token}
+  
+  auth_token:
+    title: Auth Token
+    type: password
+    description: The auth token to be used for the container registry.
+    sensitive: true
+    required: true
+    visible:
+      not:
+        - ${create_auth_token}
 
 #Logging
   exclude_services:
