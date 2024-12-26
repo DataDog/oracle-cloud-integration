@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 OUTPUT_MESSAGE_VERSION = "v1.0"
-DETAILED_LOGGING_ENABLED = os.environ.get("DD_DETAIL_LOGGING_ENABLED")
+DETAILED_LOGGING_ENABLED = os.environ.get("DD_DETAIL_LOGGING_ENABLED", False)
 
 _max_pool = int(os.environ.get("DD_MAX_POOL", 10))
 _session = requests.Session()
