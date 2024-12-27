@@ -24,8 +24,8 @@ output "function_details" {
   value = module.function.function_details
 }
 
-output "logging_details" {
+output "resources" {
     value = {
-        for k, v in module.logging : k => v.response
+      for k, v in module.resourcediscovery : k => v.response if length(v.response) > 0
     }
 }
