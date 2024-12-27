@@ -36,6 +36,10 @@ variableGroups:
       - ${auth_token_description}
       - ${auth_token}
     visible: ${create_new_function_image}
+  - title: "Logging"
+    variables:
+      - ${exclude_services}
+      - ${logging_compartments_csv}
 
 variables:
   current_user_ocid:
@@ -183,3 +187,50 @@ variables:
     visible:
       not:
         - ${create_auth_token}
+
+#Logging
+  exclude_services:
+    title: Exclude Services from Logging
+    type: enum
+    description: List of services to exclude from logging.
+    required: false
+    default: []
+    additionalProps:
+      allowMultiple: true
+    enum:
+      - "oacnativeproduction"
+      - "apigateway"
+      - "adm"
+      - "apm"
+      - "cloud_guard_query_results_prod"
+      - "cloud_guard_raw_logs_prod"
+      - "och"
+      - "oke-k8s-cp-prod"
+      - "contentdeliverynetwork"
+      - "dataflow"
+      - "dataintegration"
+      - "datascience"
+      - "delegateaccessprod"
+      - "devops"
+      - "emaildelivery"
+      - "cloudevents"
+      - "filestorage"
+      - "functions"
+      - "goldengate"
+      - "integration"
+      - "loadbalancer"
+      - "mediaflow"
+      - "ocinetworkfirewall"
+      - "objectstorage"
+      - "operatoraccessprod"
+      - "postgresql"
+      - "oci_c3_vpn"
+      - "flowlogs"
+      - "waa"
+      - "waf"
+
+  logging_compartments_csv:
+    title: Compartments CSV
+    description: "Upload a CSV file containing the list of compartments. The file must include a column named 'compartment_id'."
+    type: file
+    required: true
