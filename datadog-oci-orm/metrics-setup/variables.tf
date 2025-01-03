@@ -15,22 +15,6 @@ variable "datadog_api_key" {
   description = "The API key for sending message to datadog endpoints"
 }
 
-variable "function_subnet_id" {
-  type        = string
-  default     = ""
-  description = "The OCID of the subnet to be used for the function app. If create_vcn is set to true, that will take precedence"
-}
-
-variable "function_app_shape" {
-  type        = string
-  default     = "GENERIC_ARM"
-  description = "The shape of the function application. The docker image should be built accordingly. Use ARM if using Oracle Resource manager stack"
-  validation {
-    condition     = contains(["GENERIC_ARM", "GENERIC_X86", "GENERIC_X86_ARM"], var.function_app_shape)
-    error_message = "Valid values are: GENERIC_ARM, GENERIC_X86, GENERIC_X86_ARM."
-  }
-}
-
 variable "datadog_environment" {
   type        = string
   description = "The endpoint to hit for sending the metrics. Varies by different datacenter"
@@ -39,18 +23,6 @@ variable "datadog_environment" {
     "ocimetrics-intake.datadoghq.eu", "ocimetrics-intake.ap1.datadoghq.com", "ocimetrics-intake.ddog-gov.com"], var.datadog_environment)
     error_message = "Valid values for var: datadog_environment are (ocimetrics-intake.datadoghq.com, ocimetrics-intake.us5.datadoghq.com, ocimetrics-intake.us3.datadoghq.com, ocimetrics-intake.datadoghq.eu, ocimetrics-intake.ap1.datadoghq.com, ocimetrics-intake.ddog-gov.com)."
   }
-}
-
-variable "oci_docker_username" {
-  type        = string
-  sensitive   = true
-  description = "The docker login username for the OCI container registry. Used in creating function image. Not required if the image is already exists."
-}
-
-variable "oci_docker_password" {
-  type        = string
-  sensitive   = true
-  description = "The user auth token for the OCI docker container registry. Used in creating function image. Not required if the image already exists."
 }
 
 variable "service_connector_target_batch_size_in_kbs" {
@@ -70,6 +42,26 @@ variable "metrics_compartments" {
   description = "The comma separated list of compartments OCID to collect metrics."
 }
 
+#************************************
+#   Function Application Variables
+#************************************
+
+variable "function_subnet_id" {
+  type        = string
+  default     = ""
+  description = "The OCID of the subnet to be used for the function app. If create_vcn is set to true, that will take precedence"
+}
+
+variable "function_app_shape" {
+  type        = string
+  default     = "GENERIC_ARM"
+  description = "The shape of the function application. The docker image should be built accordingly. Use ARM if using Oracle Resource manager stack"
+  validation {
+    condition     = contains(["GENERIC_ARM", "GENERIC_X86", "GENERIC_X86_ARM"], var.function_app_shape)
+    error_message = "Valid values are: GENERIC_ARM, GENERIC_X86, GENERIC_X86_ARM."
+  }
+}
+
 #*************************************
 #         TF auth Requirements
 #*************************************
@@ -85,4 +77,31 @@ variable "region" {
 variable "compartment_ocid" {
   type        = string
   description = "The compartment OCID to deploy resources to"
+}
+
+variable "current_user_ocid" {
+  type        = string
+  description = "OCID of the logged in user"
+}
+
+#************************************
+#    Container Registry Variables
+#************************************
+variable "auth_token_description" {
+  description = "The description of the auth token to use for container registry login"
+  type        = string
+  default     = "datadog-auth-token"
+}
+
+variable "auth_token" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "The user auth token for docker login to OCI container registry."
+}
+
+variable "service_user_ocid" {
+  type        = string
+  default     = ""
+  description = "The OCID of the service user to be used for Docker login and pushing images."
 }

@@ -44,3 +44,12 @@ output "connector_hub" {
   description = "Connector hub created for forwarding the data to the function"
   value       = [for v in oci_sch_service_connector.metrics_service_connector : { name = v.display_name, ocid = v.id }]
 }
+
+output "containerregistry_details" {
+  description = "Output of pushing image to container registry"
+  value       = {
+    repository_ocid = oci_artifacts_container_repository.function_repo.id
+    repository_name = oci_artifacts_container_repository.function_repo.display_name
+    function_image_path = "${local.docker_image_path}:latest"
+  }
+}
