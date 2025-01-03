@@ -21,7 +21,7 @@ resource "oci_functions_application" "metrics_function_app" {
 }
 
 resource "oci_functions_function" "metrics_function" {
-  depends_on = [null_resource.FnImagePushToOCIR, oci_functions_application.metrics_function_app]
+  depends_on = [oci_functions_application.metrics_function_app, null_resource.wait_for_image]
   #Required
   application_id = oci_functions_application.metrics_function_app.id
   display_name   = "${oci_functions_application.metrics_function_app.display_name}-metrics-function"
