@@ -36,7 +36,7 @@ variable "datadog_environment" {
   description = "The endpoint to hit for sending the metrics. Varies by different datacenter"
   validation {
     condition = contains(["ocimetrics-intake.datadoghq.com", "ocimetrics-intake.us5.datadoghq.com", "ocimetrics-intake.us3.datadoghq.com",
-    "ocimetrics-intake.datadoghq.eu", "ocimetrics-intake.ap1.datadoghq.com", "ocimetrics-intake.ddog-gov.com"], var.datadog_environment)
+    "ocimetrics-intake.datadoghq.eu", "ocimetrics-intake.ap1.datadoghq.com", "ocimetrics-intake.ddog-gov.com", "ocimetrics-intake.datad0g.com"], var.datadog_environment)
     error_message = "Valid values for var: datadog_environment are (ocimetrics-intake.datadoghq.com, ocimetrics-intake.us5.datadoghq.com, ocimetrics-intake.us3.datadoghq.com, ocimetrics-intake.datadoghq.eu, ocimetrics-intake.ap1.datadoghq.com, ocimetrics-intake.ddog-gov.com)."
   }
 }
