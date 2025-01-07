@@ -31,3 +31,8 @@ data "oci_core_subnet" "input_subnet" {
   #Required
   subnet_id = var.create_vcn ? module.vcn[0].subnet_id[local.subnet] : var.function_subnet_id
 }
+
+data "oci_identity_user" "docker_user" {
+    #Required
+    user_id = local.user_ocid
+}

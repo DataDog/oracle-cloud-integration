@@ -24,8 +24,13 @@ variableGroups:
   - title: "Function settings"
     variables:
       - ${function_app_shape}
-      - ${oci_docker_username}
-      - ${oci_docker_password}
+  - title: "Container Registry"
+    variables:
+      - ${use_different_service_user}
+      - ${service_user_ocid}
+      - ${create_auth_token}
+      - ${auth_token_description}
+      - ${auth_token}
 
 variables:
   resource_name_prefix:
@@ -54,7 +59,11 @@ variables:
   tenancy_ocid:
     required: true
     type: string
-    visible: false        
+    visible: false
+  current_user_ocid:
+    required: true
+    type: string
+    visible: false
 
 # VCN
   vcnCompartment:
@@ -67,7 +76,7 @@ variables:
     type: oci:core:vcn:id
     visible:
       not:
-        - ${create_vcn}    
+        - ${create_vcn}
     dependsOn:
       compartmentId: ${vcnCompartment}
   function_subnet_id:
@@ -146,7 +155,7 @@ variables:
       - "oci_vcn"
       - "oci_vpn"
       - "oci_waf"
-      - "oracle_oci_database"   
+      - "oracle_oci_database"
     enum:
       - "oci_autonomous_database"
       - "oci_blockstore"
@@ -174,7 +183,6 @@ variables:
       - "oci_vpn"
       - "oci_waf"
       - "oracle_oci_database"
-    
 
   # Function setup
   function_app_shape:
@@ -187,21 +195,52 @@ variables:
       - GENERIC_X86
       - GENERIC_X86_ARM
     default: GENERIC_ARM
-  oci_docker_username:
-    title: OCI Docker registry user name
-    type: string
-    description: The user login for the OCI docker container registry to push function image. Not required if using an existing image path.
-    required: true
-    sensitive: true
-  oci_docker_password:
-    title: OCI Docker registry auth token
-    type: password
-    description: The user auth token for the OCI docker container registry. Used in creating function image.
-    required: true
-    sensitive: true
   service_connector_target_batch_size_in_kbs:
     title: Service Connector hub batch size
     type: nonNegativeInteger
     description: The batch size (in Kb) in which to send payload to target.
     required: false
     default: 5000
+
+
+# Container registry
+  use_different_service_user:
+    title: Use Different Service User
+    description: Option to use a different service user for Docker login and pushing images.
+    type: boolean
+    required: true
+    default: false
+
+  service_user_ocid:
+    title: Service User OCID
+    type: string
+    description: The OCID of the service user to be used for Docker login and pushing images.
+    required: true
+    default: ""
+    visible: ${use_different_service_user}
+
+  create_auth_token:
+    title: Create Auth Token
+    description: Variable to create auth token for the user. Otherwise, choose an existing auth token. If there are already 2 tokens, you need to delete one to create a new one.
+    type: boolean
+    required: true
+    default: false
+    visible:
+      not:
+        - ${use_different_service_user}
+
+  auth_token_description:
+    title: Auth Token Description
+    default: datadog-auth-token
+    required: true
+    visible: ${create_auth_token}
+
+  auth_token:
+    title: OCI Docker registry auth token
+    type: password
+    description: The user auth token for the OCI docker container registry. Used in creating function image.
+    required: true
+    sensitive: true
+    visible:
+      not:
+        - ${create_auth_token}

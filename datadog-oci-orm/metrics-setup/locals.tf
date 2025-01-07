@@ -27,6 +27,7 @@ locals {
   })
   oci_region_key      = lower(local.oci_regions[var.region].region_key)
   tenancy_home_region = data.oci_identity_tenancy.tenancy_metadata.home_region_key
+  user_ocid = var.service_user_ocid == "" ? var.current_user_ocid : var.service_user_ocid
 }
 
 locals {
@@ -36,5 +37,7 @@ locals {
   ocir_repo_name        = "${var.resource_name_prefix}-functions"
   function_name         = "datadog-function-metrics"
   docker_image_path     = "${local.oci_docker_repository}/${local.ocir_repo_name}/${local.function_name}:latest"
+  username = data.oci_identity_user.docker_user.name
+  registry_domain = "ocir.${var.region}.oci.oraclecloud.com"
 }
 
