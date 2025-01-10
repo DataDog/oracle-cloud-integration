@@ -75,7 +75,7 @@ resource "oci_identity_policy" "metrics_policy" {
   statements = ["Allow dynamic-group ${var.dynamic_group_name} to read metrics in tenancy",
     "Allow dynamic-group ${var.dynamic_group_name} to use fn-function in tenancy",
     "Allow dynamic-group ${var.dynamic_group_name} to use fn-invocation in tenancy",
-    "Allow group ${var.user_domain}/${oci_identity_group.read_policy_group.name} to read all-resources in tenancy"
+    "Allow group Default/${oci_identity_group.read_policy_group.name} to read all-resources in tenancy"
   ]
   defined_tags  = {}
   freeform_tags = local.freeform_tags
