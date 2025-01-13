@@ -76,6 +76,8 @@ def _process_single_log(body: dict) -> dict:
     data = body.get("data", {})
     source = body.get("source")
     time = body.get("time")
+    logtype = body.get("type")
+    oracle = body.get("oracle")
 
     payload = {
         "source": source,
@@ -83,6 +85,8 @@ def _process_single_log(body: dict) -> dict:
         "data": data,
         "ddsource": DD_SOURCE,
         "service": DD_SERVICE,
+        "type": logtype,
+        "oracle": oracle
     }
 
     dd_tags = os.environ.get('DATADOG_TAGS', '')
