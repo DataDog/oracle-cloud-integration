@@ -90,7 +90,9 @@ def _get_oci_source_name(body: dict) -> str:
 
     if logtype != "":
         # logtype is of format com.oraclecloud.{service}.{resource-type}.{category}
-        return "oci." + logtype.split(".")[2]
+        split_logtype = logtype.split(".")
+        if len(split_logtype) >= 3:
+            return "oci." + split_logtype[2]
     
     return DD_SOURCE
 
