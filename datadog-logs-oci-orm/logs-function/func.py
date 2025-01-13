@@ -7,7 +7,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-DD_SOURCE = "OCI Logs"  # Adding a source default name. The source will be mapped to the log's respective service to be processed by the correct pipeline in Datadog. 
+DD_SOURCE = "oci.logs"  # Adding a source default name. The source will be mapped to the log's respective service to be processed by the correct pipeline in Datadog. 
 DD_SERVICE = "oci"  # Adding a service name.
 DD_TIMEOUT = 10 * 60  # Adding a timeout for the Datadog API call.
 DD_BATCH_SIZE = 1000  # Adding a batch size for the Datadog API call.
