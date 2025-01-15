@@ -7,8 +7,8 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-DD_SOURCE = "oracle_cloud"  # Adding a source name.
-DD_SERVICE = "OCI Logs"  # Adding a service name.
+DD_SOURCE = "oci.logs"  # Adding a source default name. The source will be mapped to the log's respective service to be processed by the correct pipeline in Datadog.
+DD_SERVICE = "oci"  # Adding a service name.
 DD_TIMEOUT = 10 * 60  # Adding a timeout for the Datadog API call.
 DD_BATCH_SIZE = 1000  # Adding a batch size for the Datadog API call.
 
@@ -31,10 +31,10 @@ def _process(body: list[dict]) -> None:
     This function retrieves the Datadog endpoint URL and token from environment variables,
     processes each log entry in the provided list, compresses the payload, and sends it
     to the Datadog API.
-    
+
     Args:
         body (list[dict]): A list of log entries, where each log entry is represented as a dictionary.
-    
+
     Raises:
         KeyError: If the required environment variables 'DATADOG_HOST' or 'DATADOG_TOKEN' are not set.
         Exception: If there is an error during the API request or payload processing.
@@ -71,18 +71,47 @@ def _process(body: list[dict]) -> None:
     except Exception as ex:
         logger.exception(ex)
 
+def _get_oci_source_name(body: dict) -> str:
+    """
+    Returns the source name for the log entry.
+    This function determines if the log is an Audit log, and if not, what source it is coming from .
+
+    Args:
+        body (dict): A log entry represented as a dictionary.
+
+    Returns:
+        str: The source name for the log entry.
+    """
+    oracle = body.get("oracle")
+    logtype = body.get("type")
+
+    if oracle != None and oracle.get("loggroupid") != None and oracle.get("loggroupid") == "_Audit":
+        return "oci.audit"
+
+    if logtype != None and logtype != "":
+        # logtype is of format com.oraclecloud.{service}.{resource-type}.{category}
+        split_logtype = logtype.split(".")
+        if len(split_logtype) >= 3:
+            return "oci." + split_logtype[2]
+
+    return DD_SOURCE
 
 def _process_single_log(body: dict) -> dict:
     data = body.get("data", {})
     source = body.get("source")
     time = body.get("time")
+    logtype = body.get("type")
+    oracle = body.get("oracle")
+    ddsource = _get_oci_source_name(body)
 
     payload = {
         "source": source,
         "timestamp": time,
         "data": data,
-        "ddsource": DD_SOURCE,
+        "ddsource": ddsource,
         "service": DD_SERVICE,
+        "type": logtype,
+        "oracle": oracle
     }
 
     dd_tags = os.environ.get('DATADOG_TAGS', '')

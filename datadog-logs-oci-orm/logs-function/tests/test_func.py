@@ -51,6 +51,30 @@ class TestLogForwarderFunction(TestCase):
         }
     """
 
+    SAMPLE_INPUT_2 = """
+        {
+            "data": {
+              "level": "INFO",
+              "message": "Run succeeded - Read 0 messages from source and wrote 0 messages to target",
+              "messageType": "CONNECTOR_RUN_COMPLETED"
+            },
+            "id": "6b9819cf-d004-4dbc-9978-b713e743ad08",
+            "oracle": {
+              "compartmentid": "comp",
+              "ingestedtime": "2024-09-25T20:04:45.926Z",
+              "loggroupid": "_Audit",
+              "logid": "lid",
+              "resourceid": "rid",
+              "tenantid": "tid"
+            },
+            "source": "Log_Connector",
+            "specversion": "1.0",
+            "time": "2024-09-25T20:04:45.130Z",
+            "type": "com.oraclecloud.sch.serviceconnector.runlog"
+        }
+    """
+
+
     SAMPLE_OUTPUT = [
         {
             "source": "Log_Connector",
@@ -61,10 +85,42 @@ class TestLogForwarderFunction(TestCase):
                 "message": "Run succeeded - Read 0 messages from source and wrote 0 messages to target",
                 "messageType": "CONNECTOR_RUN_COMPLETED"
             },
-            "ddsource": "oracle_cloud",
-            "service": "OCI Logs"
-        }
+            "ddsource": "oci.sch",
+            "service": "oci",
+            "type": "com.oraclecloud.sch.serviceconnector.runlog",
+            "oracle":{
+                "compartmentid": "comp",
+                "ingestedtime": "2024-09-25T20:04:45.926Z",
+                "loggroupid": "lgid",
+                "logid": "lid",
+                "resourceid": "rid",
+                "tenantid": "tid"
+            }
+        },
     ]
+
+    SAMPLE_OUTPUT_2 = [ {
+            "source": "Log_Connector",
+            "timestamp": "2024-09-25T20:04:45.130Z",
+            "data":
+            {
+                "level": "INFO",
+                "message": "Run succeeded - Read 0 messages from source and wrote 0 messages to target",
+                "messageType": "CONNECTOR_RUN_COMPLETED"
+            },
+            "ddsource": "oci.audit",
+            "service": "oci",
+            "type": "com.oraclecloud.sch.serviceconnector.runlog",
+            "oracle":{
+                "compartmentid": "comp",
+                "ingestedtime": "2024-09-25T20:04:45.926Z",
+                "loggroupid": "_Audit",
+                "logid": "lid",
+                "resourceid": "rid",
+                "tenantid": "tid"
+            }
+        },
+        ]
 
 
     def setUp(self):
@@ -73,7 +129,6 @@ class TestLogForwarderFunction(TestCase):
         os.environ['DATADOG_TOKEN'] = "VERY-SECRET-TOKEN-2000"
         os.environ['DD_COMPRESS'] = "true"
         return super().setUp()
-
 
     @mock.patch("requests.post")
     def test_simple_data(self, mock_post, ):
@@ -92,8 +147,26 @@ class TestLogForwarderFunction(TestCase):
             self.assertEqual(
                 "gzip",
                 mock_post.mock_calls[0].kwargs['headers']['Content-Encoding']
-            )
+            )        
 
+    @mock.patch("requests.post")
+    def test_audit_log(self, mock_post, ):
+        """ Test single CloudEvent payload """
+
+        payload = TestLogForwarderFunction.SAMPLE_INPUT_2
+        mock_post.reset_mock()
+        handler(ctx=None, data=to_bytes_io(payload))
+        mock_post.assert_called_once()
+        request_key = 'data' if _should_compress_payload() else 'json'
+        self.assertEqual(
+            TestLogForwarderFunction.SAMPLE_OUTPUT_2,
+            to_decompressed_data(mock_post.mock_calls[0].kwargs[request_key])
+        )
+        if _should_compress_payload():
+            self.assertEqual(
+                "gzip",
+                mock_post.mock_calls[0].kwargs['headers']['Content-Encoding']
+            )    
 
     @mock.patch("requests.post")
     def test_simple_data_tags(self, mock_post, ):
