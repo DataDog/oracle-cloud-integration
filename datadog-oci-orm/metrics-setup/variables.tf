@@ -21,16 +21,6 @@ variable "function_subnet_id" {
   description = "The OCID of the subnet to be used for the function app. If create_vcn is set to true, that will take precedence"
 }
 
-variable "function_app_shape" {
-  type        = string
-  default     = "GENERIC_ARM"
-  description = "The shape of the function application. The docker image should be built accordingly. Use ARM if using Oracle Resource manager stack"
-  validation {
-    condition     = contains(["GENERIC_ARM", "GENERIC_X86", "GENERIC_X86_ARM"], var.function_app_shape)
-    error_message = "Valid values are: GENERIC_ARM, GENERIC_X86, GENERIC_X86_ARM."
-  }
-}
-
 variable "datadog_environment" {
   type        = string
   description = "The endpoint to hit for sending the metrics. Varies by different datacenter"
@@ -51,12 +41,6 @@ variable "oci_docker_password" {
   type        = string
   sensitive   = true
   description = "The user auth token for the OCI docker container registry. Used in creating function image. Not required if the image already exists."
-}
-
-variable "service_connector_target_batch_size_in_kbs" {
-  type        = string
-  description = "The batch size (in Kb) in which to send payload to target"
-  default     = "5000"
 }
 
 variable "metrics_namespaces" {
