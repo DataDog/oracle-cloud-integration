@@ -23,3 +23,9 @@ output "function_details" {
   description = "Output of function creation"
   value = module.function.function_details
 }
+
+output "resources" {
+    value = {
+      for k, v in module.resourcediscovery : k => v.response if length(v.response) > 0
+    }
+}

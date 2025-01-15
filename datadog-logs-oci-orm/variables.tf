@@ -110,3 +110,17 @@ variable "service_user_ocid" {
   default     = ""
   description = "The OCID of the service user to be used for Docker login and pushing images."
 }
+
+#***************
+#    Logging    
+#***************
+variable "exclude_services" {
+  type        = list(string)
+  default     = []
+  description = "List of services to be excluded from logging"
+}
+
+variable "logging_compartments_csv" {
+  description = "Base64-encoded CSV file containing compartment IDs."
+  type        = string
+}
