@@ -7,7 +7,7 @@ locals {
 
 locals {
   # Decode the uploaded CSV file into a map
-  logging_csv_content     = base64decode(var.logging_compartments_csv)
+  logging_csv_content = base64decode(var.logging_compartments_csv)
   logging_compartments = csvdecode(local.logging_csv_content)
 
   # Extract only the compartment IDs into a list

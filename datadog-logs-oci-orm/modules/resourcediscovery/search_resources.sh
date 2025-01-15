@@ -7,6 +7,7 @@ export RESOURCE_TYPES="${3}"
 output_file="oci_resources_${GROUP_ID}_${COMPARTMENT_ID}.json"
 echo "[]" > $output_file # Initialize the output file with an empty JSON array
 IFS=',' read -ra types <<< "$RESOURCE_TYPES"
+
 # Perform OCI CLI query for each resource type
 for rt in "${types[@]}"; do
     # Initialize variables for pagination
