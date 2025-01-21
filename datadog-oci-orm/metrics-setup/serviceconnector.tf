@@ -58,7 +58,7 @@ resource "oci_sch_service_connector" "metrics_service_connector" {
     kind = "functions"
 
     #Optional
-    batch_size_in_kbs = var.service_connector_target_batch_size_in_kbs
+    batch_size_in_kbs = 5000
     batch_time_in_sec = 60
     compartment_id    = var.tenancy_ocid
     function_id       = oci_functions_function.metrics_function.id
