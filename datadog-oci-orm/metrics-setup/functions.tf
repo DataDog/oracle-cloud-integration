@@ -15,7 +15,7 @@ resource "oci_functions_application" "metrics_function_app" {
   freeform_tags = local.freeform_tags
   network_security_group_ids = [
   ]
-  shape = var.function_app_shape
+  shape = "GENERIC_ARM"
   subnet_ids = [
     data.oci_core_subnet.input_subnet.id,
   ]
