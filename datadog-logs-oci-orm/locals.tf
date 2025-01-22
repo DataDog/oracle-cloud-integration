@@ -32,4 +32,29 @@ locals {
       }
     ]
   ])
+
+  # Flatten filtered_services to get service_id_resource_type and corresponding categories
+  service_resource_type_list = flatten([
+    for service in local.filtered_services : [
+      for rt in service.resourceTypes : {
+        key       = "${service.id}_${rt.name}" # Combine service ID and resource type as the key
+        categories = [for cat in rt.categories : cat.name] # List of category names
+      }
+    ]
+  ])
+
+  # Create service_category_map using zipmap
+  service_category_map = zipmap(
+    [for item in local.service_resource_type_list : item.key],        # Keys: service_id_resource_type
+    [for item in local.service_resource_type_list : item.categories] # Values: category name lists
+  )
+}
+
+locals {
+  # Combine and group resources by compartment ID (may still contain nested lists)
+  compartment_resources = {
+    for compartment_group, resources in module.resourcediscovery :
+    split("_", compartment_group)[0] => resources.response...
+    if length(resources.response) > 0
+  }
 }

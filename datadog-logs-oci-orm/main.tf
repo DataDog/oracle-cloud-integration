@@ -55,3 +55,11 @@ module "resourcediscovery" {
     group_id = each.value.service_id
     resource_types = [for rt in each.value.resource_types : rt.name]
 }
+
+module "logging" {
+    for_each = toset(local.logging_compartment_ids)
+    source = "./modules/logging"
+    compartment_ocid = each.value
+    service_map = local.service_category_map
+    resources = flatten(lookup(local.compartment_resources,each.value,[]))
+}
