@@ -22,7 +22,7 @@ locals {
 }
 
 locals {
-    datadog_log_group_id = try(data.oci_logging_log_groups.test_log_groups.log_groups[0].id, null)
+    datadog_log_group_id = try(data.oci_logging_log_groups.datadog_log_group.log_groups[0].id, null)
     loggroups = toset([
         for item in local.sorted_resource_evaluation : {
             loggroupid    = item.loggroup.loggroupid
