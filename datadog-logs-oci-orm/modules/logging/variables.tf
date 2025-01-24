@@ -1,3 +1,9 @@
+variable "freeform_tags" {
+  type        = map(string)
+  description = "A map of freeform tags to apply to the resources"
+  default     = {}
+}
+
 variable "compartment_ocid" {
   type        = string
   description = "The OCID of the compartment where resources exist"
@@ -16,5 +22,16 @@ variable "resources" {
     groupId       = string
     identifier    = string
     resourceType  = string
+    timeCreated   = string
+  }))
+}
+
+variable "logs_map" {
+  description = "All Log Objects present globally"
+  type = map(object({
+    loggroupid = string
+    state      = string
+    is_enabled = string
+    compartmentid = string
   }))
 }

@@ -1,35 +1,4 @@
 locals {
-    allowed_service_ids = [for key, value in var.service_map : split("_", key)[0]]
-    filtered_logs = flatten([
-        for log_group in data.oci_logging_logs.existing_logs : [
-            for log in log_group.logs :
-            # Filter logs based on the allowed_services variable
-            {
-                log_group_ocid = log.log_group_id
-                #log_ocid       = log.id
-                state          = log.state
-                #log_type       = log.log_type
-                compartment_id = log.compartment_id
-                is_enabled     = log.is_enabled
-                resource_id    = try(log.configuration[0].source[0].resource, null)
-                service_id     = try(log.configuration[0].source[0].service, null)
-                category       = try(log.configuration[0].source[0].category, null)
-            } if contains(local.allowed_service_ids, try(log.configuration[0].source[0].service, ""))
-        ]
-    ])
-
-    # Map for resourceId_service_category => [{loggroupid, state, is_enabled}]
-    logs_map = tomap({
-        for log in local.filtered_logs : 
-        "${log.resource_id}_${log.service_id}_${log.category}" => {
-            loggroupid = log.log_group_ocid
-            state      = log.state
-            is_enabled = log.is_enabled
-        }
-    })
-}
-
-locals {
     resource_evaluation = flatten([
         for resource in var.resources : [
             for category in lookup(var.service_map, "${resource.groupId}_${resource.resourceType}", []) : {
@@ -37,23 +6,36 @@ locals {
                 resource_id   = resource.identifier
                 resource_name = resource.displayName
                 category      = category
-                loggroup      = lookup(local.logs_map, "${resource.identifier}_${resource.groupId}_${category}", null)
+                time_created   = lookup(resource, "timeCreated", "")
+                loggroup      = lookup(var.logs_map, "${resource.identifier}_${resource.groupId}_${category}", null)
             }
         ]
     ])
-
-    resources_without_logs = [
-        for item in local.resource_evaluation : {
-            service_id    = item.service_id
-            resource_id   = item.resource_id
-            resource_name = item.resource_name
-            category      = item.category
-        }
-        if item.loggroup == null
+    
+    sorted_keys = sort([for item in local.resource_evaluation : "${item.time_created}_${item.resource_id}_${item.service_id}_${item.category}"])
+    sorted_resource_evaluation = [
+        for key in local.sorted_keys : lookup(
+            { for item in local.resource_evaluation : "${item.time_created}_${item.resource_id}_${item.service_id}_${item.category}" => item },
+            key
+        )
     ]
+}
 
-    loggroup_ids = toset([
-        for item in local.resource_evaluation : item.loggroup.loggroupid
-        if item.loggroup != null
+locals {
+    datadog_log_group_id = try(data.oci_logging_log_groups.test_log_groups.log_groups[0].id, null)
+    loggroups = toset([
+        for item in local.sorted_resource_evaluation : {
+            loggroupid    = item.loggroup.loggroupid
+            compartmentid = item.loggroup.compartmentid
+        }
+        if item.loggroup != null && try(item.loggroup.loggroupid, "") != local.datadog_log_group_id
     ])
+
+    resources_without_logs = zipmap(
+        [for idx, item in range(length(local.sorted_resource_evaluation)) :
+            "${local.sorted_resource_evaluation[idx].resource_name}_${local.sorted_resource_evaluation[idx].category}_${idx}"
+            if local.sorted_resource_evaluation[idx].loggroup == null || try(local.sorted_resource_evaluation[idx].loggroup.loggroupid, "") == local.datadog_log_group_id
+        ],
+        [for item in local.sorted_resource_evaluation : item if item.loggroup == null || try(item.loggroup.loggroupid, "") == local.datadog_log_group_id]
+    )
 }

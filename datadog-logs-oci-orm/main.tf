@@ -1,3 +1,4 @@
+/*
 module "vcn" {
     source = "./modules/vcn"
     compartment_ocid = var.vcn_compartment
@@ -47,7 +48,7 @@ module "function" {
     function_app_ocid = module.functionapp.function_app_details.function_app_ocid
     function_image_path = var.function_image_path == "" ? module.containerregistry[0].containerregistry_details.function_image_path : var.function_image_path
 }
-
+*/
 module "resourcediscovery" {
     for_each = { for target in local.logging_targets : "${target.compartment_id}_${target.service_id}" => target }
     source = "./modules/resourcediscovery"
@@ -60,6 +61,7 @@ module "logging" {
     for_each = toset(local.logging_compartment_ids)
     source = "./modules/logging"
     compartment_ocid = each.value
-    service_map = local.service_category_map
+    service_map = local.service_map
     resources = flatten(lookup(local.compartment_resources,each.value,[]))
+    logs_map = local.logs_map
 }
