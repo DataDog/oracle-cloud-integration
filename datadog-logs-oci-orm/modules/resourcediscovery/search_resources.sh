@@ -18,12 +18,12 @@ for rt in "${types[@]}"; do
         if [ "$next_page" == "init" ]; then
             # First query without next page token
             response=$(oci search resource structured-search --query-text \
-                "QUERY $rt resources where compartmentId = '$COMPARTMENT_ID' && lifeCycleState != 'TERMINATED' && lifeCycleState != 'FAILED'" \
+                "QUERY $rt resources where compartmentId = '$COMPARTMENT_ID' && (lifeCycleState = 'ACTIVE' || lifeCycleState = 'AVAILABLE' || lifeCycleState = 'RUNNING')" \
                 --output json)
         else
             # Query with next page token
             response=$(oci search resource structured-search --query-text \
-                "QUERY $rt resources where compartmentId = '$COMPARTMENT_ID' && lifeCycleState != 'TERMINATED' && lifeCycleState != 'FAILED'" \
+                "QUERY $rt resources where compartmentId = '$COMPARTMENT_ID' && (lifeCycleState = 'ACTIVE' || lifeCycleState = 'AVAILABLE' || lifeCycleState = 'RUNNING')" \
                 --page "$next_page" \
                 --output json)
         fi
@@ -39,7 +39,7 @@ for rt in "${types[@]}"; do
         next_page=$(echo "$response" | jq -r '."opc-next-page" // "null"')
 
         # Extract and transform items
-        items=$(echo "$response" | jq --arg group_id "$GROUP_ID" -c '[.data.items[] | {compartmentId: ."compartment-id", displayName: ."display-name", identifier: ."identifier", resourceType: ."resource-type", groupId: $group_id}]')
+        items=$(echo "$response" | jq --arg group_id "$GROUP_ID" -c '[.data.items[] | {compartmentId: ."compartment-id", displayName: ."display-name", identifier: ."identifier", resourceType: (."resource-type" | ascii_downcase), groupId: $group_id, timeCreated: (."defined-tags"."Oracle-Tags"."CreatedOn" // ."time-created")}]')
         # Append items to the output file if not empty
         if [ "$(echo "$items" | jq length)" -gt 0 ]; then
             temp_items_file="temp_items_$${GROUP_ID}_$${COMPARTMENT_ID}.json"
