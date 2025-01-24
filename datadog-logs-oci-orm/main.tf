@@ -1,4 +1,3 @@
-/*
 module "vcn" {
     source = "./modules/vcn"
     compartment_ocid = var.vcn_compartment
@@ -48,7 +47,7 @@ module "function" {
     function_app_ocid = module.functionapp.function_app_details.function_app_ocid
     function_image_path = var.function_image_path == "" ? module.containerregistry[0].containerregistry_details.function_image_path : var.function_image_path
 }
-*/
+
 module "resourcediscovery" {
     for_each = { for target in local.logging_targets : "${target.compartment_id}_${target.service_id}" => target }
     source = "./modules/resourcediscovery"

@@ -104,8 +104,8 @@ locals {
   service_map = tomap({
     for key, values in local.service_category_map : 
     key => (
-      length([for value in values : value if startswith(value, "all")]) > 0 ? 
-      [for value in values : value if startswith(value, "all")] : 
+      length([for value in values : value if substr(value, 0, 3) == "all"]) > 0 ? 
+      [for value in values : value if substr(value, 0, 3) == "all"] : 
       values
     )
   })
