@@ -13,5 +13,5 @@ data "oci_logging_log_groups" "audit_log_group" {
     compartment_id = var.compartment_ocid
 
     #Optional
-    #display_name = "_Audit"
+    display_name = "_Audit"
 }
