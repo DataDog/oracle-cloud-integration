@@ -11,7 +11,17 @@ locals {
   logging_compartments = csvdecode(local.logging_csv_content)
 
   # Extract only the compartment IDs into a list
-  logging_compartment_ids = [for row in local.logging_compartments : row.compartment_id]
+  logging_configurations = {
+    for row in local.logging_compartments :
+    row.compartment_id =>
+      {
+        enable_audit_log_forwarding = (
+          lower(try(row.audit_log_forwarding_override, "")) == "y" ? true :
+          lower(try(row.audit_log_forwarding_override, "")) == "n" ? false :
+          var.enable_audit_log_forwarding
+        )
+      }
+  }
 
   # Parse the content from the external data source
   logging_services = jsondecode(data.external.logging_services.result["content"])
@@ -24,11 +34,11 @@ locals {
 
   # Generate a Cartesian product of compartments and filtered services
   logging_targets = flatten([
-    for compartment_id in local.logging_compartment_ids : [
+    for compartment_id in keys(local.logging_configurations) : [
       for service in local.filtered_services : {
-        compartment_id = compartment_id
-        service_id     = service.id
-        resource_types = service.resourceTypes
+      compartment_id = compartment_id
+      service_id     = service.id
+      resource_types = service.resourceTypes
       }
     ]
   ])

@@ -35,3 +35,8 @@ variable "logs_map" {
     compartmentid = string
   }))
 }
+
+variable "enable_audit_log_forwarding" {
+  type        = bool
+  description = "Enable forwarding of audit logs to Datadog"
+}

@@ -124,3 +124,9 @@ variable "logging_compartments_csv" {
   description = "Base64-encoded CSV file containing compartment IDs."
   type        = string
 }
+
+variable "enable_audit_log_forwarding" {
+  type        = bool
+  default     = false
+  description = "Enable forwarding of audit logs to Datadog"
+}
