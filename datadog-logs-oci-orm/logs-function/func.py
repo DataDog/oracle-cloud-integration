@@ -11,16 +11,7 @@ DD_SOURCE = "oci.logs"  # Adding a source default name. The source will be mappe
 DD_SERVICE = "oci"  # Adding a service name.
 DD_TIMEOUT = 10 * 60  # Adding a timeout for the Datadog API call.
 DD_BATCH_SIZE = 1000  # Adding a batch size for the Datadog API call.
-REDACTED_FIELDS = [
-    "data.identity.credentials",
-    "data.request.headers.Authorization",
-    "data.request.headers.authorization",
-    "data.request.headers.X-OCI-LB-PrivateAccessMetadata",
-    "data.request.headers.opc-principal"
-]
 
-def _should_redact_sensitive_data() -> bool:
-    return os.environ.get("REDACT_SENSITIVE_DATA", "true").lower() == "true"
 
 def _should_compress_payload() -> bool:
     return os.environ.get("DD_COMPRESS", "true").lower() == "true"
@@ -105,38 +96,7 @@ def _get_oci_source_name(body: dict) -> str:
 
     return DD_SOURCE
 
-def _redact_sensitive_data(body: dict) -> dict:
-    """
-    Redacts sensitive data from the log entry.
-    This function removes the specified fields from the log entry to ensure that sensitive information is not sent to Datadog.
- 
-    Args:
-        body (dict): A log entry represented as a dictionary.
-
-    Returns:
-        dict: The log entry with sensitive data redacted.
-    """
-    def redact_field(obj, field_path):
-        keys = field_path.split(".")
-        for key in keys[:-1]:
-            if key in obj:
-                obj = obj[key]
-            else:
-                return  # Stop if the path does not exist
-        # Redact the final key if it exists
-        if keys[-1] in obj:
-            obj[keys[-1]] = "REDACTED"
-
-    for field_path in REDACTED_FIELDS:
-        redact_field(body, field_path)
-
-    return body
-
-
 def _process_single_log(body: dict) -> dict:
-    if _should_redact_sensitive_data():
-        body = _redact_sensitive_data(body=body)
-
     data = body.get("data", {})
     source = body.get("source")
     time = body.get("time")

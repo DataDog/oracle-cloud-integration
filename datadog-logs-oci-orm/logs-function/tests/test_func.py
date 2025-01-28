@@ -33,10 +33,7 @@ class TestLogForwarderFunction(TestCase):
             "data": {
               "level": "INFO",
               "message": "Run succeeded - Read 0 messages from source and wrote 0 messages to target",
-              "messageType": "CONNECTOR_RUN_COMPLETED",
-              "identity": {
-                "credentials": "credentials"
-              }
+              "messageType": "CONNECTOR_RUN_COMPLETED"
             },
             "id": "6b9819cf-d004-4dbc-9978-b713e743ad08",
             "oracle": {
@@ -59,13 +56,7 @@ class TestLogForwarderFunction(TestCase):
             "data": {
               "level": "INFO",
               "message": "Run succeeded - Read 0 messages from source and wrote 0 messages to target",
-              "messageType": "CONNECTOR_RUN_COMPLETED",
-              "request":{
-                "headers": {
-                    "X-OCI-LB-PrivateAccessMetadata": "metadata",
-                    "opc-principal": "principal"
-                }
-              }
+              "messageType": "CONNECTOR_RUN_COMPLETED"
             },
             "id": "6b9819cf-d004-4dbc-9978-b713e743ad08",
             "oracle": {
@@ -92,10 +83,7 @@ class TestLogForwarderFunction(TestCase):
             {
                 "level": "INFO",
                 "message": "Run succeeded - Read 0 messages from source and wrote 0 messages to target",
-                "messageType": "CONNECTOR_RUN_COMPLETED",
-                "identity": {
-                    "credentials": "REDACTED"
-                }
+                "messageType": "CONNECTOR_RUN_COMPLETED"
             },
             "ddsource": "oci.sch",
             "service": "oci",
@@ -118,13 +106,7 @@ class TestLogForwarderFunction(TestCase):
             {
                 "level": "INFO",
                 "message": "Run succeeded - Read 0 messages from source and wrote 0 messages to target",
-                "messageType": "CONNECTOR_RUN_COMPLETED",
-                "request": {
-                    "headers": {
-                        "X-OCI-LB-PrivateAccessMetadata": "REDACTED",
-                        "opc-principal": "REDACTED"
-                    }
-                }
+                "messageType": "CONNECTOR_RUN_COMPLETED"
             },
             "ddsource": "oci.audit",
             "service": "oci",
