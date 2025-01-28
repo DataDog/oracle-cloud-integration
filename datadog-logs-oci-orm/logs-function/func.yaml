@@ -10,3 +10,4 @@ config:
   DATADOG_TOKEN: <DATADOG_API_TOKEN>                                # DD API Token
   DD_COMPRESS: "true"                                               # Enable Compression
   # DATADOG_TAGS: "prod:true"                                       # Tags associated with logs
+  REDACT_SENSITIVE_DATA: "true"                                  # Redact sensitive data
