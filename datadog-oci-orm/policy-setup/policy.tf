@@ -41,7 +41,7 @@ resource "oci_identity_user" "read_only_user" {
     compartment_id = var.tenancy_ocid
     description = "[DO NOT REMOVE] Read only user created for fetching resources metadata which is used by Datadog Integrations"
     name = "DatadogAuthUser"
-    email = "test@test.com"
+    email = "test@datadoghq.com"
 
     #Optional
     defined_tags = {}
