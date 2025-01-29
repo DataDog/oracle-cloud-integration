@@ -1,4 +1,3 @@
-/*
 output "vcn_network_details" {
   description = "Output of VCN Network Details"
   value = module.vcn.vcn_network_details
@@ -23,7 +22,7 @@ output "function_details" {
   description = "Output of function creation"
   value = module.function.function_details
 }
-*/
+
 output "logging_details" {
   description = "Output of logging details"
   value = {

@@ -41,7 +41,7 @@ data "external" "logs_outside_compartment" {
       "bash",
       "modules/logging/search_logs_outside_compartment.sh",
       local.log_group_ids_string,
-      each.key,
+      each.value.resource_id,
       each.value.log_group != null ? "Y" : "N"
     ]
 }
