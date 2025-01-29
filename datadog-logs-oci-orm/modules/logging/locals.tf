@@ -58,18 +58,6 @@ locals {
                             jsondecode(data.external.logs_outside_compartment["${resource.resource_id}-${resource.category}"].result.content) : resource.log_group)
         }
     ]
-
-    # Sorted keys for resource evaluation based on time created, resource ID, service ID, and category
-    sorted_keys = sort([for item in local.updated_resource_evaluation : "${item.time_created}_${item.resource_id}_${item.service_id}_${item.category}"])
-    
-    # Sorted resource evaluation based on sorted keys
-    sorted_resource_evaluation = [
-        for key in local.sorted_keys : lookup(
-            { for item in local.updated_resource_evaluation : "${item.time_created}_${item.resource_id}_${item.service_id}_${item.category}" => item },
-            key
-        )
-    ]
-    
 }
 
 locals {
@@ -78,7 +66,7 @@ locals {
     
     # Set of log groups excluding the Datadog log group
     log_groups = toset([
-        for item in local.sorted_resource_evaluation : {
+        for item in local.updated_resource_evaluation : {
             log_group_id   = item.log_group.log_group_id
             compartment_id = item.log_group.compartment_id
         }
@@ -87,11 +75,11 @@ locals {
 
     # Map of resources without logs or with logs in the Datadog log group
     resources_without_logs = zipmap(
-        [for idx, item in range(length(local.sorted_resource_evaluation)) :
-            "${local.sorted_resource_evaluation[idx].resource_name}_${local.sorted_resource_evaluation[idx].category}_${idx}"
-            if local.sorted_resource_evaluation[idx].log_group == null || try(local.sorted_resource_evaluation[idx].log_group.log_group_id, "") == local.datadog_log_group_id
+        [for idx, item in range(length(local.updated_resource_evaluation)) :
+            "${local.updated_resource_evaluation[idx].resource_id}_${local.updated_resource_evaluation[idx].category}"
+            if local.updated_resource_evaluation[idx].log_group == null || try(local.updated_resource_evaluation[idx].log_group.log_group_id, "") == local.datadog_log_group_id
         ],
-        [for item in local.sorted_resource_evaluation : item if item.log_group == null || try(item.log_group.log_group_id, "") == local.datadog_log_group_id]
+        [for item in local.updated_resource_evaluation : item if item.log_group == null || try(item.log_group.log_group_id, "") == local.datadog_log_group_id]
     )
     
 }
