@@ -26,6 +26,11 @@ output "function_details" {
 output "logging_details" {
   description = "Output of logging details"
   value = {
-      for k, v in module.logging : k => v.details if length(v.details) > 0
+      for k, v in module.logging : k => v.details
     }
+}
+
+output "connectorhub_details" {
+  description = "Output of connector hub details"
+  value = module.connectorhub.connectorhub_details
 }

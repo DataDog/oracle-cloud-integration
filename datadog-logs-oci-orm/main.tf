@@ -65,3 +65,14 @@ module "logging" {
     resources = flatten(lookup(local.compartment_resources,each.value,[]))
     enable_audit_log_forwarding = local.logging_configurations[each.value].enable_audit_log_forwarding
 }
+
+module "connectorhub" {
+    source = "./modules/connectorhub"
+    freeform_tags = local.freeform_tags
+    compartment_ocid = var.compartment_ocid
+    resource_name_prefix = var.resource_name_prefix
+    #function_ocid = module.function.function_details.function_ocid
+    function_ocid = ""
+    service_log_groups = local.service_log_groups
+    audit_log_groups = local.audit_log_groups
+}

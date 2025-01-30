@@ -119,3 +119,33 @@ locals {
     )
   })
 }
+
+locals {
+  preexisting_service_log_groups = flatten([
+    for compartment_id, value in module.logging : 
+      value.details.preexisting_log_groups
+  ])
+  
+  # Extract service log groups if they are not null
+  datadog_service_log_groups = [
+    for compartment_id, value in module.logging : 
+      {
+        log_group_id = value.details.datadog_service_loggroup_id
+        compartment_id     = compartment_id
+      }
+      if try(value.details.datadog_service_log_group_id, null) != null
+  ]
+
+  service_log_groups = toset(concat(local.preexisting_service_log_groups, local.datadog_service_log_groups))
+
+  # Extract audit log groups if they are not null
+  audit_log_groups = toset([
+    for compartment_id, value in module.logging : 
+      {
+        log_group_id = value.details.audit_log_group_id
+        compartment_id     = compartment_id
+      }
+      if value.details.audit_log_group_id != null 
+  ])
+  
+}
