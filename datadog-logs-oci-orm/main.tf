@@ -57,10 +57,11 @@ module "resourcediscovery" {
 }
 
 module "logging" {
-    for_each = toset(local.logging_compartment_ids)
+    for_each = toset(keys(local.logging_configurations))
     source = "./modules/logging"
     tenancy_ocid = var.tenancy_ocid
     compartment_ocid = each.value
     service_map = local.service_map
     resources = flatten(lookup(local.compartment_resources,each.value,[]))
+    enable_audit_log_forwarding = local.logging_configurations[each.value].enable_audit_log_forwarding
 }

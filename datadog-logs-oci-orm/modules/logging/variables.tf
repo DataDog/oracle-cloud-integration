@@ -30,3 +30,8 @@ variable "resources" {
     timeCreated   = string
   }))
 }
+
+variable "enable_audit_log_forwarding" {
+  type        = bool
+  description = "Enable forwarding of audit logs to Datadog"
+}

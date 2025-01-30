@@ -40,6 +40,7 @@ variableGroups:
     variables:
       - ${exclude_services}
       - ${logging_compartments_csv}
+      - ${enable_audit_log_forwarding}
 
 variables:
   current_user_ocid:
@@ -234,3 +235,10 @@ variables:
     description: "Upload a CSV file containing the list of compartments. The file must include a column named 'compartment_id'."
     type: file
     required: true
+  
+  enable_audit_log_forwarding:
+    title: Enable Audit Log Forwarding
+    description: Enable forwarding of audit logs for selected compartments to Datadog.
+    type: boolean
+    required: true
+    default: false

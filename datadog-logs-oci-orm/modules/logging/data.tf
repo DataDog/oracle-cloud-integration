@@ -6,6 +6,17 @@ data "oci_logging_log_groups" "datadog_log_group" {
     display_name = "datadog-service-logs"
 }
 
+
+data "oci_logging_log_groups" "audit_log_group" {
+    count = var.enable_audit_log_forwarding ? 1 : 0
+
+    #Required
+    compartment_id = var.compartment_ocid
+
+    #Optional
+    display_name = "_Audit"
+}
+
 # Step 1: Fetch all compartments in the tenancy
 data "oci_identity_compartments" "all_compartments" {
   compartment_id = var.tenancy_ocid
