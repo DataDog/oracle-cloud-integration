@@ -130,7 +130,7 @@ locals {
   datadog_service_log_groups = [
     for compartment_id, value in module.logging : 
       {
-        log_group_id = value.details.datadog_service_loggroup_id
+        log_group_id = try(value.details.datadog_service_log_group_id, null)
         compartment_id     = compartment_id
       }
       if try(value.details.datadog_service_log_group_id, null) != null

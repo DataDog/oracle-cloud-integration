@@ -71,8 +71,7 @@ module "connectorhub" {
     freeform_tags = local.freeform_tags
     compartment_ocid = var.compartment_ocid
     resource_name_prefix = var.resource_name_prefix
-    #function_ocid = module.function.function_details.function_ocid
-    function_ocid = ""
+    function_ocid = module.function.function_details.function_ocid
     service_log_groups = local.service_log_groups
     audit_log_groups = local.audit_log_groups
 }
