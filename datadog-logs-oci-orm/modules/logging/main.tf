@@ -12,7 +12,7 @@ resource "oci_logging_log_group" "datadog_service_log_group" {
 resource "oci_logging_log" "service_logs" {
     for_each = local.resources_without_logs
     #Required
-    display_name = replace(each.key, " ", "_")
+    display_name = each.key
     log_group_id = oci_logging_log_group.datadog_service_log_group[0].id
     log_type = "SERVICE"
 

@@ -119,35 +119,3 @@ locals {
     )
   })
 }
-
-locals {
-    allowed_service_ids = [for key, value in local.service_map : split("_", key)[0]]
-    filtered_logs = flatten([
-        for log_group in data.oci_logging_logs.logs_by_log_group : [
-            for log in log_group.logs :
-            # Filter logs based on the allowed_services variable
-            {
-                log_group_ocid  = log.log_group_id
-                #log_ocid       = log.id
-                state           = log.state
-                #log_type       = log.log_type
-                compartment_id  = log.compartment_id
-                is_enabled      = log.is_enabled
-                resource_id     = try(log.configuration[0].source[0].resource, null)
-                service_id      = try(log.configuration[0].source[0].service, null)
-                category        = try(log.configuration[0].source[0].category, null)
-            } if contains(local.allowed_service_ids, try(log.configuration[0].source[0].service, ""))
-        ]
-    ])
-
-    # Map for resourceId_service_category => [{loggroupid, state, is_enabled}]
-    logs_map = tomap({
-        for log in local.filtered_logs : 
-        "${log.resource_id}_${log.service_id}_${log.category}" => {
-            loggroupid = log.log_group_ocid
-            state      = log.state
-            is_enabled = log.is_enabled
-            compartmentid = log.compartment_id
-        }
-    })
-}
