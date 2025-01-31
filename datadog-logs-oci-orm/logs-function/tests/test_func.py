@@ -56,7 +56,16 @@ class TestLogForwarderFunction(TestCase):
             "data": {
               "level": "INFO",
               "message": "Run succeeded - Read 0 messages from source and wrote 0 messages to target",
-              "messageType": "CONNECTOR_RUN_COMPLETED"
+              "messageType": "CONNECTOR_RUN_COMPLETED",
+              "identity": {
+                "credentials": "CREDENTIALS"
+              },
+              "request": {
+                "headers": {
+                    "opc-principal": [ "something" ],
+                    "X-OCI-LB-PrivateAccessMetadata": [ "anotherthing" ]
+                }
+              }
             },
             "id": "6b9819cf-d004-4dbc-9978-b713e743ad08",
             "oracle": {
@@ -83,7 +92,7 @@ class TestLogForwarderFunction(TestCase):
             {
                 "level": "INFO",
                 "message": "Run succeeded - Read 0 messages from source and wrote 0 messages to target",
-                "messageType": "CONNECTOR_RUN_COMPLETED"
+                "messageType": "CONNECTOR_RUN_COMPLETED",
             },
             "ddsource": "oci.sch",
             "service": "oci",
@@ -106,7 +115,16 @@ class TestLogForwarderFunction(TestCase):
             {
                 "level": "INFO",
                 "message": "Run succeeded - Read 0 messages from source and wrote 0 messages to target",
-                "messageType": "CONNECTOR_RUN_COMPLETED"
+                "messageType": "CONNECTOR_RUN_COMPLETED",
+                "identity": {
+                    "credentials": "******"
+                },
+                "request": {
+                    "headers": {
+                        "opc-principal": "******",
+                        "X-OCI-LB-PrivateAccessMetadata": "******"
+                    }
+                }
             },
             "ddsource": "oci.audit",
             "service": "oci",
@@ -147,7 +165,7 @@ class TestLogForwarderFunction(TestCase):
             self.assertEqual(
                 "gzip",
                 mock_post.mock_calls[0].kwargs['headers']['Content-Encoding']
-            )        
+            )
 
     @mock.patch("requests.post")
     def test_audit_log(self, mock_post, ):
@@ -166,7 +184,7 @@ class TestLogForwarderFunction(TestCase):
             self.assertEqual(
                 "gzip",
                 mock_post.mock_calls[0].kwargs['headers']['Content-Encoding']
-            )    
+            )
 
     @mock.patch("requests.post")
     def test_simple_data_tags(self, mock_post, ):
@@ -202,8 +220,8 @@ class TestLogForwarderFunction(TestCase):
                 total_calls = (batch_count + DD_BATCH_SIZE - 1) // DD_BATCH_SIZE
                 handler(ctx=None, data=to_bytes_io(payload))
                 self.assertEqual(
-                    total_calls, 
-                    mock_post.call_count, 
+                    total_calls,
+                    mock_post.call_count,
                     "Data was successfully submitted for the entire batch"
                 )
                 for i in range(total_calls):
