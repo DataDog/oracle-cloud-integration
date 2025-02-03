@@ -42,30 +42,6 @@ variable "tenancy_ocid" {
   description = "OCI tenant OCID, more details can be found at https://docs.cloud.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm#five"
 }
 
-variable "current_user_ocid" {
-  type        = string
-  description = "OCID of the logged in user running the terraform script"
-}
-
-#************************************
-#   Function Application Variables   
-#************************************
-variable "function_app_shape" {
-  type        = string
-  default     = "GENERIC_ARM"
-  description = "The shape of the function application. The docker image should be built accordingly. Use ARM if using Oracle Resource manager stack"
-  validation {
-    condition     = contains(["GENERIC_ARM", "GENERIC_X86", "GENERIC_X86_ARM"], var.function_app_shape)
-    error_message = "Valid values are: GENERIC_ARM, GENERIC_X86, GENERIC_X86_ARM."
-  }
-}
-
-variable "function_image_path" {
-  type        = string
-  default     = ""
-  description = "The full path of the function image. The image should be present in the container registry for the region"
-}
-
 #*************************************
 #         Datadog Variables
 #*************************************
@@ -90,39 +66,32 @@ variable "datadog_tags" {
 }
 
 #************************************
-#    Container Registry Variables    
+#    Function setting Variables    
 #************************************
-variable "auth_token_description" {
-  description = "The description of the auth token to use for container registry login"
+variable "oci_docker_username" {
   type        = string
-  default     = "datadog-auth-token"
-}
-
-variable "auth_token" {
-  type        = string
-  default     = ""
   sensitive   = true
-  description = "The user auth token for docker login to OCI container registry."
+  description = "The docker login username for the OCI container registry. Used in creating function image."
 }
 
-variable "service_user_ocid" {
+variable "oci_docker_password" {
   type        = string
-  default     = ""
-  description = "The OCID of the service user to be used for Docker login and pushing images."
+  sensitive   = true
+  description = "The user auth token for the OCI docker container registry. Used in creating function image."
 }
 
 #***************
 #    Logging    
 #***************
-variable "exclude_services" {
+variable "include_services" {
   type        = list(string)
   default     = []
-  description = "List of services to be excluded from logging"
+  description = "List of services to be included in logging"
 }
 
-variable "logging_compartments_csv" {
-  description = "Base64-encoded CSV file containing compartment IDs."
+variable "logging_compartments" {
   type        = string
+  description = "The comma separated list of compartments OCID to collect logs."
 }
 
 variable "enable_audit_log_forwarding" {

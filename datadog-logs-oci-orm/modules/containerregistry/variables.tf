@@ -3,9 +3,9 @@ variable "tenancy_ocid" {
   description = "OCI tenant OCID, more details can be found at https://docs.cloud.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm#five"
 }
 
-variable "user_ocid" {
+variable "username" {
   type        = string
-  description = "OCID of the user for managing docker images"
+  description = "Username for managing docker images"
 }
 
 variable "compartment_ocid" {
@@ -27,11 +27,6 @@ variable "resource_name_prefix" {
 variable "region" {
   type        = string
   description = "OCI Region as documented at https://docs.cloud.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm"
-}
-
-variable "auth_token_description" {
-  description = "The description of the auth token to use for container registry login"
-  type        = string
 }
 
 variable "auth_token" {
