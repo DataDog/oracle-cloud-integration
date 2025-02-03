@@ -18,7 +18,7 @@ for lgid in "${types[@]}"; do
     if [[ $(echo "$response" | jq 'length') -ne 0 ]]; then
         output_file="${RESOURCE_ID}.json"
         echo "[]" > $output_file # Initialize the output file with an empty JSON array
-        loggroup=$(echo "$response" | jq -c '.[0] | {log_group_id: .id, state: .["lifecycle-state"], is_enabled: .["is-enabled"], compartment_id: .["compartment-id"]}')
+        loggroup=$(echo "$response" | jq -c '.[0] | {log_group_id: .["log-group-id"], state: .["lifecycle-state"], is_enabled: .["is-enabled"], compartment_id: .["compartment-id"]}')
         # Write the response to the output file
         echo "$loggroup" > "$output_file"
         found=true

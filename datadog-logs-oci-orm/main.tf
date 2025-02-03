@@ -1,3 +1,4 @@
+/*
 module "vcn" {
     source = "./modules/vcn"
     compartment_ocid = var.vcn_compartment
@@ -47,7 +48,7 @@ module "function" {
     function_app_ocid = module.functionapp.function_app_details.function_app_ocid
     function_image_path = var.function_image_path == "" ? module.containerregistry[0].containerregistry_details.function_image_path : var.function_image_path
 }
-
+*/
 module "resourcediscovery" {
     for_each = { for target in local.logging_targets : "${target.compartment_id}_${target.service_id}" => target }
     source = "./modules/resourcediscovery"
@@ -57,13 +58,12 @@ module "resourcediscovery" {
 }
 
 module "logging" {
-    for_each = toset(keys(local.logging_configurations))
+    for_each = local.logging_compartment_ids
     source = "./modules/logging"
     tenancy_ocid = var.tenancy_ocid
     compartment_ocid = each.value
     service_map = local.service_map
     resources = flatten(lookup(local.compartment_resources,each.value,[]))
-    enable_audit_log_forwarding = local.logging_configurations[each.value].enable_audit_log_forwarding
 }
 
 module "connectorhub" {
@@ -71,7 +71,8 @@ module "connectorhub" {
     freeform_tags = local.freeform_tags
     compartment_ocid = var.compartment_ocid
     resource_name_prefix = var.resource_name_prefix
-    function_ocid = module.function.function_details.function_ocid
+    #function_ocid = module.function.function_details.function_ocid
+    function_ocid = "ocid1.fnfunc.oc1.iad.aaaaaaaaj6hnervgi25aviy3bu254qd6u2i7fwye3vkiubmiuksgvrtijjdq"
     service_log_groups = local.service_log_groups
-    audit_log_groups = local.audit_log_groups
+    audit_log_compartments = var.enable_audit_log_forwarding ? local.logging_compartment_ids : []
 }

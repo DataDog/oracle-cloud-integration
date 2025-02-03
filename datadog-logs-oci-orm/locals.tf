@@ -10,17 +10,9 @@ locals {
   logging_csv_content = base64decode(var.logging_compartments_csv)
   logging_compartments = csvdecode(local.logging_csv_content)
 
-  logging_configurations = {
-    for row in local.logging_compartments :
-    row.compartment_id =>
-      {
-        enable_audit_log_forwarding = (
-          lower(try(row.audit_log_forwarding_override, "")) == "y" ? true :
-          lower(try(row.audit_log_forwarding_override, "")) == "n" ? false :
-          var.enable_audit_log_forwarding
-        )
-      }
-  }
+  logging_compartment_ids = toset([
+    for row in local.logging_compartments : row.compartment_id
+  ])
 
   # Parse the content from the external data source
   logging_services = jsondecode(data.external.logging_services.result["content"])
@@ -33,7 +25,7 @@ locals {
 
   # Generate a Cartesian product of compartments and filtered services
   logging_targets = flatten([
-    for compartment_id in keys(local.logging_configurations) : [
+    for compartment_id in local.logging_compartment_ids : [
       for service in local.filtered_services : {
       compartment_id = compartment_id
       service_id     = service.id
@@ -138,14 +130,4 @@ locals {
 
   service_log_groups = toset(concat(local.preexisting_service_log_groups, local.datadog_service_log_groups))
 
-  # Extract audit log groups if they are not null
-  audit_log_groups = toset([
-    for compartment_id, value in module.logging : 
-      {
-        log_group_id = value.details.audit_log_group_id
-        compartment_id     = compartment_id
-      }
-      if value.details.audit_log_group_id != null 
-  ])
-  
 }

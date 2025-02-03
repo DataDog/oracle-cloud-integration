@@ -26,7 +26,7 @@ resource "oci_sch_service_connector" "service_log_connector" {
 
 # Audit Log Connector
 resource "oci_sch_service_connector" "audit_log_connector" {
-    count          = length(var.audit_log_groups) > 0 ? 1 : 0
+    count          = length(var.audit_log_compartments) > 0 ? 1 : 0
     compartment_id = var.compartment_ocid
     display_name   = local.audit_connector_name
     description    = "Terraform created connector hub to distribute audit logs"
@@ -34,10 +34,10 @@ resource "oci_sch_service_connector" "audit_log_connector" {
     source {
         kind = "logging"
         dynamic "log_sources" {
-            for_each = var.audit_log_groups
+            for_each = var.audit_log_compartments
             content {
-                compartment_id = log_sources.value.compartment_id
-                log_group_id   = log_sources.value.log_group_id
+                compartment_id = log_sources.value
+                log_group_id   = "_Audit"
             }
         }
     }

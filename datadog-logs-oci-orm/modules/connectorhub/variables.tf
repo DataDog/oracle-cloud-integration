@@ -19,12 +19,9 @@ variable "function_ocid" {
   type        = string
 }
 
-variable "audit_log_groups" {
-  description = "A list of maps where each map contains details about an audit log group, including the log group ID and the compartment ID where it is located."
-  type = list(object({
-    log_group_id = string
-    compartment_id     = string
-  }))
+variable "audit_log_compartments" {
+  description = "List of audit log compartments"
+  type = list(string)
 }
 
 variable "service_log_groups" {
