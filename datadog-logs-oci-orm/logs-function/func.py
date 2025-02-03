@@ -11,7 +11,13 @@ DD_SOURCE = "oci.logs"  # Adding a source default name. The source will be mappe
 DD_SERVICE = "oci"  # Adding a service name.
 DD_TIMEOUT = 10 * 60  # Adding a timeout for the Datadog API call.
 DD_BATCH_SIZE = 1000  # Adding a batch size for the Datadog API call.
-
+REDACTED_FIELDS = [
+    "data.identity.credentials",
+    "data.request.headers.Authorization",
+    "data.request.headers.authorization",
+    "data.request.headers.X-OCI-LB-PrivateAccessMetadata",
+    "data.request.headers.opc-principal"
+]
 
 def _should_compress_payload() -> bool:
     return os.environ.get("DD_COMPRESS", "true").lower() == "true"
@@ -52,7 +58,7 @@ def _process(body: list[dict]) -> None:
 
     try:
         dd_url = f"https://{dd_host}/api/v2/logs"
-        payload = [_process_single_log(b) for b in body]
+        payload = [_redact_sensitive_data(_process_single_log(b)) for b in body]
         headers = {
             "Content-type": "application/json",
             "DD-API-KEY": dd_token
@@ -96,13 +102,31 @@ def _get_oci_source_name(body: dict) -> str:
 
     return DD_SOURCE
 
+def _redact_sensitive_data(body: dict) -> dict:
+    def redact_field(obj, field_path):
+        keys = field_path.split(".")
+        for key in keys[:-1]:
+            if key in obj and isinstance(obj[key], dict):
+                obj = obj[key]
+            else:
+                return  # Stop if the path does not exist or isn't a dict
+        # Redact the final key if it exists and is not None
+        if keys[-1] in obj and obj[keys[-1]] is not None:
+            obj[keys[-1]] = "******"
+
+    for field_path in REDACTED_FIELDS:
+        redact_field(body, field_path)
+
+    return body
 def _process_single_log(body: dict) -> dict:
-    data = body.get("data", {})
-    source = body.get("source")
-    time = body.get("time")
-    logtype = body.get("type")
-    oracle = body.get("oracle")
-    ddsource = _get_oci_source_name(body)
+    modified_body = _redact_sensitive_data(body)
+
+    data = modified_body.get("data", {})
+    source = modified_body.get("source")
+    time = modified_body.get("time")
+    logtype = modified_body.get("type")
+    oracle = modified_body.get("oracle")
+    ddsource = _get_oci_source_name(modified_body)
 
     payload = {
         "source": source,
