@@ -8,8 +8,3 @@ variable "freeform_tags" {
   description = "A map of freeform tags to apply to the resources"
   default     = {}
 }
-
-variable "resource_name_prefix" {
-  type        = string
-  description = "The prefix for the name of all of the resources"
-}
