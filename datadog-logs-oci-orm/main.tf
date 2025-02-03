@@ -10,7 +10,6 @@ module "vcn" {
 module "policy" {
     source = "./modules/policy"
     tenancy_ocid = var.tenancy_ocid
-    resource_name_prefix = var.resource_name_prefix
     freeform_tags = local.freeform_tags
 }
 
