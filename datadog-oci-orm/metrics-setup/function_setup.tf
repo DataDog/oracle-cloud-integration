@@ -14,7 +14,7 @@ resource "null_resource" "Login2OCIR" {
            if [ $i -eq 5 ]; then
                echo "Error: Docker login failed after 5 attempts. Trying to login through Oracle Identity Cloud Service"
                for j in {1..5}; do
-                   echo "${var.oci_docker_password}" | docker login ${local.oci_docker_repository} --username ${local.ocir_namespace}/oracleidentitycloudservice/$username --password-stdin && break
+                   echo "${var.oci_docker_password}" | docker login ${local.oci_docker_repository} --username ${local.ocir_namespace}/oracleidentitycloudservice/${var.oci_docker_username} --password-stdin && break
                    echo "Retrying Docker login through Identity service... attempt $j"
                    sleep 5
                done
