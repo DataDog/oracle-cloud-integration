@@ -23,8 +23,6 @@ variableGroups:
   - title: "Function settings"
     variables:
       - ${function_app_shape}
-      - ${oci_docker_username}
-      - ${oci_docker_password}
 
 variables:
   resource_name_prefix:
@@ -174,7 +172,6 @@ variables:
       - "oci_waf"
       - "oracle_oci_database"
 
-
   # Function setup
   function_app_shape:
     title: Function Application shape
@@ -185,16 +182,4 @@ variables:
       - GENERIC_ARM
       - GENERIC_X86
     default: GENERIC_ARM
-  oci_docker_username:
-    title: OCI Docker registry user name
-    type: string
-    description: The user login for the OCI docker container registry to push function image. Not required if using an existing image path.
-    required: true
-    sensitive: true
-  oci_docker_password:
-    title: OCI Docker registry auth token
-    type: password
-    description: The user auth token for the OCI docker container registry. Used in creating function image.
-    required: true
-    sensitive: true
 

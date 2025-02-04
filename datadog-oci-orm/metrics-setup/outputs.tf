@@ -3,7 +3,7 @@
 output "vcn_network_details" {
   depends_on  = [module.vcn]
   description = "Output of the created network infra"
-  value = var.create_vcn ? {
+  value = var.create_vcn && length(module.vcn) > 0 ? {
     vcn_id             = module.vcn[0].vcn_id
     nat_gateway_id     = module.vcn[0].nat_gateway_id
     nat_route_id       = module.vcn[0].nat_route_id
@@ -22,17 +22,22 @@ output "vcn_network_details" {
 
 output "function_application" {
   description = "OCID of the Function app"
-  value       = oci_functions_application.metrics_function_app.id
+  value       = [for app in oci_functions_application.metrics_function_app : app.id]
 }
 
 output "function_application_function" {
   description = "OCID of the Function"
-  value       = oci_functions_function.metrics_function.id
+  value       = [for app in oci_functions_function.metrics_function : app.id]
 }
 
 output "compartment_map" {
   description = "Derived namespaces"
   value       = local.final_namespaces
+}
+
+output "service_account_error" {
+  description = "Message in case service user has not been created."
+  value       = local.is_service_user_available ? "" : "Service user not available to create function images. Please run the policy stack to create the service user."
 }
 
 output "namespace_error" {

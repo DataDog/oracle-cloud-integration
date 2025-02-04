@@ -27,6 +27,7 @@ locals {
   })
   oci_region_key      = lower(local.oci_regions[var.region].region_key)
   tenancy_home_region = data.oci_identity_tenancy.tenancy_metadata.home_region_key
+  home_region_name    = [for key, reg in local.oci_regions : reg.region_name if reg.region_key == local.tenancy_home_region][0]
   is_gov_cloud_region = contains(["us-langley-1", "us-luke-1", "us-gov-ashburn-1", "us-gov-chicago-1", "us-gov-phoenix-1"], var.region)
 }
 

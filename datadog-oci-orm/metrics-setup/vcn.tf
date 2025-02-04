@@ -2,7 +2,7 @@ module "vcn" {
   depends_on               = [data.oci_objectstorage_namespace.namespace]
   source                   = "oracle-terraform-modules/vcn/oci"
   version                  = "3.6.0"
-  count                    = var.create_vcn ? 1 : 0
+  count                    = var.create_vcn && local.is_service_user_available ? 1 : 0
   compartment_id           = var.compartment_ocid
   defined_tags             = {}
   freeform_tags            = local.freeform_tags
