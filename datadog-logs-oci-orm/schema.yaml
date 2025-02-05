@@ -28,8 +28,8 @@ variableGroups:
       - ${oci_docker_password}
   - title: "Logging"
     variables:
+      - ${logging_compartments}
       - ${include_services}
-      - ${logging_compartments_csv}
       - ${enable_audit_log_forwarding}
 
 variables:
