@@ -22,6 +22,7 @@ variableGroups:
       - ${metrics_compartments}
   - title: "Function settings"
     variables:
+      - ${function_app_shape}
       - ${oci_docker_username}
       - ${oci_docker_password}
 
@@ -52,7 +53,7 @@ variables:
   tenancy_ocid:
     required: true
     type: string
-    visible: false        
+    visible: false
 
 # VCN
   vcnCompartment:
@@ -65,7 +66,7 @@ variables:
     type: oci:core:vcn:id
     visible:
       not:
-        - ${create_vcn}    
+        - ${create_vcn}
     dependsOn:
       compartmentId: ${vcnCompartment}
   function_subnet_id:
@@ -144,7 +145,7 @@ variables:
       - "oci_vcn"
       - "oci_vpn"
       - "oci_waf"
-      - "oracle_oci_database"   
+      - "oracle_oci_database"
     enum:
       - "oci_autonomous_database"
       - "oci_blockstore"
@@ -172,9 +173,18 @@ variables:
       - "oci_vpn"
       - "oci_waf"
       - "oracle_oci_database"
-    
+
 
   # Function setup
+  function_app_shape:
+    title: Function Application shape
+    type: enum
+    description: The shape of the function application. The docker image should be built accordingly. Select GENERIC_X86 if there's an error in creating with GENERIC_ARM.
+    required: true
+    enum:
+      - GENERIC_ARM
+      - GENERIC_X86
+    default: GENERIC_ARM
   oci_docker_username:
     title: OCI Docker registry user name
     type: string

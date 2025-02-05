@@ -21,6 +21,16 @@ variable "function_subnet_id" {
   description = "The OCID of the subnet to be used for the function app. If create_vcn is set to true, that will take precedence"
 }
 
+variable "function_app_shape" {
+  type        = string
+  default     = "GENERIC_ARM"
+  description = "The shape of the function application. The docker image should be built accordingly. Select GENERIC_X86 if there's an error in creating with GENERIC_ARM."
+  validation {
+    condition     = contains(["GENERIC_ARM", "GENERIC_X86"], var.function_app_shape)
+    error_message = "Valid values are: GENERIC_ARM, GENERIC_X86."
+  }
+}
+
 variable "datadog_environment" {
   type        = string
   description = "The endpoint to hit for sending the metrics. Varies by different datacenter"
