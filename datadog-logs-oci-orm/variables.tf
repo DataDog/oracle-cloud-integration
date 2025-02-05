@@ -66,7 +66,7 @@ variable "datadog_tags" {
 }
 
 #************************************
-#    Function setting Variables    
+#    Function setup Variables    
 #************************************
 variable "oci_docker_username" {
   type        = string

@@ -110,7 +110,7 @@ variables:
   oci_docker_username:
     title: OCI Docker registry user name
     type: string
-    description: The user login for the OCI docker container registry to push function image. Not required if using an existing image path.
+    description: The user login for the OCI docker container registry to push function image.
     required: true
     sensitive: true
   oci_docker_password:
@@ -124,7 +124,7 @@ variables:
   include_services:
     title: Include Services for Logging
     type: enum
-    description: List of services to exclude from logging.
+    description: List of services to include for logging.
     required: false
     default:
       - "flowlogs"
@@ -152,6 +152,7 @@ variables:
       - "functions"
       - "goldengate"
       - "integration"
+      - "keymanagementservice"
       - "loadbalancer"
       - "mediaflow"
       - "ocinetworkfirewall"
@@ -167,7 +168,7 @@ variables:
     title: Logging compartments
     type: text
     required: true
-    description: The list of logging compartments. Enter comma separated list of OCID of compartments to monitor.
+    description: The list of logging compartments. Enter comma separated list of OCID of compartments from which logs should be forwarded.
     default: ${tenancy_ocid}
     multiline: true
   
