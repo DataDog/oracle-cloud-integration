@@ -11,7 +11,7 @@ resource "oci_functions_application" "logs_function_app" {
   freeform_tags = var.freeform_tags
   network_security_group_ids = [
   ]
-  shape = var.function_app_shape
+  shape = "GENERIC_ARM"
   subnet_ids = [
     var.subnet_ocid,
   ]
