@@ -1,3 +1,4 @@
+# Service Log Connector
 resource "oci_sch_service_connector" "service_log_connector" {
     compartment_id = var.compartment_ocid
     display_name   = local.service_connector_name
