@@ -11,7 +11,6 @@ variableGroups:
       - ${tenancy_ocid}
       - ${region}
       - ${compartment_ocid}
-      - ${current_user_ocid}
   - title: "Network options"
     variables:
       - ${create_vcn}
@@ -25,26 +24,15 @@ variableGroups:
       - ${datadog_tags}
   - title: "Function settings"
     variables:
-      - ${function_app_shape}
-      - ${create_new_function_image}
-      - ${function_image_path}
-  - title: "Container Registry"
-    variables:
-      - ${use_different_service_user}
-      - ${service_user_ocid}
-      - ${create_auth_token}
-      - ${auth_token_description}
-      - ${auth_token}
-    visible: ${create_new_function_image}
+      - ${oci_docker_username}
+      - ${oci_docker_password}
   - title: "Logging"
     variables:
-      - ${exclude_services}
+      - ${include_services}
       - ${logging_compartments_csv}
+      - ${enable_audit_log_forwarding}
 
 variables:
-  current_user_ocid:
-    visible: false
-  
   tenancy_ocid:
       visible: false
 
@@ -119,82 +107,29 @@ variables:
     confirmation: true
 
 # Function setup
-  function_app_shape:
-    title: Function Application shape
-    type: enum
-    description: The shape of the function application. The docker image should be built accordingly. Use GENERIC_ARM if using Oracle Resource manager stack.
-    required: true
-    enum:
-      - GENERIC_ARM
-      - GENERIC_X86
-      - GENERIC_X86_ARM
-    default: GENERIC_ARM
-  
-  create_new_function_image:
-    title: Create New Function Image
-    description: Variable to create new function image. Otherwise, choose an existing image.
-    required: true
-    type: boolean
-    default: true
-
-  function_image_path:
-    title: Function Image Path
+  oci_docker_username:
+    title: OCI Docker registry user name
     type: string
+    description: The user login for the OCI docker container registry to push function image.
     required: true
-    description: The full path of the function image. The image should be present in the container registry for the region and be compatible with the function application shape.
-    visible:
-      not:
-        - ${create_new_function_image}
-
-# Container Registry
-  use_different_service_user:
-    title: Use Different Service User
-    description: Option to use a different service user for Docker login and pushing images.
-    type: boolean
-    required: true
-    default: false
-
-  service_user_ocid:
-    title: Service User OCID
-    type: string
-    description: The OCID of the service user to be used for Docker login and pushing images.
-    required: true
-    default: ""
-    visible: ${use_different_service_user}
-
-  create_auth_token:
-    title: Create Auth Token
-    description: Variable to create auth token for the user. Otherwise, choose an existing auth token. If there are already 2 tokens, you need to delete one to create a new one.
-    type: boolean
-    required: true
-    default: false
-    visible: 
-      not:
-        - ${use_different_service_user}
-  
-  auth_token_description:
-    title: Auth Token Description
-    default: datadog-auth-token
-    required: true
-    visible: ${create_auth_token}
-  
-  auth_token:
-    title: Auth Token
-    type: password
-    description: The auth token to be used for the container registry.
     sensitive: true
+  oci_docker_password:
+    title: OCI Docker registry auth token
+    type: password
+    description: The user auth token for the OCI docker container registry. Used in creating function image.
     required: true
-    visible:
-      not:
-        - ${create_auth_token}
+    sensitive: true
 
 #Logging
-  exclude_services:
-    title: Exclude Services from Logging
+  include_services:
+    title: Include Services for Logging
     type: enum
-    description: List of services to exclude from logging.
+    description: List of services to include for logging.
     required: false
-    default: []
+    default:
+      - "flowlogs"
+      - "oke-k8s-cp-prod"
+      - "och"
     additionalProps:
       allowMultiple: true
     enum:
@@ -206,7 +141,6 @@ variables:
       - "cloud_guard_raw_logs_prod"
       - "och"
       - "oke-k8s-cp-prod"
-      - "contentdeliverynetwork"
       - "dataflow"
       - "dataintegration"
       - "datascience"
@@ -218,6 +152,7 @@ variables:
       - "functions"
       - "goldengate"
       - "integration"
+      - "keymanagementservice"
       - "loadbalancer"
       - "mediaflow"
       - "ocinetworkfirewall"
@@ -228,9 +163,18 @@ variables:
       - "flowlogs"
       - "waa"
       - "waf"
-
-  logging_compartments_csv:
-    title: Compartments CSV
-    description: "Upload a CSV file containing the list of compartments. The file must include a column named 'compartment_id'."
-    type: file
+  
+  logging_compartments:
+    title: Logging compartments
+    type: text
     required: true
+    description: The list of logging compartments. Enter comma separated list of OCID of compartments from which logs should be forwarded.
+    default: ${tenancy_ocid}
+    multiline: true
+  
+  enable_audit_log_forwarding:
+    title: Enable Audit Log Forwarding
+    description: Enable forwarding of audit logs for selected compartments to Datadog.
+    type: boolean
+    required: true
+    default: false

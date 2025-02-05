@@ -13,10 +13,9 @@ output "function_app_details" {
   value = module.functionapp.function_app_details
 }
 
-
 output "containerregistry_details" {
   description = "Output of Pushing Function image to Container registry"
-  value = length(module.containerregistry) > 0 ? module.containerregistry[0].containerregistry_details : null
+  value = module.containerregistry.containerregistry_details
 }
 
 output "function_details" {
@@ -24,8 +23,14 @@ output "function_details" {
   value = module.function.function_details
 }
 
-output "resources" {
-    value = {
-      for k, v in module.resourcediscovery : k => v.response if length(v.response) > 0
+output "logging_details" {
+  description = "Output of logging details"
+  value = {
+      for k, v in module.logging : k => v.details
     }
+}
+
+output "connectorhub_details" {
+  description = "Output of connector hub details"
+  value = module.connectorhub.connectorhub_details
 }
