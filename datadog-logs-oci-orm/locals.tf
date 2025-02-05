@@ -6,13 +6,7 @@ locals {
 }
 
 locals {
-  # Decode the uploaded CSV file into a map
-  logging_csv_content = base64decode(var.logging_compartments_csv)
-  logging_compartments = csvdecode(local.logging_csv_content)
-
-  logging_compartment_ids = toset([
-    for row in local.logging_compartments : row.compartment_id
-  ])
+  logging_compartment_ids = toset(split(",", var.logging_compartments))
 
   # Parse the content from the external data source
   logging_services = jsondecode(data.external.logging_services.result["content"])
@@ -20,7 +14,7 @@ locals {
   # Filter services to exclude those in exclude_services
   filtered_services = [
     for service in local.logging_services : service
-    if !contains(var.exclude_services, service.id)
+    if contains(var.include_services, service.id)
   ]
 
   # Generate a Cartesian product of compartments and filtered services

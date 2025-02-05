@@ -1,4 +1,4 @@
 locals {
-  dynamic_group_name = "${var.resource_name_prefix}-sch-dg"
-  policy_name     = "${var.resource_name_prefix}-sch-policy"
+  dynamic_group_name = "datadog-logs-dynamic-group"
+  policy_name     = "datadog-logs-policy"
 }
