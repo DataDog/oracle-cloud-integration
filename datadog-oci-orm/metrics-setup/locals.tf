@@ -27,12 +27,13 @@ locals {
   })
   oci_region_key      = lower(local.oci_regions[var.region].region_key)
   tenancy_home_region = data.oci_identity_tenancy.tenancy_metadata.home_region_key
+  is_gov_cloud_region = contains(["us-langley-1", "us-luke-1", "us-gov-ashburn-1", "us-gov-chicago-1", "us-gov-phoenix-1"], var.region)
 }
 
 locals {
   # OCI docker repository
-  oci_docker_repository = "${local.oci_region_key}.ocir.io/${local.ocir_namespace}"
-  oci_docker_host       = "${local.oci_region_key}.ocir.io"
+  oci_docker_host       = local.is_gov_cloud_region ? "ocir.${var.region}.oci.oraclegovcloud.com" : "${local.oci_region_key}.ocir.io"
+  oci_docker_repository = "${local.oci_docker_host}/${local.ocir_namespace}"
   ocir_repo_name        = "${var.resource_name_prefix}-functions"
   function_name         = "datadog-function-metrics"
   docker_image_path     = "${local.oci_docker_repository}/${local.ocir_repo_name}/${local.function_name}:latest"
