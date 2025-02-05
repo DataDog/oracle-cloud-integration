@@ -1,4 +1,4 @@
-data "oci_logging_log_groups" "datadog_log_group" {
+data "oci_logging_log_groups" "datadog_service_log_group" {
     #Required
     compartment_id = var.compartment_ocid
 

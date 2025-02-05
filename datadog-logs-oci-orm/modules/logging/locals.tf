@@ -62,7 +62,7 @@ locals {
 
 locals {
     # Datadog log group ID
-    datadog_log_group_id = try(data.oci_logging_log_groups.datadog_log_group.log_groups[0].id, null)
+    datadog_service_log_group_id = try(data.oci_logging_log_groups.datadog_service_log_group.log_groups[0].id, null)
     
     # Set of log groups excluding the Datadog log group
     log_groups = toset([
@@ -70,16 +70,16 @@ locals {
             log_group_id   = item.log_group.log_group_id
             compartment_id = item.log_group.compartment_id
         }
-        if item.log_group != null && try(item.log_group.log_group_id, "") != local.datadog_log_group_id
+        if item.log_group != null && try(item.log_group.log_group_id, "") != local.datadog_service_log_group_id
     ])
 
     # Map of resources without logs or with logs in the Datadog log group
     resources_without_logs = zipmap(
         [for idx, item in range(length(local.updated_resource_evaluation)) :
             "${local.updated_resource_evaluation[idx].resource_id}_${local.updated_resource_evaluation[idx].category}"
-            if local.updated_resource_evaluation[idx].log_group == null || try(local.updated_resource_evaluation[idx].log_group.log_group_id, "") == local.datadog_log_group_id
+            if local.updated_resource_evaluation[idx].log_group == null || try(local.updated_resource_evaluation[idx].log_group.log_group_id, "") == local.datadog_service_log_group_id
         ],
-        [for item in local.updated_resource_evaluation : item if item.log_group == null || try(item.log_group.log_group_id, "") == local.datadog_log_group_id]
+        [for item in local.updated_resource_evaluation : item if item.log_group == null || try(item.log_group.log_group_id, "") == local.datadog_service_log_group_id]
     )
     
 }
