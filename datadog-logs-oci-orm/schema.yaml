@@ -93,6 +93,8 @@ variables:
     type: enum
     description: The endpoint to hit for sending the logs.
     required: true
+    default:
+      - http-intake.logs.datadoghq.com
     enum:
       - http-intake.logs.datadoghq.com
     allowMultiple: false

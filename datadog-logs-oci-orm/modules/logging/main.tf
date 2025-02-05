@@ -7,6 +7,10 @@ resource "oci_logging_log_group" "datadog_service_log_group" {
     #Optional
     description = "[DO NOT REMOVE] This log group is managed by the system. Do not edit. It is used for forwarding logs to Datadog."
     freeform_tags = var.freeform_tags
+
+    lifecycle {
+        prevent_destroy = true
+    }
 }
 
 resource "oci_logging_log" "service_logs" {
