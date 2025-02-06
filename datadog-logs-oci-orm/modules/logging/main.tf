@@ -1,5 +1,5 @@
 resource "oci_logging_log_group" "datadog_service_log_group" {
-    count = (length(local.resources_without_logs) > 0 && local.datadog_service_log_group_id != null) ? 1 : 0
+    count = length(local.resources_without_logs) > 0 ? 1 : 0
     #Required
     compartment_id = var.compartment_ocid
     display_name = "datadog-service-logs"
@@ -14,7 +14,7 @@ resource "oci_logging_log" "service_logs" {
     for_each = local.resources_without_logs
     #Required
     display_name = each.key
-    log_group_id = try(local.datadog_service_log_group_id != null ? local.datadog_service_log_group_id : oci_logging_log_group.datadog_service_log_group[0].id, "")
+    log_group_id = oci_logging_log_group.datadog_service_log_group[0].id
     log_type = "SERVICE"
 
     #Optional
