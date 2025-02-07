@@ -3,6 +3,7 @@ locals {
   freeform_tags = {
     datadog-terraform = "true"
   }
+  home_region_name = [for region in data.oci_identity_regions.all_regions.regions : region.name if region.key == data.oci_identity_tenancy.tenancy_metadata.home_region_key][0]
 }
 
 locals {

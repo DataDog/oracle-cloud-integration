@@ -5,7 +5,7 @@ output "vcn_network_details" {
 
 output "policy_details" {
   description = "Output of Log Forwarding Policy"
-  value = module.policy.policy_details
+  value = length(module.policy) > 0 ? module.policy[0].policy_details : {}
 }
 
 output "function_app_details" {

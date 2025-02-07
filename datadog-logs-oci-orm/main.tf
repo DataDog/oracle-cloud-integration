@@ -9,6 +9,7 @@ module "vcn" {
 
 module "policy" {
     source = "./modules/policy"
+    count = var.region == local.home_region_name ? 1 : 0
     tenancy_ocid = var.tenancy_ocid
     freeform_tags = local.freeform_tags
 }
