@@ -15,7 +15,10 @@ data "oci_identity_compartments" "all_compartments" {
 
 # Step 2: Fetch all log groups in each compartment
 data "oci_logging_log_groups" "log_groups_by_compartment" {
-  for_each       = toset([for compartment in data.oci_identity_compartments.all_compartments.compartments : compartment.id])
+  for_each       = toset(concat(
+                      [for compartment in data.oci_identity_compartments.all_compartments.compartments : compartment.id],
+                      [var.tenancy_ocid]
+                    ))
   compartment_id = each.value
 }
 
