@@ -54,8 +54,9 @@ variable "datadog_endpoint" {
   type        = string
   description = "The endpoint to hit for sending the logs."
   validation {
-    condition     = contains(["http-intake.logs.datadoghq.com"], var.datadog_endpoint)
-    error_message = "Valid values for var: datadog_endpoint are (http-intake.logs.datadoghq.com)."
+    condition = contains(["http-intake.logs.datadoghq.com", "http-intake.logs.us5.datadoghq.com", "http-intake.logs.us3.datadoghq.com",
+    "http-intake.logs.datadoghq.eu", "http-intake.logs.ap1.datadoghq.com"], var.datadog_environment)
+    error_message = "Valid values for var: datadog_environment are (http-intake.logs.datadoghq.com, http-intake.logs.us5.datadoghq.com, http-intake.logs.us3.datadoghq.com, http-intake.logs.datadoghq.eu, http-intake.logs.ap1.datadoghq.com)."
   }
 }
 
