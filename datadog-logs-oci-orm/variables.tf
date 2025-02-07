@@ -69,6 +69,16 @@ variable "datadog_tags" {
 #************************************
 #    Function setup Variables    
 #************************************
+variable "function_app_shape" {
+  type        = string
+  default     = "GENERIC_ARM"
+  description = "The shape of the function application. The docker image should be built accordingly."
+  validation {
+    condition     = contains(["GENERIC_ARM", "GENERIC_X86", "GENERIC_X86_ARM"], var.function_app_shape)
+    error_message = "Valid values are: GENERIC_ARM, GENERIC_X86, GENERIC_X86_ARM."
+  }
+}
+
 variable "oci_docker_username" {
   type        = string
   sensitive   = true

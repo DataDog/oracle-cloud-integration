@@ -17,6 +17,16 @@ variable "resource_name_prefix" {
 #************************************
 #   Function Application Variables   
 #************************************
+variable "function_app_shape" {
+  type        = string
+  default     = "GENERIC_ARM"
+  description = "The shape of the function application. The docker image should be built accordingly."
+  validation {
+    condition     = contains(["GENERIC_ARM", "GENERIC_X86", "GENERIC_X86_ARM"], var.function_app_shape)
+    error_message = "Valid values are: GENERIC_ARM, GENERIC_X86, GENERIC_X86_ARM."
+  }
+}
+
 variable "subnet_ocid" {
   type        = string
   description = "The OCID of the subnet to be used for the function app"

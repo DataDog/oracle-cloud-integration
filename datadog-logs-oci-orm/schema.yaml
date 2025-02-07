@@ -24,6 +24,7 @@ variableGroups:
       - ${datadog_tags}
   - title: "Function settings"
     variables:
+      - ${function_app_shape}
       - ${oci_docker_username}
       - ${oci_docker_password}
   - title: "Logging"
@@ -111,6 +112,16 @@ variables:
     confirmation: true
 
 # Function setup
+  function_app_shape:
+    title: Function Application shape
+    type: enum
+    description: The shape of the function application. The docker image should be built accordingly.
+    required: true
+    enum:
+      - GENERIC_ARM
+      - GENERIC_X86
+      - GENERIC_X86_ARM
+    default: GENERIC_ARM
   oci_docker_username:
     title: OCI Docker registry user name
     type: string
