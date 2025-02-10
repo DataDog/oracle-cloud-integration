@@ -41,18 +41,6 @@ variable "datadog_environment" {
   }
 }
 
-variable "oci_docker_username" {
-  type        = string
-  sensitive   = true
-  description = "The docker login username for the OCI container registry. Used in creating function image. Not required if the image is already exists."
-}
-
-variable "oci_docker_password" {
-  type        = string
-  sensitive   = true
-  description = "The user auth token for the OCI docker container registry. Used in creating function image. Not required if the image already exists."
-}
-
 variable "metrics_namespaces" {
   type        = list(string)
   description = "The list of namespaces to collect the metrics for the metrics compartments. Remove any unwanted namespaces."

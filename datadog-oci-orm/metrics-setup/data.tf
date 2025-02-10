@@ -27,6 +27,7 @@ data "oci_monitoring_metrics" "existing_namespaces" {
 }
 
 data "oci_core_subnet" "input_subnet" {
+  count      = local.is_service_user_available ? 1 : 0
   depends_on = [module.vcn]
   #Required
   subnet_id = var.create_vcn ? module.vcn[0].subnet_id[local.subnet] : var.function_subnet_id

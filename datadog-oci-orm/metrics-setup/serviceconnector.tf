@@ -1,7 +1,7 @@
 
 # Local variables to manage connector hubs
 locals {
-  metrics_compartments        = toset(split(",", var.metrics_compartments))
+  metrics_compartments        = local.is_service_user_available ? toset(split(",", var.metrics_compartments)) : toset([])
   metrics_compartments_sorted = sort(tolist(local.metrics_compartments))
   supported_namespaces        = var.metrics_namespaces
   # Fetch existing namespaces from the given compartments and intersect with those supported in var.metrics_namespaces
@@ -61,7 +61,7 @@ resource "oci_sch_service_connector" "metrics_service_connector" {
     batch_size_in_kbs = 5000
     batch_time_in_sec = 60
     compartment_id    = var.tenancy_ocid
-    function_id       = oci_functions_function.metrics_function.id
+    function_id       = oci_functions_function.metrics_function[0].id
   }
 
   #Optional
