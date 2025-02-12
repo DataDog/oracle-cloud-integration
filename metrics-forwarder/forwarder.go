@@ -35,7 +35,7 @@ func sendMetricsToDatadog(metricsMessage []byte, client HTTPClient) error {
 		if err != nil {
 			log.Printf("Error compressing payload: %v", err)
 		} else {
-			fmt.Printf("Uncompressed payload size=%d", len(metricsMessage))
+			fmt.Printf("Uncompressed payload size=%d\n", len(metricsMessage))
 			metricsMessage = compressedPayload
 			apiHeaders["Content-Encoding"] = "Gzip"
 		}
@@ -51,7 +51,7 @@ func sendMetricsToDatadog(metricsMessage []byte, client HTTPClient) error {
 		req.Header.Set(key, value)
 	}
 
-	fmt.Printf("Sending payload size=%d encoding=%s", len(metricsMessage), apiHeaders["Content-Encoding"])
+	fmt.Printf("Sending payload size=%d encoding=%s\n", len(metricsMessage), apiHeaders["Content-Encoding"])
 
 	resp, err := client.Do(req)
 	if err != nil {
