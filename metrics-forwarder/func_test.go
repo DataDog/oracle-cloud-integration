@@ -42,7 +42,7 @@ func TestMyHandler(t *testing.T) {
 	testCases := []struct {
 		name            string
 		tenancyOCID     string
-		mockSendFunc    func(metricsMessage []byte, client HTTPClient) error
+		mockSendFunc    func(client APIClient, metricsMessage []byte) error
 		expectedStatus  string
 		expectedMessage string
 		expectedError   string
@@ -58,7 +58,7 @@ func TestMyHandler(t *testing.T) {
 		{
 			name:        "ErrorSendingMetrics",
 			tenancyOCID: "test-tenancy",
-			mockSendFunc: func(metricsMessage []byte, client HTTPClient) error {
+			mockSendFunc: func(client APIClient, metricsMessage []byte) error {
 				return fmt.Errorf("error sending metrics to Datadog")
 			},
 			expectedStatus:  "error",
@@ -68,7 +68,7 @@ func TestMyHandler(t *testing.T) {
 		{
 			name:        "SuccessfulMetricsHandling",
 			tenancyOCID: "test-tenancy",
-			mockSendFunc: func(metricsMessage []byte, client HTTPClient) error {
+			mockSendFunc: func(client APIClient, metricsMessage []byte) error {
 				return nil
 			},
 			expectedStatus:  "success",

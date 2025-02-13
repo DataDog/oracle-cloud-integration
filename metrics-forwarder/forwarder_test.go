@@ -2,24 +2,33 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"testing"
 
+	datadog "github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 // Mock HTTP Client for Datadog API
-type MockHTTPClient struct {
+type MockAPIClient struct {
 	mock.Mock
 }
 
-// Mock `Do` method to simulate API response
-func (m *MockHTTPClient) Do(req *http.Request) (*http.Response, error) {
+// Mock `CallAPI` method to simulate API response
+func (m *MockAPIClient) CallAPI(req *http.Request) (*http.Response, error) {
 	args := m.Called(req)
 	return args.Get(0).(*http.Response), args.Error(1)
+}
+
+// Mock `PrepareRequest` method to simulate API request
+func (m *MockAPIClient) PrepareRequest(ctx context.Context, path string, method string, postBody interface{}, headerParams map[string]string, queryParams url.Values, formParams url.Values, fileName *datadog.FormFile) (*http.Request, error) {
+	apiClient := createApiClient()
+	return apiClient.PrepareRequest(ctx, path, method, postBody, headerParams, queryParams, formParams, fileName)
 }
 
 func TestSendMetricsToDatadog(t *testing.T) {
@@ -69,8 +78,7 @@ func TestSendMetricsToDatadog(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockClient := new(MockHTTPClient)
-
+			mockClient := new(MockAPIClient)
 			// Set environment variable
 			if tc.compressed {
 				os.Setenv("DD_COMPRESS", "true")
@@ -79,8 +87,8 @@ func TestSendMetricsToDatadog(t *testing.T) {
 			}
 			defer os.Unsetenv("DD_COMPRESS")
 			if tc.apiKey != "" {
-				os.Setenv("DD_INTAKE_HOST", "test.com")
-				defer os.Unsetenv("DD_INTAKE_HOST")
+				os.Setenv("DD_SITE", "test.com")
+				defer os.Unsetenv("DD_SITE")
 				os.Setenv("DD_API_KEY", tc.apiKey)
 				defer os.Unsetenv("DD_API_KEY")
 			}
@@ -91,10 +99,10 @@ func TestSendMetricsToDatadog(t *testing.T) {
 				Body:       io.NopCloser(bytes.NewBufferString("")),
 			}
 
-			mockClient.On("Do", mock.Anything).Return(mockResponse, nil)
+			mockClient.On("CallAPI", mock.Anything).Return(mockResponse, nil)
 
 			// Call the function with a mock client
-			err := sendMetricsToDatadog([]byte(`{"metrics":"test"}`), mockClient)
+			err := sendMetricsToDatadog(mockClient, []byte(`{"metrics":"test"}`))
 
 			// Validate
 			if tc.expectError {

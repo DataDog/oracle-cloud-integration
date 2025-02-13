@@ -33,7 +33,8 @@ func myHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	}
 
 	// 3. Send message to Datadog
-	err = sendMetricsFunc(metricsMsg, httpClient)
+
+	err = sendMetricsFunc(createApiClient(), metricsMsg)
 	if err != nil {
 		log.Printf("Error sending metrics to Datadog: %v", err)
 		writeResponse(out, "error", "", err)
