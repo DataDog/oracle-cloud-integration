@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	fdk "github.com/fnproject/fdk-go"
 )
@@ -74,5 +75,5 @@ func generateMetricsMsg(ctx context.Context, serializedMetricData string) ([]byt
 }
 
 func isDetailedLoggingEnabled() bool {
-	return os.Getenv("DETAILED_LOGGING_ENABLED") == "true"
+	return strings.ToLower(os.Getenv("DETAILED_LOGGING_ENABLED")) == "true"
 }

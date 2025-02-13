@@ -9,9 +9,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	fdk "github.com/fnproject/fdk-go"
+	"github.com/stretchr/testify/assert"
 )
 
 func getContext() context.Context {

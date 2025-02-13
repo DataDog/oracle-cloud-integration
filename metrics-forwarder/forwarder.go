@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 )
 
 var httpClient = &http.Client{}
@@ -31,13 +32,12 @@ func sendMetricsToDatadog(metricsMessage []byte, client HTTPClient) error {
 	}
 
 	if shouldCompressPayload() {
-		compressedPayload, err := compressPayload(metricsMessage)
-		if err != nil {
-			log.Printf("Error compressing payload: %v", err)
-		} else {
+		if compressedPayload, err := compressPayload(metricsMessage); err == nil {
 			fmt.Printf("Uncompressed payload size=%d\n", len(metricsMessage))
 			metricsMessage = compressedPayload
 			apiHeaders["Content-Encoding"] = "Gzip"
+		} else {
+			log.Printf("Error compressing payload: %v", err)
 		}
 	}
 
@@ -68,7 +68,7 @@ func sendMetricsToDatadog(metricsMessage []byte, client HTTPClient) error {
 }
 
 func shouldCompressPayload() bool {
-	return os.Getenv("DD_COMPRESS") == "true"
+	return strings.ToLower(os.Getenv("DD_COMPRESS")) == "true"
 }
 
 func compressPayload(payload []byte) ([]byte, error) {
