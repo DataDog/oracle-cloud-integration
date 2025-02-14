@@ -4,7 +4,7 @@ COPY . .
 
 # Enable Go modules & build with optimizations
 RUN go mod tidy && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o func .
+    CGO_ENABLED=0 GOOS=linux GOARCH=$(go env GOARCH) go build -o func .
 
 FROM fnproject/go:1.23
 
