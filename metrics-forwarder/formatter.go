@@ -13,7 +13,7 @@ import (
 
 var outputMessageVersion = "v1.0"
 
-type Header struct {
+type header struct {
 	TenancyOCID     string `json:"tenancy_ocid"`
 	SourceFnAppOCID string `json:"source_fn_app_ocid"`
 	SourceFnAppName string `json:"source_fn_app_name"`
@@ -22,16 +22,27 @@ type Header struct {
 	SourceFnCallID  string `json:"source_fn_call_id"`
 }
 
-type Payload struct {
-	Headers Header `json:"headers"`
+type payload struct {
+	Headers header `json:"headers"`
 	Body    string `json:"body"`
 }
 
-type MetricsMessage struct {
+type metricsMessage struct {
 	Version string  `json:"version"`
-	Payload Payload `json:"payload"`
+	Payload payload `json:"payload"`
 }
 
+// generateMetricsMsg generates a metrics message in JSON format.
+// It retrieves the tenancy OCID from the environment variables and extracts function metadata from the Fn context.
+// The function constructs a message with the retrieved metadata and serialized metric data, and returns the JSON-encoded message.
+//
+// Parameters:
+//   - ctx: The context from which to retrieve the Fn context metadata.
+//   - serializedMetricData: The serialized metric data to include in the message body.
+//
+// Returns:
+//   - []byte: The JSON-encoded metrics message.
+//   - error: An error if any occurs during the process, such as missing environment variables or JSON marshalling errors.
 func generateMetricsMsg(ctx context.Context, serializedMetricData string) ([]byte, error) {
 	tenancyOCID := os.Getenv("TENANCY_OCID")
 	if tenancyOCID == "" {
@@ -44,7 +55,7 @@ func generateMetricsMsg(ctx context.Context, serializedMetricData string) ([]byt
 		return nil, errors.New("failed to retrieve Fn context metadata")
 	}
 
-	header := Header{
+	header := header{
 		TenancyOCID:     tenancyOCID,
 		SourceFnAppOCID: md.AppID(),
 		SourceFnAppName: md.AppName(),
@@ -53,12 +64,12 @@ func generateMetricsMsg(ctx context.Context, serializedMetricData string) ([]byt
 		SourceFnCallID:  md.CallID(),
 	}
 
-	payload := Payload{
+	payload := payload{
 		Headers: header,
 		Body:    serializedMetricData,
 	}
 
-	message := MetricsMessage{
+	message := metricsMessage{
 		Version: outputMessageVersion,
 		Payload: payload,
 	}
