@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"bytes"
@@ -27,8 +27,8 @@ func (m *MockAPIClient) CallAPI(req *http.Request) (*http.Response, error) {
 
 // Mock `PrepareRequest` method to simulate API request
 func (m *MockAPIClient) PrepareRequest(ctx context.Context, path string, method string, postBody interface{}, headerParams map[string]string, queryParams url.Values, formParams url.Values, fileName *datadog.FormFile) (*http.Request, error) {
-	apiClient := createApiClient()
-	return apiClient.PrepareRequest(ctx, path, method, postBody, headerParams, queryParams, formParams, fileName)
+	apiClient := CreateDatadogClient("test.com", "valid_api_key")
+	return apiClient.Client.PrepareRequest(ctx, path, method, postBody, headerParams, queryParams, formParams, fileName)
 }
 
 func TestSendMetricsToDatadog(t *testing.T) {
@@ -79,6 +79,8 @@ func TestSendMetricsToDatadog(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockClient := new(MockAPIClient)
+			mockDatadogClient := CreateDatadogClient("test.com", tc.apiKey)
+			mockDatadogClient.Client = mockClient
 			// Set environment variable
 			if tc.compressed {
 				os.Setenv("DD_COMPRESS", "true")
@@ -86,12 +88,6 @@ func TestSendMetricsToDatadog(t *testing.T) {
 				os.Setenv("DD_COMPRESS", "false")
 			}
 			defer os.Unsetenv("DD_COMPRESS")
-			if tc.apiKey != "" {
-				os.Setenv("DD_SITE", "test.com")
-				defer os.Unsetenv("DD_SITE")
-				os.Setenv("DD_API_KEY", tc.apiKey)
-				defer os.Unsetenv("DD_API_KEY")
-			}
 
 			// Mock Datadog API response
 			mockResponse := &http.Response{
@@ -102,7 +98,7 @@ func TestSendMetricsToDatadog(t *testing.T) {
 			mockClient.On("CallAPI", mock.Anything).Return(mockResponse, nil)
 
 			// Call the function with a mock client
-			err := sendMetricsToDatadog(mockClient, []byte(`{"metrics":"test"}`))
+			err := SendMetricsToDatadog(mockDatadogClient, []byte(`{"metrics":"test"}`))
 
 			// Validate
 			if tc.expectError {

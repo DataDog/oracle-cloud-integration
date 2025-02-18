@@ -1,13 +1,16 @@
-package main
+package handler
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"testing"
+
+	"metrics-forwarder/internal/client"
 
 	fdk "github.com/fnproject/fdk-go"
 	"github.com/stretchr/testify/assert"
@@ -42,7 +45,7 @@ func TestMyHandler(t *testing.T) {
 	testCases := []struct {
 		name            string
 		tenancyOCID     string
-		mockSendFunc    func(client APIClient, metricsMessage []byte) error
+		mockSendFunc    func(client client.DatadogClient, metricsMessage []byte) error
 		expectedStatus  string
 		expectedMessage string
 		expectedError   string
@@ -53,12 +56,12 @@ func TestMyHandler(t *testing.T) {
 			mockSendFunc:    nil,
 			expectedStatus:  "error",
 			expectedMessage: "",
-			expectedError:   "missing environment variable: TENANCY_OCID",
+			expectedError:   "missing one of the required environment variables: TENANCY_OCID, DD_SITE, DD_API_KEY",
 		},
 		{
 			name:        "ErrorSendingMetrics",
 			tenancyOCID: "test-tenancy",
-			mockSendFunc: func(client APIClient, metricsMessage []byte) error {
+			mockSendFunc: func(client client.DatadogClient, metricsMessage []byte) error {
 				return fmt.Errorf("error sending metrics to Datadog")
 			},
 			expectedStatus:  "error",
@@ -68,7 +71,7 @@ func TestMyHandler(t *testing.T) {
 		{
 			name:        "SuccessfulMetricsHandling",
 			tenancyOCID: "test-tenancy",
-			mockSendFunc: func(client APIClient, metricsMessage []byte) error {
+			mockSendFunc: func(client client.DatadogClient, metricsMessage []byte) error {
 				return nil
 			},
 			expectedStatus:  "success",
@@ -82,6 +85,10 @@ func TestMyHandler(t *testing.T) {
 			input := bytes.NewBufferString(`{"metrics": "test-metric"}`)
 			output := &bytes.Buffer{}
 			if tc.tenancyOCID != "" {
+				os.Setenv("DD_SITE", "test-site")
+				defer os.Unsetenv("DD_SITE")
+				os.Setenv("DD_API_KEY", "test-api")
+				defer os.Unsetenv("DD_API_KEY")
 				os.Setenv("TENANCY_OCID", tc.tenancyOCID)
 				defer os.Unsetenv("TENANCY_OCID")
 			}
@@ -93,9 +100,9 @@ func TestMyHandler(t *testing.T) {
 				sendMetricsFunc = tc.mockSendFunc
 			}
 
-			myHandler(getContext(), input, output)
+			MyHandler(getContext(), input, output)
 
-			var resp FnResponse
+			var resp fnResponse
 			err := json.Unmarshal(output.Bytes(), &resp)
 
 			assert.NoError(t, err)
@@ -113,4 +120,65 @@ func TestGetSerializedMetricData(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, "test input data", result)
+}
+
+func TestReadEnvVars(t *testing.T) {
+	testCases := []struct {
+		name        string
+		tenancyOCID string
+		site        string
+		apiKey      string
+		expectError bool
+	}{
+		{
+			name:        "EnvVarsSetSuccessfully",
+			tenancyOCID: "test-tenancy",
+			site:        "test-site",
+			apiKey:      "test-api",
+			expectError: false,
+		},
+		{
+			name:        "EnvVarsNotSet",
+			tenancyOCID: "",
+			site:        "",
+			apiKey:      "",
+			expectError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.tenancyOCID != "" {
+				os.Setenv("TENANCY_OCID", tc.tenancyOCID)
+				defer os.Unsetenv("TENANCY_OCID")
+			} else {
+				os.Unsetenv("TENANCY_OCID")
+			}
+
+			if tc.site != "" {
+				os.Setenv("DD_SITE", tc.site)
+				defer os.Unsetenv("DD_SITE")
+			} else {
+				os.Unsetenv("DD_SITE")
+			}
+
+			if tc.apiKey != "" {
+				os.Setenv("DD_API_KEY", tc.apiKey)
+				defer os.Unsetenv("DD_API_KEY")
+			} else {
+				os.Unsetenv("DD_API_KEY")
+			}
+
+			actualTenancyOCID, actualSite, actualApiKey, err := readEnvVars()
+
+			if tc.expectError {
+				assert.Equal(t, errors.New("missing one of the required environment variables: TENANCY_OCID, DD_SITE, DD_API_KEY"), err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.tenancyOCID, actualTenancyOCID)
+				assert.Equal(t, tc.site, actualSite)
+				assert.Equal(t, tc.apiKey, actualApiKey)
+			}
+		})
+	}
 }

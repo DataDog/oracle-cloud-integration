@@ -1,4 +1,4 @@
-package main
+package formatter
 
 import (
 	"context"
@@ -32,23 +32,20 @@ type metricsMessage struct {
 	Payload payload `json:"payload"`
 }
 
-// generateMetricsMsg generates a metrics message in JSON format.
-// It retrieves the tenancy OCID from the environment variables and extracts function metadata from the Fn context.
-// The function constructs a message with the retrieved metadata and serialized metric data, and returns the JSON-encoded message.
+// GenerateMetricsMsg generates a metrics message in JSON format.
+//
+// This function extracts function metadata from the provided context, constructs
+// a header and payload, and then marshals them into a JSON message.
 //
 // Parameters:
-//   - ctx: The context from which to retrieve the Fn context metadata.
+//   - ctx: The context from which to extract function metadata.
 //   - serializedMetricData: The serialized metric data to include in the message body.
+//   - tenancyOCID: The OCID of the tenancy.
 //
 // Returns:
-//   - []byte: The JSON-encoded metrics message.
-//   - error: An error if any occurs during the process, such as missing environment variables or JSON marshalling errors.
-func generateMetricsMsg(ctx context.Context, serializedMetricData string) ([]byte, error) {
-	tenancyOCID := os.Getenv("TENANCY_OCID")
-	if tenancyOCID == "" {
-		return nil, errors.New("missing environment variable: TENANCY_OCID")
-	}
-
+//   - []byte: The generated JSON message.
+//   - error: An error if the message generation fails.
+func GenerateMetricsMsg(ctx context.Context, serializedMetricData string, tenancyOCID string) ([]byte, error) {
 	// Extract function metadata from Fn Context
 	md, ok := fdk.GetContext(ctx).(fdk.Context)
 	if !ok {
@@ -78,7 +75,6 @@ func generateMetricsMsg(ctx context.Context, serializedMetricData string) ([]byt
 	if err != nil {
 		return nil, err
 	}
-
 	if isDetailedLoggingEnabled() {
 		fmt.Println("Metric payload =", string(jsonData))
 	}
