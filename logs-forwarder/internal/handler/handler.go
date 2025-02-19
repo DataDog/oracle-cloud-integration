@@ -18,6 +18,20 @@ var sendLogsFunc = client.SendLogsToDatadog
 
 const DefaultBatchSize = 1000
 
+// MyHandler processes logs from an input reader and sends them to Datadog in batches.
+// It reads necessary environment variables, deserializes the logs, and processes them in batches.
+// If any error occurs during the process, it writes an error response to the output writer.
+//
+// Parameters:
+//   - ctx: The context for the handler.
+//   - in: The input reader containing serialized logs data.
+//   - out: The output writer to write responses.
+//
+// The function performs the following steps:
+//  1. Reads environment variables for site and apiKey.
+//  2. Deserializes the logs data from the input reader.
+//  3. Processes the logs in batches, sending them to Datadog.
+//  4. Writes a success response if all logs are processed successfully, or an error response if any step fails.
 func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	site, apiKey, err := readEnvVars()
 	if err != nil {

@@ -11,6 +11,15 @@ import (
 	datadog "github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
+// SendLogsToDatadog sends log messages to Datadog.
+// It prepares the request with appropriate headers and sends the logs to the Datadog API.
+//
+// Parameters:
+//   - client: An instance of DatadogClient containing the API key and site information.
+//   - logsMessage: A byte slice containing the log messages to be sent.
+//
+// Returns:
+//   - error: An error if the request preparation or API call fails, or if the response status code is not in the 2xx range.
 func SendLogsToDatadog(client DatadogClient, logsMessage []byte) error {
 	apiHeaders := map[string]string{
 		"Content-Type": "application/json",
