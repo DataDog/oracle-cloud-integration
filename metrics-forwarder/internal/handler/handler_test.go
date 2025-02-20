@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -122,7 +121,7 @@ func TestGetSerializedMetricData(t *testing.T) {
 	assert.Equal(t, "test input data", result)
 }
 
-func TestReadEnvVars(t *testing.T) {
+func TestNewDatadogClientWithTenancy(t *testing.T) {
 	testCases := []struct {
 		name        string
 		tenancyOCID string
@@ -169,15 +168,16 @@ func TestReadEnvVars(t *testing.T) {
 				os.Unsetenv("DD_API_KEY")
 			}
 
-			actualTenancyOCID, actualSite, actualApiKey, err := readEnvVars()
+			ddclient, tenancyOCID, err := newDatadogClientWithTenancy()
 
 			if tc.expectError {
-				assert.Equal(t, errors.New("missing one of the required environment variables: TENANCY_OCID, DD_SITE, DD_API_KEY"), err)
+				assert.Error(t, err)
+				assert.Equal(t, ddclient, client.DatadogClient{})
+				assert.Equal(t, tenancyOCID, "")
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, tc.tenancyOCID, actualTenancyOCID)
-				assert.Equal(t, tc.site, actualSite)
-				assert.Equal(t, tc.apiKey, actualApiKey)
+				assert.NotEqual(t, ddclient, client.DatadogClient{})
+				assert.Equal(t, tenancyOCID, tc.tenancyOCID)
 			}
 		})
 	}

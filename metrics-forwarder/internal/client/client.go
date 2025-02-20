@@ -19,7 +19,7 @@ type DatadogClient struct {
 	apiKey string
 }
 
-func CreateDatadogClient(site, apiKey string) DatadogClient {
+func NewDatadogClient(site, apiKey string) DatadogClient {
 	configuration := datadog.NewConfiguration()
 	configuration.RetryConfiguration.EnableRetry = true
 	client := datadog.NewAPIClient(configuration)

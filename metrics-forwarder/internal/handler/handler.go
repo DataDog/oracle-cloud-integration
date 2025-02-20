@@ -36,7 +36,7 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	}
 
 	// 2. Read tenancy OCID, site and datadog API key
-	tenancyOCID, site, apiKey, err := readEnvVars()
+	client, tenancyOCID, err := newDatadogClientWithTenancy()
 	if err != nil {
 		log.Println(err)
 		writeResponse(out, "error", "", err)
@@ -52,7 +52,7 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	}
 
 	// 4. Send message to Datadog
-	err = sendMetricsFunc(client.CreateDatadogClient(site, apiKey), metricsMsg)
+	err = sendMetricsFunc(client, metricsMsg)
 	if err != nil {
 		log.Printf("Error sending metrics to Datadog: %v", err)
 		writeResponse(out, "error", "", err)
@@ -72,12 +72,12 @@ func getSerializedMetricData(rawMetrics io.Reader) (string, error) {
 	return buf.String(), nil
 }
 
-func readEnvVars() (string, string, string, error) {
+func newDatadogClientWithTenancy() (client.DatadogClient, string, error) {
 	tenancyOCID := os.Getenv("TENANCY_OCID")
 	site := os.Getenv("DD_SITE")
 	apiKey := os.Getenv("DD_API_KEY")
 	if tenancyOCID == "" || site == "" || apiKey == "" {
-		return "", "", "", errors.New("missing one of the required environment variables: TENANCY_OCID, DD_SITE, DD_API_KEY")
+		return client.DatadogClient{}, "", errors.New("missing one of the required environment variables: TENANCY_OCID, DD_SITE, DD_API_KEY")
 	}
-	return tenancyOCID, site, apiKey, nil
+	return client.NewDatadogClient(site, apiKey), tenancyOCID, nil
 }
