@@ -33,7 +33,7 @@ const DefaultBatchSize = 1000
 //  3. Processes the logs in batches, sending them to Datadog.
 //  4. Writes a success response if all logs are processed successfully, or an error response if any step fails.
 func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
-	client, err := createDatadogClient()
+	client, err := newDatadogClient()
 	if err != nil {
 		log.Println(err)
 		writeResponse(out, "error", "", err)
@@ -102,13 +102,13 @@ func processLogs(client client.DatadogClient, logs []map[string]interface{}) err
 	return nil
 }
 
-func createDatadogClient() (client.DatadogClient, error) {
+func newDatadogClient() (client.DatadogClient, error) {
 	site := os.Getenv("DD_SITE")
 	apiKey := os.Getenv("DD_API_KEY")
 	if site == "" || apiKey == "" {
 		return client.DatadogClient{}, errors.New("missing one of the required environment variables: DD_SITE, DD_API_KEY")
 	}
-	return client.CreateDatadogClient(site, apiKey), nil
+	return client.NewDatadogClient(site, apiKey), nil
 }
 
 func getBatchSize() int {

@@ -27,7 +27,7 @@ func (m *MockAPIClient) CallAPI(req *http.Request) (*http.Response, error) {
 
 // Mock `PrepareRequest` method to simulate API request
 func (m *MockAPIClient) PrepareRequest(ctx context.Context, path string, method string, postBody interface{}, headerParams map[string]string, queryParams url.Values, formParams url.Values, fileName *datadog.FormFile) (*http.Request, error) {
-	apiClient := CreateDatadogClient("test.com", "valid_api_key")
+	apiClient := NewDatadogClient("test.com", "valid_api_key")
 	return apiClient.Client.PrepareRequest(ctx, path, method, postBody, headerParams, queryParams, formParams, fileName)
 }
 
@@ -79,7 +79,7 @@ func TestSendMetricsToDatadog(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockClient := new(MockAPIClient)
-			mockDatadogClient := CreateDatadogClient("test.com", tc.apiKey)
+			mockDatadogClient := NewDatadogClient("test.com", tc.apiKey)
 			mockDatadogClient.Client = mockClient
 			// Set environment variable
 			if tc.compressed {
