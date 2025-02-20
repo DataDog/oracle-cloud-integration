@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	datadog "github.com/DataDog/datadog-api-client-go/v2/api/datadog"
+	"github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
 
 // SendLogsToDatadog sends log messages to Datadog.

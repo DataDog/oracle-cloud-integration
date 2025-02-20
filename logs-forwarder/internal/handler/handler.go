@@ -33,7 +33,7 @@ const DefaultBatchSize = 1000
 //  3. Processes the logs in batches, sending them to Datadog.
 //  4. Writes a success response if all logs are processed successfully, or an error response if any step fails.
 func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
-	site, apiKey, err := readEnvVars()
+	client, err := createDatadogClient()
 	if err != nil {
 		log.Println(err)
 		writeResponse(out, "error", "", err)
@@ -49,12 +49,13 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 
 	batchSize := getBatchSize()
 	fmt.Printf("Received %d logs to process with a batch size of %d\n", len(logs), batchSize)
+
 	for i := 0; i < len(logs); i += batchSize {
 		end := i + batchSize
 		if end > len(logs) {
 			end = len(logs)
 		}
-		err = processLogs(logs[i:end], site, apiKey)
+		err = processLogs(client, logs[i:end])
 		if err != nil {
 			log.Printf("Error processing logs in batch %d: %v", i/batchSize+1, err)
 			writeResponse(out, "error", "", err)
@@ -89,25 +90,25 @@ func getSerializedLogsData(rawLogs io.Reader) ([]map[string]interface{}, error) 
 	return logs, nil
 }
 
-func processLogs(logs []map[string]interface{}, site, apiKey string) error {
+func processLogs(client client.DatadogClient, logs []map[string]interface{}) error {
 	logsMsg, err := formatter.GenerateLogsMsg(logs)
 	if err != nil {
 		return err
 	}
-	err = sendLogsFunc(client.CreateDatadogClient(site, apiKey), logsMsg)
+	err = sendLogsFunc(client, logsMsg)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func readEnvVars() (string, string, error) {
+func createDatadogClient() (client.DatadogClient, error) {
 	site := os.Getenv("DD_SITE")
 	apiKey := os.Getenv("DD_API_KEY")
 	if site == "" || apiKey == "" {
-		return "", "", errors.New("missing one of the required environment variables: DD_SITE, DD_API_KEY")
+		return client.DatadogClient{}, errors.New("missing one of the required environment variables: DD_SITE, DD_API_KEY")
 	}
-	return site, apiKey, nil
+	return client.CreateDatadogClient(site, apiKey), nil
 }
 
 func getBatchSize() int {

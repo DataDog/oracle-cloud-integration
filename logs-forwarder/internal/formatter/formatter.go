@@ -83,12 +83,12 @@ func getFieldValue(log map[string]interface{}, field string, isMap bool) interfa
 			return val
 		}
 		return make(map[string]interface{})
-	} else {
-		if val, ok := log[field].(string); ok {
-			return val
-		}
-		return ""
 	}
+
+	if val, ok := log[field].(string); ok {
+		return val
+	}
+	return ""
 }
 
 func getSource(log map[string]interface{}) string {
