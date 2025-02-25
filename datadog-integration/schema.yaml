@@ -1,0 +1,77 @@
+# Title shown in Application Information tab.
+title: Datadog Log Forwarding Infrastructure
+# Sub Title shown in Application Information tab.
+description: Setting up infrastructure for sending OCI Logs to Datadog
+schemaVersion: 1.1.0
+version: 1.0
+locale: en
+variableGroups:
+  - title: "Tenancy"
+    variables:
+      - ${tenancy_ocid}
+      - ${region}
+      - ${compartment_ocid}
+      - ${current_user_ocid}
+  - title: "Datadog Environment"
+    variables:
+      - ${datadog_app_key}
+      - ${datadog_api_key}
+      - ${datadog_site}
+  - title: "Tenancy Options"
+    variables:
+      - ${metrics_image_tag}
+      - ${logs_image_tag}
+
+variables:
+# Tenancy
+  tenancy_ocid:
+      visible: false
+
+  region:
+    visible: false
+
+  compartment_ocid:
+    visible: false
+  
+  current_user_ocid:
+    visible: false
+
+# Datadog Environment
+  datadog_api_key:
+    title: Datadog API Key
+    type: string
+    description: The API key for sending message to datadog endpoints.
+    required: true
+    sensitive: true
+    password: true
+    confirmation: true
+
+  datadog_app_key:
+    title: Datadog APP Key
+    type: string
+    description: The APP key for establishing integration with Datadog.
+    required: true
+    sensitive: true
+    password: true
+    confirmation: true
+  
+  datadog_site:
+    title: Datadog Site
+    type: string
+    description: The site for Datadog.
+    required: true
+
+# Tenancy Options
+  metrics_image_tag:
+    title: Metrics Image Tag
+    type: string
+    description: Image tag for forwarding metrics to Datadog.
+    required: false
+    default: ""
+
+  logs_image_tag:
+    title: Logs Image Tag
+    type: string
+    description: Image tag for forwarding logs to Datadog.
+    required: false
+    default: ""
