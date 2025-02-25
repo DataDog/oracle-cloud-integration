@@ -1,10 +1,10 @@
 resource "oci_identity_user" "dd_auth_user" {
-    #Required
-    compartment_id = var.tenancy_id
-    description = "[DO NOT REMOVE] Read only user created for fetching resources metadata which is used by Datadog Integrations"
-    name = var.user_name
-    email = local.email
-    freeform_tags = var.tags
+  # Required
+  compartment_id = var.tenancy_id
+  description    = "[DO NOT REMOVE] Read only user created for fetching resources metadata which is used by Datadog Integrations"
+  name           = var.user_name
+  email          = local.email
+  freeform_tags  = var.tags
 }
 
 resource "tls_private_key" "this" {
@@ -13,22 +13,22 @@ resource "tls_private_key" "this" {
 }
 
 resource "oci_identity_api_key" "this" {
-  user_id    = oci_identity_user.dd_auth_user.id
-  key_value  = tls_private_key.this.public_key_pem
+  user_id   = oci_identity_user.dd_auth_user.id
+  key_value = tls_private_key.this.public_key_pem
 }
 
 resource "oci_identity_group" "user_group" {
-  #Required
+  # Required
   compartment_id = var.tenancy_id
   description    = "[DO NOT REMOVE] Group for adding permissions to Datadog user"
   name           = local.user_group_name
-  freeform_tags = var.tags
+  freeform_tags  = var.tags
 }
 
 resource "oci_identity_user_group_membership" "dd_user_group_membership" {
-    #Required
-    group_id = oci_identity_group.user_group.id
-    user_id = oci_identity_user.dd_auth_user.id
+  # Required
+  group_id = oci_identity_group.user_group.id
+  user_id  = oci_identity_user.dd_auth_user.id
 }
 
 resource "oci_identity_policy" "dd_auth_policy" {
@@ -43,8 +43,8 @@ resource "oci_identity_policy" "dd_auth_policy" {
 }
 
 resource "oci_identity_dynamic_group" "sch_dg" {
-  count = var.forward_metrics || var.forward_logs ? 1 : 0
-  #Required
+  count          = var.forward_metrics || var.forward_logs ? 1 : 0
+  # Required
   compartment_id = var.tenancy_id
   description    = "[DO NOT REMOVE] Dynamic group for forwarding by service connector"
   matching_rule  = "All {resource.type = 'serviceconnector', resource.compartment.id = '${var.compartment_id}'}"
@@ -53,8 +53,8 @@ resource "oci_identity_dynamic_group" "sch_dg" {
 }
 
 resource "oci_identity_policy" "dg_policy" {
-  depends_on = [oci_identity_dynamic_group.sch_dg]
-  count = var.forward_metrics || var.forward_logs ? 1 : 0
+  depends_on     = [oci_identity_dynamic_group.sch_dg]
+  count          = var.forward_metrics || var.forward_logs ? 1 : 0
   compartment_id = var.tenancy_id
   description    = "[DO NOT REMOVE] Policy to have any connector hub read from eligible sources and write to a target function"
   name           = local.dg_policy_name

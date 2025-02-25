@@ -1,4 +1,4 @@
 data "oci_identity_user" "current_user" {
-    #Required
+    # Required
     user_id = var.current_user_id
 }

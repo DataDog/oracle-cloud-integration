@@ -6,10 +6,10 @@ terraform {
       version = "5.46.0"
     }
     tls = {
-        source = "hashicorp/tls"
+      source = "hashicorp/tls"
     }
     http = {
-        source = "hashicorp/http"
+      source = "hashicorp/http"
     }
   }
 }

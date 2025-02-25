@@ -1,12 +1,12 @@
 variable "user_name" {
-    description = "The name of the user"
-    type        = string
+  description = "The name of the user"
+  type        = string
 }
 
 variable "tags" {
-    description = "A map of tags to assign to the resource"
-    type        = map(string)
-    default     = {}
+  description = "A map of tags to assign to the resource"
+  type        = map(string)
+  default     = {}
 }
 
 variable "tenancy_id" {
@@ -15,12 +15,12 @@ variable "tenancy_id" {
 }
 
 variable "compartment_name" {
-    description = "The name of the compartment"
-    type        = string
+  description = "The name of the compartment"
+  type        = string
 }
 
 variable "compartment_id" {
-  type = string
+  type        = string
   description = "The OCID of the compartment for the dynamic group of all service connector resources"
 }
 

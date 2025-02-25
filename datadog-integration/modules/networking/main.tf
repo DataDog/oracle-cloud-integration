@@ -7,6 +7,7 @@ module "vcn" {
   vcn_dns_label            = "ddvcnmodule"
   vcn_name                 = local.vcn_name
   lockdown_default_seclist = false
+
   subnets = {
     private = {
       cidr_block = "10.0.0.0/16"
@@ -14,6 +15,7 @@ module "vcn" {
       name       = local.subnet
     }
   }
+
   create_nat_gateway           = true
   nat_gateway_display_name     = local.nat_gateway
   create_service_gateway       = true

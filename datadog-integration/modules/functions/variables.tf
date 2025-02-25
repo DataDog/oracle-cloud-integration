@@ -4,7 +4,7 @@ variable "tenancy_id" {
 }
 
 variable "region" {
-  type = string
+  type        = string
   description = "OCI Region as documented at https://docs.cloud.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm"
 }
 
@@ -19,9 +19,9 @@ variable "datadog_site" {
 }
 
 variable "tags" {
-    description = "A map of tags to assign to the resource"
-    type        = map(string)
-    default     = {}
+  type        = map(string)
+  description = "A map of tags to assign to the resource"
+  default     = {}
 }
 
 variable "subnet_id" {
@@ -30,13 +30,13 @@ variable "subnet_id" {
 }
 
 variable "metrics_image_tag" {
-  type = string
+  type        = string
   description = "Image tag for forwarding metrics to Datadog"
-  default = ""
+  default     = ""
 }
 
 variable "logs_image_tag" {
-  type = string
+  type        = string
   description = "Image tag for forwarding logs to Datadog"
-  default = ""
+  default     = ""
 }
