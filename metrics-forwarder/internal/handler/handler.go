@@ -36,7 +36,7 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	}
 
 	// 2. Read tenancy OCID, site and datadog API key
-	client, tenancyOCID, err := newDatadogClientWithTenancy()
+	ddclient, tenancyOCID, err := newDatadogClientWithTenancy()
 	if err != nil {
 		log.Println(err)
 		writeResponse(out, "error", "", err)
@@ -52,7 +52,7 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	}
 
 	// 4. Send message to Datadog
-	err = sendMetricsFunc(client, metricsMsg)
+	err = sendMetricsFunc(ddclient, metricsMsg)
 	if err != nil {
 		log.Printf("Error sending metrics to Datadog: %v", err)
 		writeResponse(out, "error", "", err)
