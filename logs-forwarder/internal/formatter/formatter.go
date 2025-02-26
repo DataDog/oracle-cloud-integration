@@ -11,7 +11,7 @@ const DD_SOURCE = "oci.logs"
 
 // ProcessedLog represents the transformed log format.
 type logPayload struct {
-	Source    string                 `json:"source,omitempty"`
+	OCISource string                 `json:"ocisource,omitempty"`
 	Timestamp string                 `json:"timestamp,omitempty"`
 	Data      map[string]interface{} `json:"data,omitempty"`
 	DDSource  string                 `json:"ddsource,omitempty"`
@@ -67,7 +67,7 @@ func getTags() string {
 
 func formatLog(log map[string]interface{}) logPayload {
 	return logPayload{
-		Source:    getFieldValue(log, "source", false).(string),
+		OCISource: getFieldValue(log, "source", false).(string),
 		Timestamp: getFieldValue(log, "time", false).(string),
 		Data:      getFieldValue(log, "data", true).(map[string]interface{}),
 		DDSource:  getSource(log),

@@ -30,7 +30,7 @@ var singleLogEntry = map[string]interface{}{
 }
 
 var expectedSingleLogEntry = logPayload{
-	Source:    "Log_Connector",
+	OCISource: "Log_Connector",
 	Timestamp: "2024-09-29T18:10:45.130Z",
 	Data: map[string]interface{}{
 		"level":       "INFO",
