@@ -33,7 +33,7 @@ const DefaultBatchSize = 1000
 //  3. Processes the logs in batches, sending them to Datadog.
 //  4. Writes a success response if all logs are processed successfully, or an error response if any step fails.
 func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
-	client, err := newDatadogClient()
+	ddclient, err := newDatadogClient()
 	if err != nil {
 		log.Println(err)
 		writeResponse(out, "error", "", err)
@@ -55,7 +55,7 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 		if end > len(logs) {
 			end = len(logs)
 		}
-		err = processLogs(client, logs[i:end])
+		err = processLogs(ddclient, logs[i:end])
 		if err != nil {
 			log.Printf("Error processing logs in batch %d: %v", i/batchSize+1, err)
 			writeResponse(out, "error", "", err)
