@@ -1,0 +1,195 @@
+# Title shown in Application Information tab.
+title: Datadog Log Forwarding Infrastructure
+# Sub Title shown in Application Information tab.
+description: Setting up infrastructure for sending OCI Logs to Datadog
+schemaVersion: 1.1.0
+version: 1.0
+locale: en
+variableGroups:
+  - title: "Tenancy"
+    variables:
+      - ${tenancy_ocid}
+      - ${region}
+      - ${compartment_ocid}
+  - title: "Network options"
+    variables:
+      - ${create_vcn}
+      - ${vcn_compartment}
+      - ${existing_vcn}
+      - ${subnet_ocid}
+  - title: "Datadog Environment"
+    variables:
+      - ${datadog_endpoint}
+      - ${datadog_api_key}
+      - ${datadog_tags}
+  - title: "Function settings"
+    variables:
+      - ${function_app_shape}
+      - ${oci_docker_username}
+      - ${oci_docker_password}
+  - title: "Logging"
+    variables:
+      - ${logging_compartments}
+      - ${include_services}
+      - ${enable_audit_log_forwarding}
+
+variables:
+  tenancy_ocid:
+      visible: false
+
+  region:
+    visible: false
+
+  compartment_ocid:
+    visible: false
+  
+  resource_name_prefix:
+    type: string
+    title: Resource prefix
+    description: The prefix for the name of all of the resources.
+    required: true
+    default: dd-logs
+
+
+# VCN
+  create_vcn:
+    title: Create VCN
+    description: Optional variable to create virtual network for the setup. Otherwise, choose an existing subnet from VCN
+    type: boolean
+    default: true
+  
+  vcn_compartment:
+    # prepopulates available values for compartment
+    type: oci:identity:compartment:id
+    title: VCN Compartment
+    description: The compartment to create the VCN in.
+    required: true
+
+  existing_vcn:
+    type: oci:core:vcn:id
+    title: Existing VCN
+    description: The VCN to be used if not creating a new one.
+    required: true
+    visible:
+      not:
+        - ${create_vcn}
+    dependsOn:
+      compartmentId: ${vcn_compartment}
+
+  subnet_ocid:
+    title: Function Subnet OCID
+    type: oci:core:subnet:id
+    description: The OCID of the subnet to be used for the function app. Required if not creating the VCN.
+    required: true
+    visible:
+      not:
+        - ${create_vcn}
+    dependsOn:
+      compartmentId: ${vcn_compartment}
+      vcnId: ${existing_vcn}
+
+# Datadog Environment
+  datadog_endpoint:
+    title: Datadog Endpoint
+    type: enum
+    description: The endpoint to hit for sending the logs.
+    required: true
+    enum:
+      - http-intake.logs.datadoghq.com
+      - http-intake.logs.us5.datadoghq.com
+      - http-intake.logs.us3.datadoghq.com
+      - http-intake.logs.datadoghq.eu
+      - http-intake.logs.ap1.datadoghq.com
+    allowMultiple: false
+
+  datadog_api_key:
+    title: Datadog API Key
+    type: string
+    description: The API key for sending message to datadog endpoints.
+    required: true
+    sensitive: true
+    password: true
+    confirmation: true
+
+# Function setup
+  function_app_shape:
+    title: Function Application shape
+    type: enum
+    description: The shape of the function application. The docker image should be built accordingly.
+    required: true
+    enum:
+      - GENERIC_ARM
+      - GENERIC_X86
+      - GENERIC_X86_ARM
+    default: GENERIC_ARM
+  oci_docker_username:
+    title: OCI Docker registry user name
+    type: string
+    description: The user login for the OCI docker container registry to push function image.
+    required: true
+    sensitive: true
+  oci_docker_password:
+    title: OCI Docker registry auth token
+    type: password
+    description: The user auth token for the OCI docker container registry. Used in creating function image.
+    required: true
+    sensitive: true
+
+#Logging
+  include_services:
+    title: Include Services for Logging
+    type: enum
+    description: List of services to include for logging.
+    required: false
+    default:
+      - "flowlogs"
+      - "oke-k8s-cp-prod"
+      - "och"
+    additionalProps:
+      allowMultiple: true
+    enum:
+      - "oacnativeproduction"
+      - "apigateway"
+      - "adm"
+      - "apm"
+      - "cloud_guard_query_results_prod"
+      - "cloud_guard_raw_logs_prod"
+      - "och"
+      - "oke-k8s-cp-prod"
+      - "dataflow"
+      - "dataintegration"
+      - "datascience"
+      - "delegateaccessprod"
+      - "devops"
+      - "emaildelivery"
+      - "cloudevents"
+      - "filestorage"
+      - "functions"
+      - "goldengate"
+      - "integration"
+      - "keymanagementservice"
+      - "loadbalancer"
+      - "mediaflow"
+      - "ocinetworkfirewall"
+      - "objectstorage"
+      - "operatoraccessprod"
+      - "postgresql"
+      - "oci_c3_vpn"
+      - "flowlogs"
+      - "waa"
+      - "waf"
+  
+  logging_compartments:
+    title: Logging compartments
+    type: text
+    required: true
+    description: The list of logging compartments. Enter comma separated list of OCID of compartments from which logs should be forwarded.
+    default: ${tenancy_ocid}
+    multiline: true
+  
+  enable_audit_log_forwarding:
+    title: Enable Audit Log Forwarding
+    description: Enable forwarding of audit logs for selected compartments to Datadog.
+    type: boolean
+    required: true
+    default: false
