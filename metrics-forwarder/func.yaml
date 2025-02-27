@@ -1,0 +1,12 @@
+schema_version: 20180708
+name: metrics-forwarder
+version: 0.0.2
+runtime: go
+build_image: fnproject/go:1.23-dev
+run_image: fnproject/go:1.23
+entrypoint: ./func
+memory: 256
+triggers:
+- name: metrics-forwarder
+  type: http
+  source: /metrics-forwarder
