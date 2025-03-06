@@ -63,7 +63,8 @@ resource "oci_identity_policy" "dg_policy" {
     var.forward_metrics ? ["Allow dynamic-group Default/${local.dg_name} to read metrics in tenancy"] : [],
     [
       "Allow dynamic-group Default/${local.dg_name} to use fn-function in compartment ${var.compartment_name}",
-      "Allow dynamic-group Default/${local.dg_name} to use fn-invocation in compartment ${var.compartment_name}"
+      "Allow dynamic-group Default/${local.dg_name} to use fn-invocation in compartment ${var.compartment_name}",
+      "Allow dynamic-group Default/${local.dg_name} to read secret-bundles in compartment ${var.compartment_name}"
     ]
   )
   freeform_tags = var.tags
