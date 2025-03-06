@@ -47,6 +47,7 @@ module "functions" {
 }
 
 module "integration" {
+  depends_on = [module.kms]
   source = "./modules/integration"
   providers = {
     restapi = restapi
