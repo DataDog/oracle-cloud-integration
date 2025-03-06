@@ -12,10 +12,6 @@ data "oci_identity_tenancy" "tenancy_metadata" {
   tenancy_id = var.tenancy_ocid
 }
 
-data "oci_identity_user" "current_user" {
-    user_id = var.current_user_ocid
-}
-
 provider "oci" {
   tenancy_ocid = var.tenancy_ocid
 }
@@ -28,7 +24,6 @@ locals {
   dynamic_group_name     = "datadog-dynamic-group"
   user_group_name        = "DatadogAuthGroup"
   user_write_group_name  = "DatadogAuthWriteGroup"
-  email = data.oci_identity_user.current_user.email
   freeform_tags = {
     datadog-terraform = "true"
   }
