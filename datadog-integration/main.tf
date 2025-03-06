@@ -45,3 +45,19 @@ module "functions" {
   home_region = local.home_region_name
   api_key_secret_id = length(module.kms) > 0 ? module.kms[0].api_key_secret_id : ""
 }
+
+module "integration" {
+  source = "./modules/integration"
+  providers = {
+    restapi = restapi
+  }
+  count                   = var.region == local.home_region_name ? 1 : 0
+  datadog_api_key         = var.datadog_api_key
+  datadog_app_key         = var.datadog_app_key
+  datadog_site            = var.datadog_site
+  home_region             = local.home_region_name
+  tenancy_ocid            = var.tenancy_ocid
+  private_key             = module.auth[0].private_key
+  public_key_finger_print = module.auth[0].public_key_fingerprint
+  user_ocid               = module.auth[0].user_id
+}

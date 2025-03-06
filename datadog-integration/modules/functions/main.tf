@@ -1,3 +1,13 @@
+terraform {
+  required_version = ">= 1.5.0"
+  required_providers {
+    oci = {
+      source  = "oracle/oci"
+      version = "5.46.0"
+    }
+  }
+}
+
 resource "oci_functions_application" "dd_function_app" {
   compartment_id = var.compartment_id
   display_name   = "dd-function-app"
