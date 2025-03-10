@@ -19,11 +19,11 @@ terraform {
 }
 
 provider "restapi" {
-  update_method  = "PATCH"
-  uri            = "https://${var.datadog_site}"
+  update_method = "PATCH"
+  uri           = "https://${var.datadog_site}"
   headers = {
-    "DD-API-KEY"           = var.datadog_api_key
-    "DD-APPLICATION-KEY"   = var.datadog_app_key
-    "Content-Type"         = "application/json"
+    "DD-API-KEY"         = var.datadog_api_key
+    "DD-APPLICATION-KEY" = var.datadog_app_key
+    "Content-Type"       = "application/json"
   }
 }

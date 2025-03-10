@@ -5,7 +5,9 @@ locals {
     config = merge(
         {
             "DD_COMPRESS" = "true",
-            "DD_SITE"     = var.datadog_site
+            "DD_SITE"     = var.datadog_site,
+            "HOME_REGION" = var.home_region,
+            "API_KEY_SECRET_OCID" = var.api_key_secret_id
         },
         length(var.logs_image_tag) > 0 ? {
             "DATADOG_TAGS"  = "",

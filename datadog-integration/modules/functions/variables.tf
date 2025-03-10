@@ -40,3 +40,13 @@ variable "logs_image_tag" {
   description = "Image tag for forwarding logs to Datadog"
   default     = ""
 }
+
+variable "home_region" {
+  type        = string
+  description = "The name of the home region"
+}
+
+variable "api_key_secret_id" {
+  type        = string
+  description = "The secret ID for the API key"
+}
