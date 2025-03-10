@@ -23,7 +23,7 @@ resource "oci_kms_key" "datadog_key" {
     length    = 32
   }
   management_endpoint = oci_kms_vault.datadog_vault.management_endpoint
-  freeform_tags = var.tags
+  freeform_tags       = var.tags
 }
 
 resource "oci_vault_secret" "api_key" {

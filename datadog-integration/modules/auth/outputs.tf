@@ -8,7 +8,7 @@ output "private_key" {
 }
 
 output "public_key_fingerprint" {
-  value = oci_identity_api_key.this.fingerprint
+  value     = oci_identity_api_key.this.fingerprint
   sensitive = true
 }
 
