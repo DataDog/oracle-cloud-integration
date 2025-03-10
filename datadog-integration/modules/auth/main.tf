@@ -53,7 +53,7 @@ resource "oci_identity_policy" "dd_auth_policy" {
 }
 
 resource "oci_identity_dynamic_group" "sch_dg" {
-  count          = var.forward_metrics || var.forward_logs ? 1 : 0
+  count = var.forward_metrics || var.forward_logs ? 1 : 0
   # Required
   compartment_id = var.tenancy_id
   description    = "[DO NOT REMOVE] Dynamic group for forwarding by service connector"

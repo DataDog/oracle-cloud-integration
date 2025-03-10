@@ -46,7 +46,7 @@ resource "oci_identity_user" "read_only_user" {
   compartment_id = var.tenancy_ocid
   description    = "[DO NOT REMOVE] Read only user created for fetching resources metadata which is used by Datadog Integrations"
   name           = local.dd_auth_user
-  email          = "test@datadoghq.com"
+  email          = local.email
 
   #Optional
   defined_tags  = {}
@@ -58,7 +58,7 @@ resource "oci_identity_user" "write_permissions_user" {
   compartment_id = var.tenancy_ocid
   description    = "[DO NOT REMOVE] User for performing write based operations like docker image push"
   name           = local.dd_auth_write_user
-  email          = "test@oci.com"
+  email          = local.email
 
   #Optional
   defined_tags  = {}
