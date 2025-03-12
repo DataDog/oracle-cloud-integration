@@ -8,5 +8,5 @@ variable "tenancy_ocid" {
 
 variable "current_user_ocid" {
   type        = string
-  description = "The OCID of the current user executing the terraform script"
+  description = "The OCID of the current user executing the terraform script. Do not modify."
 }

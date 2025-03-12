@@ -40,3 +40,9 @@ locals {
   docker_image_path     = "${local.oci_docker_repository}/${local.ocir_repo_name}/${local.function_name}:latest"
 }
 
+locals {
+  # OCI function apps
+  oci_function_app  = "${var.resource_name_prefix}-function-app"
+  oci_function_name = "${local.oci_function_app}-metrics-function"
+}
+
