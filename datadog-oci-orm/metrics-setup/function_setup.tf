@@ -3,6 +3,17 @@ data "oci_identity_users" "docker_registry_user" {
   name           = "DatadogAuthWriteUser"
 }
 
+data "oci_functions_applications" "function_app_name" {
+  compartment_id = var.compartment_ocid
+  display_name   = local.oci_function_app
+}
+
+data "oci_functions_functions" "function_name" {
+  count          = local.is_function_app_created ? 1 : 0
+  application_id = data.oci_functions_applications.function_app_name.applications[0].id
+  display_name   = local.oci_function_name
+}
+
 data "oci_identity_auth_tokens" "docker_registry_user_tokens" {
   count   = local.is_service_user_available ? 1 : 0
   user_id = local.datadog_write_user_id
@@ -12,14 +23,18 @@ data "oci_identity_auth_tokens" "docker_registry_user_tokens" {
 locals {
   token_ids                 = [for token in data.oci_identity_auth_tokens.docker_registry_user_tokens : token.id]
   is_service_user_available = length(data.oci_identity_users.docker_registry_user.users) == 1 ? true : false
+  is_function_app_created   = length(data.oci_functions_applications.function_app_name.applications) > 0 ? true : false
+  function_exec             = data.oci_functions_functions.function_name
+  is_function_created       = local.is_function_app_created && length(local.function_exec) > 0 ? true : false
+  perform_docker_login      = local.is_service_user_available && !local.is_function_created
   datadog_write_user_login  = local.is_service_user_available ? data.oci_identity_users.docker_registry_user.users[0].name : ""
   datadog_write_user_id     = local.is_service_user_available ? data.oci_identity_users.docker_registry_user.users[0].id : ""
-  token_value               = local.is_service_user_available ? jsondecode(data.external.auth_token_fetch[0].result.output)["token"] : ""
+  token_value               = local.perform_docker_login ? jsondecode(data.external.auth_token_fetch[0].result.output)["token"] : ""
 }
 
 # external script to manage the auth tokens. Destroy existing ones and generate new
 data "external" "auth_token_fetch" {
-  count   = local.is_service_user_available ? 1 : 0
+  count   = local.perform_docker_login ? 1 : 0
   program = ["python", "${path.module}/auth_token.py"]
   query = {
     "user_ocid" : local.datadog_write_user_id
@@ -29,7 +44,7 @@ data "external" "auth_token_fetch" {
 }
 
 resource "null_resource" "Login2OCIR" {
-  count      = local.is_service_user_available ? 1 : 0
+  count      = local.perform_docker_login ? 1 : 0
   depends_on = [data.external.auth_token_fetch]
   provisioner "local-exec" {
     command = <<EOT

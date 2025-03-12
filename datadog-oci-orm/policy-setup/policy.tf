@@ -117,3 +117,10 @@ resource "oci_identity_policy" "metrics_policy" {
   defined_tags  = {}
   freeform_tags = local.freeform_tags
 }
+
+output "user_output" {
+  value = {
+    user_ocid_to_add_to_datadog_integration = oci_identity_user.read_only_user.id
+    user_name                               = oci_identity_user.read_only_user.name
+  }
+}
