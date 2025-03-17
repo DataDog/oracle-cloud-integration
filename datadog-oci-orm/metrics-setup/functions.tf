@@ -12,7 +12,7 @@ resource "oci_functions_application" "metrics_function_app" {
     "TENANCY_OCID"             = var.tenancy_ocid
   }
   defined_tags  = {}
-  display_name  = "${var.resource_name_prefix}-function-app"
+  display_name  = local.oci_function_app
   freeform_tags = local.freeform_tags
   network_security_group_ids = [
   ]
@@ -27,7 +27,7 @@ resource "oci_functions_function" "metrics_function" {
   count      = local.is_service_user_available ? 1 : 0
   #Required
   application_id = oci_functions_application.metrics_function_app[0].id
-  display_name   = "${oci_functions_application.metrics_function_app[0].display_name}-metrics-function"
+  display_name   = local.oci_function_name
   memory_in_mbs  = "256"
 
   #Optional
