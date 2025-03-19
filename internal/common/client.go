@@ -40,7 +40,7 @@ type DatadogClient struct {
 //	error - An error if the message could not be sent or if the API key could not be refreshed.
 func (client DatadogClient) SendMessageToDatadog(ctx context.Context, message []byte, url string) error {
 	status, err := client.sendMessage(ctx, message, url)
-	if err != nil && status == 403 {
+	if err != nil && status == http.StatusForbidden {
 		// Attempt to fetch the API key again in case it has been rotated
 		err = client.refreshAPIKey(ctx)
 		if err != nil {
