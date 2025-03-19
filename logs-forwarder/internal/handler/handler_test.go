@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"logs-forwarder/internal/client"
+	"oracle-cloud-integration/internal/common"
 	"os"
 	"testing"
 
@@ -14,8 +14,8 @@ import (
 func TestMyHandler_Success(t *testing.T) {
 	// Mock environment variables
 	os.Setenv("DD_SITE", "datadoghq.com")
-	os.Setenv("DD_API_KEY", "test-api-key")
-	os.Setenv("DD_BATCH_SIZE", "2")
+	os.Setenv("API_KEY_SECRET_OCID", "ocid1.apikey.oc1..test")
+	os.Setenv("HOME_REGION", "us-ashburn-1")
 
 	// Mock input logs
 	logs := []map[string]interface{}{
@@ -29,10 +29,15 @@ func TestMyHandler_Success(t *testing.T) {
 
 	// Mock SendLogsToDatadog function
 	originalSendFunc := sendLogsFunc
-	defer func() { sendLogsFunc = originalSendFunc }()
-	sendLogsFunc = func(client client.DatadogClient, logsMsg []byte) error {
+	originalDatadogClientFunc := datadogClientFunc
+	defer func() {
+		sendLogsFunc = originalSendFunc
+		datadogClientFunc = originalDatadogClientFunc
+	}()
+	sendLogsFunc = func(ctx context.Context, client common.DatadogClient, logsMsg []byte) error {
 		return nil
 	}
+	datadogClientFunc = common.GetDefaultTestDatadogClient
 
 	MyHandler(context.Background(), in, out)
 

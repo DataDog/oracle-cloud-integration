@@ -10,11 +10,13 @@ import (
 	"os"
 	"strconv"
 
-	"logs-forwarder/internal/client"
-	"logs-forwarder/internal/formatter"
+	"oracle-cloud-integration/internal/common"
+	"oracle-cloud-integration/logs-forwarder/internal/formatter"
+	"oracle-cloud-integration/logs-forwarder/internal/forwarder"
 )
 
-var sendLogsFunc = client.SendLogsToDatadog
+var sendLogsFunc = forwarder.SendLogsToDatadog
+var datadogClientFunc = common.NewDatadogClient
 
 const DefaultBatchSize = 1000
 
@@ -33,7 +35,7 @@ const DefaultBatchSize = 1000
 //  3. Processes the logs in batches, sending them to Datadog.
 //  4. Writes a success response if all logs are processed successfully, or an error response if any step fails.
 func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
-	ddclient, err := newDatadogClient()
+	ddclient, err := datadogClientFunc()
 	if err != nil {
 		log.Println(err)
 		writeResponse(out, "error", "", err)
@@ -55,7 +57,7 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 		if end > len(logs) {
 			end = len(logs)
 		}
-		err = processLogs(ddclient, logs[i:end])
+		err = processLogs(ctx, ddclient, logs[i:end])
 		if err != nil {
 			log.Printf("Error processing logs in batch %d: %v", i/batchSize+1, err)
 			writeResponse(out, "error", "", err)
@@ -90,25 +92,16 @@ func getSerializedLogsData(rawLogs io.Reader) ([]map[string]interface{}, error) 
 	return logs, nil
 }
 
-func processLogs(client client.DatadogClient, logs []map[string]interface{}) error {
+func processLogs(ctx context.Context, client common.DatadogClient, logs []map[string]interface{}) error {
 	logsMsg, err := formatter.GenerateLogsMsg(logs)
 	if err != nil {
 		return err
 	}
-	err = sendLogsFunc(client, logsMsg)
+	err = sendLogsFunc(ctx, client, logsMsg)
 	if err != nil {
 		return err
 	}
 	return nil
-}
-
-func newDatadogClient() (client.DatadogClient, error) {
-	site := os.Getenv("DD_SITE")
-	apiKey := os.Getenv("DD_API_KEY")
-	if site == "" || apiKey == "" {
-		return client.DatadogClient{}, errors.New("missing one of the required environment variables: DD_SITE, DD_API_KEY")
-	}
-	return client.NewDatadogClient(site, apiKey), nil
 }
 
 func getBatchSize() int {

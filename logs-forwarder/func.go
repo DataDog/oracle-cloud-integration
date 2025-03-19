@@ -1,7 +1,7 @@
 package main
 
 import (
-	"logs-forwarder/internal/handler"
+	"oracle-cloud-integration/logs-forwarder/internal/handler"
 
 	fdk "github.com/fnproject/fdk-go"
 )
