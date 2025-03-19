@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"metrics-forwarder/internal/client"
+	"oracle-cloud-integration/internal/common"
 
 	fdk "github.com/fnproject/fdk-go"
 	"github.com/stretchr/testify/assert"
@@ -23,11 +23,6 @@ func getContext() context.Context {
 }
 
 type MockFnContext struct {
-	appID   string
-	appName string
-	fnID    string
-	fnName  string
-	callID  string
 }
 
 func (m MockFnContext) AppID() string                          { return "mock-app-id" }
@@ -44,7 +39,7 @@ func TestMyHandler(t *testing.T) {
 	testCases := []struct {
 		name            string
 		tenancyOCID     string
-		mockSendFunc    func(client client.DatadogClient, metricsMessage []byte) error
+		mockSendFunc    func(ctx context.Context, client common.DatadogClient, metricsMessage []byte) (int, error)
 		expectedStatus  string
 		expectedMessage string
 		expectedError   string
@@ -55,13 +50,13 @@ func TestMyHandler(t *testing.T) {
 			mockSendFunc:    nil,
 			expectedStatus:  "error",
 			expectedMessage: "",
-			expectedError:   "missing one of the required environment variables: TENANCY_OCID, DD_SITE, DD_API_KEY",
+			expectedError:   "missing required environment variable TENANCY_OCID",
 		},
 		{
 			name:        "ErrorSendingMetrics",
 			tenancyOCID: "test-tenancy",
-			mockSendFunc: func(client client.DatadogClient, metricsMessage []byte) error {
-				return fmt.Errorf("error sending metrics to Datadog")
+			mockSendFunc: func(ctx context.Context, client common.DatadogClient, metricsMessage []byte) (int, error) {
+				return 500, fmt.Errorf("error sending metrics to Datadog")
 			},
 			expectedStatus:  "error",
 			expectedMessage: "",
@@ -70,8 +65,8 @@ func TestMyHandler(t *testing.T) {
 		{
 			name:        "SuccessfulMetricsHandling",
 			tenancyOCID: "test-tenancy",
-			mockSendFunc: func(client client.DatadogClient, metricsMessage []byte) error {
-				return nil
+			mockSendFunc: func(ctx context.Context, client common.DatadogClient, metricsMessage []byte) (int, error) {
+				return 202, nil
 			},
 			expectedStatus:  "success",
 			expectedMessage: "Metrics sent to Datadog",
@@ -93,8 +88,12 @@ func TestMyHandler(t *testing.T) {
 			}
 
 			originalSendFunc := sendMetricsFunc
-			defer func() { sendMetricsFunc = originalSendFunc }()
-
+			originalDatadogClientFunc := datadogClientFunc
+			defer func() {
+				sendMetricsFunc = originalSendFunc
+				datadogClientFunc = originalDatadogClientFunc
+			}()
+			datadogClientFunc = common.GetDefaultTestDatadogClient
 			if tc.mockSendFunc != nil {
 				sendMetricsFunc = tc.mockSendFunc
 			}
@@ -119,66 +118,4 @@ func TestGetSerializedMetricData(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, "test input data", result)
-}
-
-func TestNewDatadogClientWithTenancy(t *testing.T) {
-	testCases := []struct {
-		name        string
-		tenancyOCID string
-		site        string
-		apiKey      string
-		expectError bool
-	}{
-		{
-			name:        "EnvVarsSetSuccessfully",
-			tenancyOCID: "test-tenancy",
-			site:        "test-site",
-			apiKey:      "test-api",
-			expectError: false,
-		},
-		{
-			name:        "EnvVarsNotSet",
-			tenancyOCID: "",
-			site:        "",
-			apiKey:      "",
-			expectError: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			if tc.tenancyOCID != "" {
-				os.Setenv("TENANCY_OCID", tc.tenancyOCID)
-				defer os.Unsetenv("TENANCY_OCID")
-			} else {
-				os.Unsetenv("TENANCY_OCID")
-			}
-
-			if tc.site != "" {
-				os.Setenv("DD_SITE", tc.site)
-				defer os.Unsetenv("DD_SITE")
-			} else {
-				os.Unsetenv("DD_SITE")
-			}
-
-			if tc.apiKey != "" {
-				os.Setenv("DD_API_KEY", tc.apiKey)
-				defer os.Unsetenv("DD_API_KEY")
-			} else {
-				os.Unsetenv("DD_API_KEY")
-			}
-
-			ddclient, tenancyOCID, err := newDatadogClientWithTenancy()
-
-			if tc.expectError {
-				assert.Error(t, err)
-				assert.Equal(t, ddclient, client.DatadogClient{})
-				assert.Equal(t, tenancyOCID, "")
-			} else {
-				assert.NoError(t, err)
-				assert.NotEqual(t, ddclient, client.DatadogClient{})
-				assert.Equal(t, tenancyOCID, tc.tenancyOCID)
-			}
-		})
-	}
 }

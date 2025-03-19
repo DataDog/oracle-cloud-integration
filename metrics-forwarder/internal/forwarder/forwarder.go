@@ -1,12 +1,12 @@
-package client
+package forwarder
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"strings"
+	"oracle-cloud-integration/internal/common"
 
 	datadog "github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
@@ -23,25 +23,22 @@ import (
 // Returns:
 //   - error: An error if the request preparation or API call fails, or if the
 //     response status code indicates a failure.
-func SendMetricsToDatadog(client DatadogClient, metricsMessage []byte) error {
+func SendMetrics(ctx context.Context, client common.DatadogClient, metricsMessage []byte) (int, error) {
 	apiHeaders := map[string]string{
 		"Content-Type": "application/json",
-		"DD-API-KEY":   client.apiKey,
+		"DD-API-KEY":   client.ApiKey,
 	}
 	fmt.Printf("Uncompressed payload size=%d\n", len(metricsMessage))
-	if shouldCompressPayload() {
-		apiHeaders["Content-Encoding"] = "gzip"
-	}
 
-	url := fmt.Sprintf("https://ocimetrics-intake.%s/api/v2/ocimetrics", client.site)
-	req, err := client.Client.PrepareRequest(nil, url, http.MethodPost, metricsMessage, apiHeaders, nil, nil, nil)
+	url := fmt.Sprintf("https://ocimetrics-intake.%s/api/v2/ocimetrics", client.Site)
+	req, err := client.Client.PrepareRequest(ctx, url, http.MethodPost, metricsMessage, apiHeaders, nil, nil, nil)
 	if err != nil {
-		return err
+		return 500, err
 	}
 
 	resp, err := client.Client.CallAPI(req)
 	if err != nil {
-		return err
+		return 500, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		log.Printf("Error: Received non-200 response from Datadog: %d", resp.StatusCode)
@@ -49,11 +46,7 @@ func SendMetricsToDatadog(client DatadogClient, metricsMessage []byte) error {
 		if err == nil {
 			log.Printf("Error response body: %s", string(body))
 		}
-		return errors.New("failed to send metrics to Datadog")
+		return resp.StatusCode, errors.New("failed to send metrics to Datadog")
 	}
-	return nil
-}
-
-func shouldCompressPayload() bool {
-	return strings.ToLower(os.Getenv("DD_COMPRESS")) == "true"
+	return resp.StatusCode, nil
 }

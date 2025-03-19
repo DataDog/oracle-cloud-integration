@@ -1,7 +1,7 @@
 package main
 
 import (
-	"metrics-forwarder/internal/handler"
+	"oracle-cloud-integration/metrics-forwarder/internal/handler"
 
 	fdk "github.com/fnproject/fdk-go"
 )

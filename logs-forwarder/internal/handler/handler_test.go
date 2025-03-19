@@ -34,8 +34,8 @@ func TestMyHandler_Success(t *testing.T) {
 		sendLogsFunc = originalSendFunc
 		datadogClientFunc = originalDatadogClientFunc
 	}()
-	sendLogsFunc = func(ctx context.Context, client common.DatadogClient, logsMsg []byte) error {
-		return nil
+	sendLogsFunc = func(ctx context.Context, client common.DatadogClient, logsMsg []byte) (int, error) {
+		return 202, nil
 	}
 	datadogClientFunc = common.GetDefaultTestDatadogClient
 

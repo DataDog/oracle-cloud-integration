@@ -53,3 +53,17 @@ func NewDatadogClient() (DatadogClient, error) {
 	cache.ApiKey = apiKey
 	return *cache, nil
 }
+
+func (client DatadogClient) SendMessageToDatadog(ctx context.Context, message []byte, sendFunc func(ctx context.Context, client DatadogClient, message []byte) (int, error)) error {
+	status, err := sendFunc(ctx, client, message)
+	if err != nil && status == 403 {
+		// Attempt to fetch the API key again in case it has been rotated
+		err = client.refreshAPIKey(ctx)
+		if err != nil {
+			return err
+		}
+		_, err = sendFunc(ctx, client, message)
+		return err
+	}
+	return err
+}

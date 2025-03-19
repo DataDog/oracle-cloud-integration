@@ -11,7 +11,7 @@ import (
 	"github.com/oracle/oci-go-sdk/v65/secrets"
 )
 
-func (client DatadogClient) RefreshAPIKey(ctx context.Context) error {
+func (client DatadogClient) refreshAPIKey(ctx context.Context) error {
 	apiKey, err := client.fetchAPIKeyFromVault(ctx)
 	if err != nil {
 		return err

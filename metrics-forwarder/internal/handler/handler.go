@@ -8,11 +8,13 @@ import (
 	"log"
 	"os"
 
-	"metrics-forwarder/internal/client"
-	"metrics-forwarder/internal/formatter"
+	"oracle-cloud-integration/internal/common"
+	"oracle-cloud-integration/metrics-forwarder/internal/formatter"
+	"oracle-cloud-integration/metrics-forwarder/internal/forwarder"
 )
 
-var sendMetricsFunc = client.SendMetricsToDatadog
+var sendMetricsFunc = forwarder.SendMetrics
+var datadogClientFunc = common.NewDatadogClient
 
 // MyHandler processes incoming metrics data, formats it, and sends it to Datadog.
 // It performs the following steps:
@@ -52,7 +54,7 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	}
 
 	// 4. Send message to Datadog
-	err = sendMetricsFunc(ddclient, metricsMsg)
+	err = ddclient.SendMessageToDatadog(ctx, metricsMsg, sendMetricsFunc)
 	if err != nil {
 		log.Printf("Error sending metrics to Datadog: %v", err)
 		writeResponse(out, "error", "", err)
@@ -72,12 +74,11 @@ func getSerializedMetricData(rawMetrics io.Reader) (string, error) {
 	return buf.String(), nil
 }
 
-func newDatadogClientWithTenancy() (client.DatadogClient, string, error) {
+func newDatadogClientWithTenancy() (common.DatadogClient, string, error) {
 	tenancyOCID := os.Getenv("TENANCY_OCID")
-	site := os.Getenv("DD_SITE")
-	apiKey := os.Getenv("DD_API_KEY")
-	if tenancyOCID == "" || site == "" || apiKey == "" {
-		return client.DatadogClient{}, "", errors.New("missing one of the required environment variables: TENANCY_OCID, DD_SITE, DD_API_KEY")
+	if tenancyOCID == "" {
+		return common.DatadogClient{}, "", errors.New("missing required environment variable TENANCY_OCID")
 	}
-	return client.NewDatadogClient(site, apiKey), tenancyOCID, nil
+	client, err := datadogClientFunc()
+	return client, tenancyOCID, err
 }

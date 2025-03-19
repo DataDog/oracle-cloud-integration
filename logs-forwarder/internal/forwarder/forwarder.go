@@ -21,21 +21,7 @@ import (
 //
 // Returns:
 //   - error: An error if the request preparation or API call fails, or if the response status code is not in the 2xx range.
-func SendLogsToDatadog(ctx context.Context, client common.DatadogClient, logsMessage []byte) error {
-	status, err := sendLogs(ctx, client, logsMessage)
-	if err != nil && status == 403 {
-		// Attempt to fetch the API key again in case it has been rotated
-		err = client.RefreshAPIKey(ctx)
-		if err != nil {
-			return err
-		}
-		_, err = sendLogs(ctx, client, logsMessage)
-		return err
-	}
-	return err
-}
-
-func sendLogs(ctx context.Context, client common.DatadogClient, logsMessage []byte) (int, error) {
+func SendLogs(ctx context.Context, client common.DatadogClient, logsMessage []byte) (int, error) {
 	apiHeaders := map[string]string{
 		"Content-Type": "application/json",
 		"DD-API-KEY":   client.ApiKey,

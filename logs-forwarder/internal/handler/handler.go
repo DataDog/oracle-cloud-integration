@@ -15,7 +15,7 @@ import (
 	"oracle-cloud-integration/logs-forwarder/internal/forwarder"
 )
 
-var sendLogsFunc = forwarder.SendLogsToDatadog
+var sendLogsFunc = forwarder.SendLogs
 var datadogClientFunc = common.NewDatadogClient
 
 const DefaultBatchSize = 1000
@@ -97,7 +97,7 @@ func processLogs(ctx context.Context, client common.DatadogClient, logs []map[st
 	if err != nil {
 		return err
 	}
-	err = sendLogsFunc(ctx, client, logsMsg)
+	err = client.SendMessageToDatadog(ctx, logsMsg, sendLogsFunc)
 	if err != nil {
 		return err
 	}
