@@ -1,4 +1,4 @@
-package forwarder
+package common
 
 import (
 	"bytes"
@@ -7,13 +7,11 @@ import (
 	"net/http"
 	"testing"
 
-	"oracle-cloud-integration/internal/common"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-func TestSendLogsToDatadog(t *testing.T) {
+func TestSendMessageToDatadog(t *testing.T) {
 	testCases := []struct {
 		name           string
 		mockStatusCode int
@@ -43,17 +41,18 @@ func TestSendLogsToDatadog(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockDatadogClient, _ := common.GetDefaultTestDatadogClient()
+			mockDatadogClient, _ := getTestDatadogClient()
 
 			// Mock Datadog API response
 			mockResponse := &http.Response{
 				StatusCode: tc.mockStatusCode,
 				Body:       io.NopCloser(bytes.NewBufferString("")),
 			}
-			mockDatadogClient.Client.(*common.MockAPIClient).On("CallAPI", mock.Anything).Return(mockResponse, nil)
+			mockClient := mockDatadogClient.Client.(*MockAPIClient)
+			mockClient.On("CallAPI", mock.Anything).Return(mockResponse, nil)
 
 			// Call the function with a mock client
-			err := mockDatadogClient.SendMessageToDatadog(context.TODO(), []byte(`{"logs":"test"}`), SendLogs)
+			err := mockDatadogClient.SendMessageToDatadog(context.TODO(), []byte(`{"message":"test"}`), "https://test-intake.test.hq.com/api/v2/test")
 
 			// Validate
 			if tc.expectError {
@@ -65,7 +64,7 @@ func TestSendLogsToDatadog(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			mockDatadogClient.Client.(*common.MockAPIClient).AssertExpectations(t)
+			mockClient.AssertExpectations(t)
 		})
 	}
 }

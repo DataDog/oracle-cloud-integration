@@ -12,10 +12,8 @@ import (
 
 	"oracle-cloud-integration/internal/common"
 	"oracle-cloud-integration/logs-forwarder/internal/formatter"
-	"oracle-cloud-integration/logs-forwarder/internal/forwarder"
 )
 
-var sendLogsFunc = forwarder.SendLogs
 var datadogClientFunc = common.NewDatadogClient
 
 const DefaultBatchSize = 1000
@@ -35,12 +33,13 @@ const DefaultBatchSize = 1000
 //  3. Processes the logs in batches, sending them to Datadog.
 //  4. Writes a success response if all logs are processed successfully, or an error response if any step fails.
 func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
-	ddclient, err := datadogClientFunc()
+	ddclient, site, err := newDatadogClientWithSite()
 	if err != nil {
 		log.Println(err)
 		writeResponse(out, "error", "", err)
 		return
 	}
+	url := fmt.Sprintf("https://http-intake.logs.%s/api/v2/logs", site)
 
 	logs, err := getSerializedLogsData(in)
 	if err != nil {
@@ -57,7 +56,7 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 		if end > len(logs) {
 			end = len(logs)
 		}
-		err = processLogs(ctx, ddclient, logs[i:end])
+		err = processLogs(ctx, ddclient, url, logs[i:end])
 		if err != nil {
 			log.Printf("Error processing logs in batch %d: %v", i/batchSize+1, err)
 			writeResponse(out, "error", "", err)
@@ -92,12 +91,12 @@ func getSerializedLogsData(rawLogs io.Reader) ([]map[string]interface{}, error) 
 	return logs, nil
 }
 
-func processLogs(ctx context.Context, client common.DatadogClient, logs []map[string]interface{}) error {
+func processLogs(ctx context.Context, client common.DatadogClient, url string, logs []map[string]interface{}) error {
 	logsMsg, err := formatter.GenerateLogsMsg(logs)
 	if err != nil {
 		return err
 	}
-	err = client.SendMessageToDatadog(ctx, logsMsg, sendLogsFunc)
+	err = client.SendMessageToDatadog(ctx, logsMsg, url)
 	if err != nil {
 		return err
 	}
@@ -115,4 +114,13 @@ func getBatchSize() int {
 		return DefaultBatchSize
 	}
 	return batchSize
+}
+
+func newDatadogClientWithSite() (common.DatadogClient, string, error) {
+	site := os.Getenv("DD_SITE")
+	if site == "" {
+		return common.DatadogClient{}, "", errors.New("missing required environment variable DD_SITE")
+	}
+	client, err := datadogClientFunc()
+	return client, site, err
 }

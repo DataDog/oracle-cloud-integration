@@ -3,6 +3,8 @@ package common
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -20,20 +22,71 @@ type apiClient interface {
 type DatadogClient struct {
 	Client      apiClient
 	ApiKey      string
-	Site        string
 	vaultRegion string
 	secretOCID  string
+}
+
+// SendMessageToDatadog sends a message to Datadog. If the initial attempt fails with a 403 status code,
+// it tries to refresh the API key and resend the message.
+//
+// Parameters:
+//
+//	ctx - The context for the request.
+//	message - The message to be sent as a byte slice.
+//	url - The URL to which the message should be sent.
+//
+// Returns:
+//
+//	error - An error if the message could not be sent or if the API key could not be refreshed.
+func (client DatadogClient) SendMessageToDatadog(ctx context.Context, message []byte, url string) error {
+	status, err := client.sendMessage(ctx, message, url)
+	if err != nil && status == 403 {
+		// Attempt to fetch the API key again in case it has been rotated
+		err = client.refreshAPIKey(ctx)
+		if err != nil {
+			return err
+		}
+		_, err = client.sendMessage(ctx, message, url)
+		return err
+	}
+	return err
+}
+
+func (client DatadogClient) sendMessage(ctx context.Context, message []byte, url string) (int, error) {
+	apiHeaders := map[string]string{
+		"Content-Encoding": "gzip",
+		"Content-Type":     "application/json",
+		"DD-API-KEY":       client.ApiKey,
+	}
+	fmt.Printf("Uncompressed payload size=%d\n", len(message))
+	req, err := client.Client.PrepareRequest(ctx, url, http.MethodPost, message, apiHeaders, nil, nil, nil)
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+
+	resp, err := client.Client.CallAPI(req)
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		log.Printf("Error: Received non-200 response from Datadog: %d", resp.StatusCode)
+		body, err := datadog.ReadBody(resp)
+		if err == nil {
+			log.Printf("Error response body: %s", string(body))
+		}
+		return resp.StatusCode, errors.New("failed to send message to Datadog")
+	}
+	return resp.StatusCode, nil
 }
 
 func NewDatadogClient() (DatadogClient, error) {
 	if cache != nil {
 		return *cache, nil
 	}
-	site := os.Getenv("DD_SITE")
 	secretOCID := os.Getenv("API_KEY_SECRET_OCID")
 	homeRegion := os.Getenv("HOME_REGION")
-	if site == "" || secretOCID == "" || homeRegion == "" {
-		return DatadogClient{}, errors.New("missing one of the required environment variables: DD_SITE, API_KEY_SECRET_OCID, HOME_REGION")
+	if secretOCID == "" || homeRegion == "" {
+		return DatadogClient{}, errors.New("missing one of the required environment variables: API_KEY_SECRET_OCID, HOME_REGION")
 	}
 
 	configuration := datadog.NewConfiguration()
@@ -42,7 +95,6 @@ func NewDatadogClient() (DatadogClient, error) {
 
 	cache = &DatadogClient{
 		Client:      client,
-		Site:        site,
 		secretOCID:  secretOCID,
 		vaultRegion: homeRegion,
 	}
@@ -52,18 +104,4 @@ func NewDatadogClient() (DatadogClient, error) {
 	}
 	cache.ApiKey = apiKey
 	return *cache, nil
-}
-
-func (client DatadogClient) SendMessageToDatadog(ctx context.Context, message []byte, sendFunc func(ctx context.Context, client DatadogClient, message []byte) (int, error)) error {
-	status, err := sendFunc(ctx, client, message)
-	if err != nil && status == 403 {
-		// Attempt to fetch the API key again in case it has been rotated
-		err = client.refreshAPIKey(ctx)
-		if err != nil {
-			return err
-		}
-		_, err = sendFunc(ctx, client, message)
-		return err
-	}
-	return err
 }

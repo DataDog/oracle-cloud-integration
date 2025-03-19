@@ -1,7 +1,9 @@
 package common
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/url"
 
@@ -26,12 +28,23 @@ func (m *MockAPIClient) PrepareRequest(ctx context.Context, path string, method 
 }
 
 func GetDefaultTestDatadogClient() (DatadogClient, error) {
+	ddclient, _ := getTestDatadogClient()
+	// Mock Datadog API response
+	mockResponse := &http.Response{
+		StatusCode: http.StatusAccepted,
+		Body:       io.NopCloser(bytes.NewBufferString("")),
+	}
+	mockClient := ddclient.Client.(*MockAPIClient)
+	mockClient.On("CallAPI", mock.Anything).Return(mockResponse, nil)
+	return ddclient, nil
+}
+
+func getTestDatadogClient() (DatadogClient, error) {
 	configuration := datadog.NewConfiguration()
 	configuration.RetryConfiguration.EnableRetry = true
-	client := new(MockAPIClient)
-
+	mockClient := new(MockAPIClient)
 	return DatadogClient{
-		Client: client,
+		Client: mockClient,
 		ApiKey: "apiKey",
 	}, nil
 }

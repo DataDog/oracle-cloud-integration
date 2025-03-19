@@ -3,7 +3,6 @@ module oracle-cloud-integration/metrics-forwarder
 go 1.23.4
 
 require (
-	github.com/DataDog/datadog-api-client-go/v2 v2.36.1
 	github.com/fnproject/fdk-go v0.0.53
 	github.com/stretchr/testify v1.10.0
 	oracle-cloud-integration/internal v0.0.0
@@ -12,6 +11,7 @@ require (
 replace oracle-cloud-integration/internal => ../internal
 
 require (
+	github.com/DataDog/datadog-api-client-go/v2 v2.36.1 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect

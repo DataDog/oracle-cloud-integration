@@ -28,17 +28,11 @@ func TestMyHandler_Success(t *testing.T) {
 	out := &bytes.Buffer{}
 
 	// Mock SendLogsToDatadog function
-	originalSendFunc := sendLogsFunc
 	originalDatadogClientFunc := datadogClientFunc
 	defer func() {
-		sendLogsFunc = originalSendFunc
 		datadogClientFunc = originalDatadogClientFunc
 	}()
-	sendLogsFunc = func(ctx context.Context, client common.DatadogClient, logsMsg []byte) (int, error) {
-		return 202, nil
-	}
 	datadogClientFunc = common.GetDefaultTestDatadogClient
-
 	MyHandler(context.Background(), in, out)
 
 	assert.Contains(t, out.String(), `"status":"success"`)

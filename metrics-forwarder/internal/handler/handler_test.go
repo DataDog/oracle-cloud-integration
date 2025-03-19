@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"testing"
@@ -39,7 +38,6 @@ func TestMyHandler(t *testing.T) {
 	testCases := []struct {
 		name            string
 		tenancyOCID     string
-		mockSendFunc    func(ctx context.Context, client common.DatadogClient, metricsMessage []byte) (int, error)
 		expectedStatus  string
 		expectedMessage string
 		expectedError   string
@@ -47,27 +45,13 @@ func TestMyHandler(t *testing.T) {
 		{
 			name:            "ErrorGeneratingMetricsMsg",
 			tenancyOCID:     "",
-			mockSendFunc:    nil,
 			expectedStatus:  "error",
 			expectedMessage: "",
-			expectedError:   "missing required environment variable TENANCY_OCID",
+			expectedError:   "missing required environment variables TENANCY_OCID or DD_SITE",
 		},
 		{
-			name:        "ErrorSendingMetrics",
-			tenancyOCID: "test-tenancy",
-			mockSendFunc: func(ctx context.Context, client common.DatadogClient, metricsMessage []byte) (int, error) {
-				return 500, fmt.Errorf("error sending metrics to Datadog")
-			},
-			expectedStatus:  "error",
-			expectedMessage: "",
-			expectedError:   "error sending metrics to Datadog",
-		},
-		{
-			name:        "SuccessfulMetricsHandling",
-			tenancyOCID: "test-tenancy",
-			mockSendFunc: func(ctx context.Context, client common.DatadogClient, metricsMessage []byte) (int, error) {
-				return 202, nil
-			},
+			name:            "SuccessfulMetricsHandling",
+			tenancyOCID:     "test-tenancy",
 			expectedStatus:  "success",
 			expectedMessage: "Metrics sent to Datadog",
 			expectedError:   "",
@@ -81,22 +65,15 @@ func TestMyHandler(t *testing.T) {
 			if tc.tenancyOCID != "" {
 				os.Setenv("DD_SITE", "test-site")
 				defer os.Unsetenv("DD_SITE")
-				os.Setenv("DD_API_KEY", "test-api")
-				defer os.Unsetenv("DD_API_KEY")
 				os.Setenv("TENANCY_OCID", tc.tenancyOCID)
 				defer os.Unsetenv("TENANCY_OCID")
 			}
 
-			originalSendFunc := sendMetricsFunc
 			originalDatadogClientFunc := datadogClientFunc
 			defer func() {
-				sendMetricsFunc = originalSendFunc
 				datadogClientFunc = originalDatadogClientFunc
 			}()
 			datadogClientFunc = common.GetDefaultTestDatadogClient
-			if tc.mockSendFunc != nil {
-				sendMetricsFunc = tc.mockSendFunc
-			}
 
 			MyHandler(getContext(), input, output)
 
