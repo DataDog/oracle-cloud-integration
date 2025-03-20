@@ -15,7 +15,7 @@ locals {
     } : {},
     length(var.metrics_image_tag) > 0 ? {
       "TENANCY_OCID"             = var.tenancy_id,
-      "DETAILED_LOGGING_ENABLED" = "true"
+      "DETAILED_LOGGING_ENABLED" = "false"
     } : {}
   )
 }
