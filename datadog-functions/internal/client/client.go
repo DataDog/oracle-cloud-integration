@@ -1,4 +1,4 @@
-package common
+package client
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 
 	datadog "github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 )
@@ -38,7 +39,9 @@ type DatadogClient struct {
 // Returns:
 //
 //	error - An error if the message could not be sent or if the API key could not be refreshed.
-func (client DatadogClient) SendMessageToDatadog(ctx context.Context, message []byte, url string) error {
+func (client *DatadogClient) SendMessageToDatadog(ctx context.Context, message []byte, url string) error {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel() // releases resources if sendMessage or refreshAPIKey completes before timeout elapses
 	status, err := client.sendMessage(ctx, message, url)
 	if err != nil && status == http.StatusForbidden {
 		// Attempt to fetch the API key again in case it has been rotated
@@ -52,7 +55,7 @@ func (client DatadogClient) SendMessageToDatadog(ctx context.Context, message []
 	return err
 }
 
-func (client DatadogClient) sendMessage(ctx context.Context, message []byte, url string) (int, error) {
+func (client *DatadogClient) sendMessage(ctx context.Context, message []byte, url string) (int, error) {
 	apiHeaders := map[string]string{
 		"Content-Encoding": "gzip",
 		"Content-Type":     "application/json",
@@ -98,10 +101,30 @@ func NewDatadogClient() (DatadogClient, error) {
 		secretOCID:  secretOCID,
 		vaultRegion: homeRegion,
 	}
-	apiKey, err := cache.fetchAPIKeyFromVault(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel() // releases resources if fetchAPIKeyFromVault completes before timeout elapses
+	apiKey, err := cache.fetchAPIKeyFromVault(ctx)
 	if err != nil {
 		return DatadogClient{}, err
 	}
 	cache.ApiKey = apiKey
 	return *cache, nil
+}
+
+func NewDatadogClientWithSite() (DatadogClient, string, error) {
+	site := os.Getenv("DD_SITE")
+	if site == "" {
+		return DatadogClient{}, "", errors.New("missing required environment variable DD_SITE")
+	}
+	client, err := NewDatadogClient()
+	return client, site, err
+}
+
+func NewDatadogClientWithTenancyAndSite() (DatadogClient, string, string, error) {
+	tenancyOCID := os.Getenv("TENANCY_OCID")
+	if tenancyOCID == "" {
+		return DatadogClient{}, "", "", errors.New("missing required environment variable TENANCY_OCID")
+	}
+	client, site, err := NewDatadogClientWithSite()
+	return client, tenancyOCID, site, err
 }

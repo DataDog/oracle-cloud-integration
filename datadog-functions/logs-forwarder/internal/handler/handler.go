@@ -10,11 +10,11 @@ import (
 	"os"
 	"strconv"
 
-	"oracle-cloud-integration/internal/common"
-	"oracle-cloud-integration/logs-forwarder/internal/formatter"
+	"datadog-functions/internal/client"
+	"datadog-functions/logs-forwarder/internal/formatter"
 )
 
-var datadogClientFunc = common.NewDatadogClient
+var datadogClientFunc = client.NewDatadogClientWithSite
 
 const DefaultBatchSize = 1000
 
@@ -33,7 +33,7 @@ const DefaultBatchSize = 1000
 //  3. Processes the logs in batches, sending them to Datadog.
 //  4. Writes a success response if all logs are processed successfully, or an error response if any step fails.
 func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
-	ddclient, site, err := newDatadogClientWithSite()
+	ddclient, site, err := datadogClientFunc()
 	if err != nil {
 		log.Println(err)
 		writeResponse(out, "error", "", err)
@@ -91,7 +91,7 @@ func getSerializedLogsData(rawLogs io.Reader) ([]map[string]interface{}, error) 
 	return logs, nil
 }
 
-func processLogs(ctx context.Context, client common.DatadogClient, url string, logs []map[string]interface{}) error {
+func processLogs(ctx context.Context, client client.DatadogClient, url string, logs []map[string]interface{}) error {
 	logsMsg, err := formatter.GenerateLogsMsg(logs)
 	if err != nil {
 		return err
@@ -114,13 +114,4 @@ func getBatchSize() int {
 		return DefaultBatchSize
 	}
 	return batchSize
-}
-
-func newDatadogClientWithSite() (common.DatadogClient, string, error) {
-	site := os.Getenv("DD_SITE")
-	if site == "" {
-		return common.DatadogClient{}, "", errors.New("missing required environment variable DD_SITE")
-	}
-	client, err := datadogClientFunc()
-	return client, site, err
 }

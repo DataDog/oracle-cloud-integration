@@ -1,11 +1,13 @@
-package common
+package client
 
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 
 	datadog "github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 	"github.com/stretchr/testify/mock"
@@ -27,7 +29,21 @@ func (m *MockAPIClient) PrepareRequest(ctx context.Context, path string, method 
 	return &http.Request{}, nil
 }
 
-func GetDefaultTestDatadogClient() (DatadogClient, error) {
+func NewTestDatadogClientWithSite() (DatadogClient, string, error) {
+	ddclient, _ := getDefaultTestDatadogClient()
+	return ddclient, "test", nil
+}
+
+func NewTestDatadogClientWithTenancyAndSite() (DatadogClient, string, string, error) {
+	tenancyOCID := os.Getenv("TENANCY_OCID")
+	if tenancyOCID == "" {
+		return DatadogClient{}, "", "", errors.New("missing required environment variable TENANCY_OCID")
+	}
+	client, site, err := NewTestDatadogClientWithSite()
+	return client, tenancyOCID, site, err
+}
+
+func getDefaultTestDatadogClient() (DatadogClient, error) {
 	ddclient, _ := getTestDatadogClient()
 	// Mock Datadog API response
 	mockResponse := &http.Response{

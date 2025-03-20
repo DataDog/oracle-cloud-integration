@@ -3,8 +3,8 @@ package handler
 import (
 	"bytes"
 	"context"
+	"datadog-functions/internal/client"
 	"encoding/json"
-	"oracle-cloud-integration/internal/common"
 	"os"
 	"testing"
 
@@ -32,7 +32,7 @@ func TestMyHandler_Success(t *testing.T) {
 	defer func() {
 		datadogClientFunc = originalDatadogClientFunc
 	}()
-	datadogClientFunc = common.GetDefaultTestDatadogClient
+	datadogClientFunc = client.NewTestDatadogClientWithSite
 	MyHandler(context.Background(), in, out)
 
 	assert.Contains(t, out.String(), `"status":"success"`)

@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"oracle-cloud-integration/internal/common"
+	"datadog-functions/internal/client"
 
 	fdk "github.com/fnproject/fdk-go"
 	"github.com/stretchr/testify/assert"
@@ -47,7 +47,7 @@ func TestMyHandler(t *testing.T) {
 			tenancyOCID:     "",
 			expectedStatus:  "error",
 			expectedMessage: "",
-			expectedError:   "missing required environment variables TENANCY_OCID or DD_SITE",
+			expectedError:   "missing required environment variable TENANCY_OCID",
 		},
 		{
 			name:            "SuccessfulMetricsHandling",
@@ -63,8 +63,6 @@ func TestMyHandler(t *testing.T) {
 			input := bytes.NewBufferString(`{"metrics": "test-metric"}`)
 			output := &bytes.Buffer{}
 			if tc.tenancyOCID != "" {
-				os.Setenv("DD_SITE", "test-site")
-				defer os.Unsetenv("DD_SITE")
 				os.Setenv("TENANCY_OCID", tc.tenancyOCID)
 				defer os.Unsetenv("TENANCY_OCID")
 			}
@@ -73,7 +71,7 @@ func TestMyHandler(t *testing.T) {
 			defer func() {
 				datadogClientFunc = originalDatadogClientFunc
 			}()
-			datadogClientFunc = common.GetDefaultTestDatadogClient
+			datadogClientFunc = client.NewTestDatadogClientWithTenancyAndSite
 
 			MyHandler(getContext(), input, output)
 

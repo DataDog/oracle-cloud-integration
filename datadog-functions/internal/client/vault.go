@@ -1,4 +1,4 @@
-package common
+package client
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/oracle/oci-go-sdk/v65/secrets"
 )
 
-func (client DatadogClient) refreshAPIKey(ctx context.Context) error {
+func (client *DatadogClient) refreshAPIKey(ctx context.Context) error {
 	apiKey, err := client.fetchAPIKeyFromVault(ctx)
 	if err != nil {
 		return err
@@ -21,7 +21,7 @@ func (client DatadogClient) refreshAPIKey(ctx context.Context) error {
 }
 
 // fetchAPIKeyFromVault retrieves the Datadog API Key stored in OCI Vault.
-func (client DatadogClient) fetchAPIKeyFromVault(ctx context.Context) (string, error) {
+func (client *DatadogClient) fetchAPIKeyFromVault(ctx context.Context) (string, error) {
 	// Create a resource principal authentication provider
 	rp, err := auth.ResourcePrincipalConfigurationProvider()
 	if err != nil {

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"oracle-cloud-integration/logs-forwarder/internal/handler"
+	"datadog-functions/metrics-forwarder/internal/handler"
 
 	fdk "github.com/fnproject/fdk-go"
 )

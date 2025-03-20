@@ -3,17 +3,15 @@ package handler
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log"
-	"os"
 
-	"oracle-cloud-integration/internal/common"
-	"oracle-cloud-integration/metrics-forwarder/internal/formatter"
+	"datadog-functions/internal/client"
+	"datadog-functions/metrics-forwarder/internal/formatter"
 )
 
-var datadogClientFunc = common.NewDatadogClient
+var datadogClientFunc = client.NewDatadogClientWithTenancyAndSite
 
 // MyHandler processes incoming metrics data, formats it, and sends it to Datadog.
 // It performs the following steps:
@@ -37,7 +35,7 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	}
 
 	// 2. Read tenancy OCID, site and datadog API key
-	ddclient, tenancyOCID, site, err := newDatadogClientWithTenancyAndSite()
+	ddclient, tenancyOCID, site, err := datadogClientFunc()
 	if err != nil {
 		log.Println(err)
 		writeResponse(out, "error", "", err)
@@ -72,14 +70,4 @@ func getSerializedMetricData(rawMetrics io.Reader) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
-}
-
-func newDatadogClientWithTenancyAndSite() (common.DatadogClient, string, string, error) {
-	tenancyOCID := os.Getenv("TENANCY_OCID")
-	site := os.Getenv("DD_SITE")
-	if tenancyOCID == "" || site == "" {
-		return common.DatadogClient{}, "", "", errors.New("missing required environment variables TENANCY_OCID or DD_SITE")
-	}
-	client, err := datadogClientFunc()
-	return client, tenancyOCID, site, err
 }
