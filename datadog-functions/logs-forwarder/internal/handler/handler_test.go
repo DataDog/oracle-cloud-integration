@@ -3,8 +3,8 @@ package handler
 import (
 	"bytes"
 	"context"
+	"datadog-functions/internal/client"
 	"encoding/json"
-	"logs-forwarder/internal/client"
 	"os"
 	"testing"
 
@@ -14,8 +14,8 @@ import (
 func TestMyHandler_Success(t *testing.T) {
 	// Mock environment variables
 	os.Setenv("DD_SITE", "datadoghq.com")
-	os.Setenv("DD_API_KEY", "test-api-key")
-	os.Setenv("DD_BATCH_SIZE", "2")
+	os.Setenv("API_KEY_SECRET_OCID", "ocid1.apikey.oc1..test")
+	os.Setenv("HOME_REGION", "us-ashburn-1")
 
 	// Mock input logs
 	logs := []map[string]interface{}{
@@ -28,12 +28,11 @@ func TestMyHandler_Success(t *testing.T) {
 	out := &bytes.Buffer{}
 
 	// Mock SendLogsToDatadog function
-	originalSendFunc := sendLogsFunc
-	defer func() { sendLogsFunc = originalSendFunc }()
-	sendLogsFunc = func(client client.DatadogClient, logsMsg []byte) error {
-		return nil
-	}
-
+	originalDatadogClientFunc := datadogClientFunc
+	defer func() {
+		datadogClientFunc = originalDatadogClientFunc
+	}()
+	datadogClientFunc = client.NewTestDatadogClientWithSite
 	MyHandler(context.Background(), in, out)
 
 	assert.Contains(t, out.String(), `"status":"success"`)

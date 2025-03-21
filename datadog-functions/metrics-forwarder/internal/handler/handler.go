@@ -3,16 +3,15 @@ package handler
 import (
 	"bytes"
 	"context"
-	"errors"
+	"fmt"
 	"io"
 	"log"
-	"os"
 
-	"metrics-forwarder/internal/client"
-	"metrics-forwarder/internal/formatter"
+	"datadog-functions/internal/client"
+	"datadog-functions/metrics-forwarder/internal/formatter"
 )
 
-var sendMetricsFunc = client.SendMetricsToDatadog
+var datadogClientFunc = client.NewDatadogClientWithTenancyAndSite
 
 // MyHandler processes incoming metrics data, formats it, and sends it to Datadog.
 // It performs the following steps:
@@ -36,7 +35,7 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	}
 
 	// 2. Read tenancy OCID, site and datadog API key
-	ddclient, tenancyOCID, err := newDatadogClientWithTenancy()
+	ddclient, tenancyOCID, site, err := datadogClientFunc()
 	if err != nil {
 		log.Println(err)
 		writeResponse(out, "error", "", err)
@@ -52,7 +51,8 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	}
 
 	// 4. Send message to Datadog
-	err = sendMetricsFunc(ddclient, metricsMsg)
+	url := fmt.Sprintf("https://ocimetrics-intake.%s/api/v2/ocimetrics", site)
+	err = ddclient.SendMessageToDatadog(ctx, metricsMsg, url)
 	if err != nil {
 		log.Printf("Error sending metrics to Datadog: %v", err)
 		writeResponse(out, "error", "", err)
@@ -70,14 +70,4 @@ func getSerializedMetricData(rawMetrics io.Reader) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
-}
-
-func newDatadogClientWithTenancy() (client.DatadogClient, string, error) {
-	tenancyOCID := os.Getenv("TENANCY_OCID")
-	site := os.Getenv("DD_SITE")
-	apiKey := os.Getenv("DD_API_KEY")
-	if tenancyOCID == "" || site == "" || apiKey == "" {
-		return client.DatadogClient{}, "", errors.New("missing one of the required environment variables: TENANCY_OCID, DD_SITE, DD_API_KEY")
-	}
-	return client.NewDatadogClient(site, apiKey), tenancyOCID, nil
 }

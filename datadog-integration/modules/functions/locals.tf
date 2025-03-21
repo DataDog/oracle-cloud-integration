@@ -4,7 +4,6 @@ locals {
 
   config = merge(
     {
-      "DD_COMPRESS"         = "true",
       "DD_SITE"             = var.datadog_site,
       "HOME_REGION"         = var.home_region,
       "API_KEY_SECRET_OCID" = var.api_key_secret_id
@@ -16,7 +15,7 @@ locals {
     } : {},
     length(var.metrics_image_tag) > 0 ? {
       "TENANCY_OCID"             = var.tenancy_id,
-      "DETAILED_LOGGING_ENABLED" = "true"
+      "DETAILED_LOGGING_ENABLED" = "false"
     } : {}
   )
 }

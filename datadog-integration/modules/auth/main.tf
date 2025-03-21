@@ -58,7 +58,17 @@ resource "oci_identity_dynamic_group" "sch_dg" {
   compartment_id = var.tenancy_id
   description    = "[DO NOT REMOVE] Dynamic group for forwarding by service connector"
   matching_rule  = "All {resource.type = 'serviceconnector', resource.compartment.id = '${var.compartment_id}'}"
-  name           = local.dg_name
+  name           = local.dg_sch_name
+  freeform_tags  = var.tags
+}
+
+resource "oci_identity_dynamic_group" "func_dg" {
+  count = var.forward_metrics || var.forward_logs ? 1 : 0
+  # Required
+  compartment_id = var.tenancy_id
+  description    = "[DO NOT REMOVE] Dynamic group for forwarding functions"
+  matching_rule  = "All {resource.type = 'fnfunc', resource.compartment.id = '${var.compartment_id}'}"
+  name           = local.dg_fn_name
   freeform_tags  = var.tags
 }
 
@@ -69,12 +79,12 @@ resource "oci_identity_policy" "dg_policy" {
   description    = "[DO NOT REMOVE] Policy to have any connector hub read from eligible sources and write to a target function"
   name           = local.dg_policy_name
   statements = concat(
-    var.forward_logs ? ["Allow dynamic-group Default/${local.dg_name} to read log-content in tenancy"] : [],
-    var.forward_metrics ? ["Allow dynamic-group Default/${local.dg_name} to read metrics in tenancy"] : [],
+    var.forward_logs ? ["Allow dynamic-group Default/${local.dg_sch_name} to read log-content in tenancy"] : [],
+    var.forward_metrics ? ["Allow dynamic-group Default/${local.dg_sch_name} to read metrics in tenancy"] : [],
     [
-      "Allow dynamic-group Default/${local.dg_name} to use fn-function in compartment ${var.compartment_name}",
-      "Allow dynamic-group Default/${local.dg_name} to use fn-invocation in compartment ${var.compartment_name}",
-      "Allow dynamic-group Default/${local.dg_name} to read secret-bundles in compartment ${var.compartment_name}"
+      "Allow dynamic-group Default/${local.dg_sch_name} to use fn-function in compartment ${var.compartment_name}",
+      "Allow dynamic-group Default/${local.dg_sch_name} to use fn-invocation in compartment ${var.compartment_name}",
+      "Allow dynamic-group Default/${local.dg_fn_name} to read secret-bundles in compartment ${var.compartment_name}"
     ]
   )
   freeform_tags = var.tags
