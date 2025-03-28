@@ -3,7 +3,7 @@ package handler
 import (
 	"bytes"
 	"context"
-	"datadog-functions/internal/client"
+	"datadog-functions/lib/client"
 	"encoding/json"
 	"os"
 	"testing"

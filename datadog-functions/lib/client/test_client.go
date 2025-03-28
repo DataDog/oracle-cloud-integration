@@ -50,7 +50,7 @@ func getDefaultTestDatadogClient() (DatadogClient, error) {
 		StatusCode: http.StatusAccepted,
 		Body:       io.NopCloser(bytes.NewBufferString("")),
 	}
-	mockClient := ddclient.Client.(*MockAPIClient)
+	mockClient := ddclient.client.(*MockAPIClient)
 	mockClient.On("CallAPI", mock.Anything).Return(mockResponse, nil)
 	return ddclient, nil
 }
@@ -60,7 +60,7 @@ func getTestDatadogClient() (DatadogClient, error) {
 	configuration.RetryConfiguration.EnableRetry = true
 	mockClient := new(MockAPIClient)
 	return DatadogClient{
-		Client: mockClient,
-		ApiKey: "apiKey",
+		client: mockClient,
+		apiKey: "apiKey",
 	}, nil
 }

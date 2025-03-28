@@ -1,14 +1,14 @@
 module datadog-functions/metrics-forwarder
 
-go 1.24.1
+go 1.24.0
 
 require (
-	datadog-functions/internal v0.0.0
+	datadog-functions/lib v0.0.0
 	github.com/fnproject/fdk-go v0.0.55
 	github.com/stretchr/testify v1.10.0
 )
 
-replace datadog-functions/internal => ../internal
+replace datadog-functions/lib => ../lib
 
 require (
 	github.com/DataDog/datadog-api-client-go/v2 v2.36.1 // indirect
