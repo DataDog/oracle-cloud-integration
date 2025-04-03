@@ -10,7 +10,7 @@ import (
 	"os"
 	"strconv"
 
-	"datadog-functions/internal/client"
+	"datadog-functions/lib/client"
 	"datadog-functions/logs-forwarder/internal/formatter"
 )
 

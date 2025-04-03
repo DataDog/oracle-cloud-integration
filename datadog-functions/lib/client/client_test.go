@@ -48,7 +48,7 @@ func TestSendMessageToDatadog(t *testing.T) {
 				StatusCode: tc.mockStatusCode,
 				Body:       io.NopCloser(bytes.NewBufferString("")),
 			}
-			mockClient := mockDatadogClient.Client.(*MockAPIClient)
+			mockClient := mockDatadogClient.client.(*MockAPIClient)
 			mockClient.On("CallAPI", mock.Anything).Return(mockResponse, nil)
 
 			// Call the function with a mock client

@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"datadog-functions/internal/client"
+	"datadog-functions/lib/client"
 
 	fdk "github.com/fnproject/fdk-go"
 	"github.com/stretchr/testify/assert"

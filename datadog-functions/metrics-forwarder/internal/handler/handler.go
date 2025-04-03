@@ -7,7 +7,7 @@ import (
 	"io"
 	"log"
 
-	"datadog-functions/internal/client"
+	"datadog-functions/lib/client"
 	"datadog-functions/metrics-forwarder/internal/formatter"
 )
 
