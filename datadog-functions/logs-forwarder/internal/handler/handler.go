@@ -26,17 +26,21 @@ const (
 	FormatterTimeout = 3 * time.Minute
 )
 
-// MyHandler processes logs from an input reader and sends them to Datadog in batches.
-// It uses a streaming approach with parallel API calls:
-// 1. Reads logs one by one from input
-// 2. Formats each log using the formatter
-// 3. Batches formatted logs
-// 4. Sends batches to Datadog using a worker pool
+// MyHandler is an Oracle Cloud Function that forwards logs to Datadog.
+// It coordinates the log processing pipeline:
+// - Establishes connection with Datadog using API credentials
+// - Processes incoming logs through a formatter
+// - Manages concurrent processing with timeouts and error handling
+// - Sends formatted logs to Datadog in optimized batches
 //
-// The handler implements timeouts and cancellation:
-// - Context cancellation for graceful shutdown
-// - Formatter timeout to prevent hanging
-// - Error propagation through channels
+// The function implements graceful shutdown and resource cleanup through context
+// cancellation. If any stage of the pipeline fails, it ensures proper error
+// reporting and cleanup of goroutines.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeouts
+//   - in: Reader containing the incoming log data in JSON format
+//   - out: Writer for the function's response
 func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	ddclient, site, err := datadogClientFunc()
 	if err != nil {
