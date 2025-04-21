@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	"datadog-functions/lib/client"
 	"datadog-functions/logs-forwarder/internal/formatter"
@@ -17,7 +18,13 @@ import (
 
 var datadogClientFunc = client.NewDatadogClientWithSite
 
-const DefaultBatchSize = 1000
+const (
+	// DefaultBatchSize is the number of logs to accumulate before sending to Datadog
+	DefaultBatchSize = 1000
+
+	// FormatterTimeout is the maximum duration allowed for log formatting operations
+	FormatterTimeout = 3 * time.Minute
+)
 
 // MyHandler processes logs from an input reader and sends them to Datadog in batches.
 // It uses a streaming approach with parallel API calls:
@@ -25,6 +32,11 @@ const DefaultBatchSize = 1000
 // 2. Formats each log using the formatter
 // 3. Batches formatted logs
 // 4. Sends batches to Datadog using a worker pool
+//
+// The handler implements timeouts and cancellation:
+// - Context cancellation for graceful shutdown
+// - Formatter timeout to prevent hanging
+// - Error propagation through channels
 func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	ddclient, site, err := datadogClientFunc()
 	if err != nil {
@@ -53,16 +65,32 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	writeResponse(out, "success", "Logs sent to Datadog", nil)
 }
 
-// startLogsFormatter starts the goroutine that reads and formats logs
+// startLogsFormatter starts a goroutine that reads and formats logs.
+// It applies a timeout to prevent the formatter from hanging indefinitely.
+// The goroutine will:
+// - Read and decode JSON logs from the input
+// - Format each log entry
+// - Send formatted logs through the channel
+// - Handle context cancellation and timeouts
+// - Close the formattedLogs channel when done
 func startLogsFormatter(ctx context.Context, wg *sync.WaitGroup, in io.Reader, formattedLogs chan<- formatter.LogPayload, errChan chan<- error) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 
+		// Create a context with timeout
+		ctx, cancel := context.WithTimeout(ctx, FormatterTimeout)
+		defer cancel()
+
 		if err := formatLogs(ctx, in, formattedLogs); err != nil {
 			select {
-			case errChan <- err:
+			case errChan <- fmt.Errorf("formatter error: %w", err):
 			case <-ctx.Done():
+				if ctx.Err() == context.DeadlineExceeded {
+					errChan <- fmt.Errorf("formatter timed out after %v", FormatterTimeout)
+				} else {
+					errChan <- ctx.Err()
+				}
 			}
 			return
 		}
@@ -70,17 +98,22 @@ func startLogsFormatter(ctx context.Context, wg *sync.WaitGroup, in io.Reader, f
 	}()
 }
 
+// formatLogs decodes and formats logs from the input reader.
+// It supports both single log entries and arrays of logs.
+// The function will stop processing if the context is cancelled.
 func formatLogs(ctx context.Context, rawLogs io.Reader, formattedLogs chan<- formatter.LogPayload) error {
 	// Decode incoming JSON payload
 	var body interface{}
 	err := json.NewDecoder(rawLogs).Decode(&body)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to decode JSON: %w", err)
 	}
+
 	lf, err := formatter.NewLogFormatter()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create log formatter: %w", err)
 	}
+
 	// Normalize input into a slice of maps
 	switch v := body.(type) {
 	case []interface{}: // If it's an array, convert to []map[string]interface{}
@@ -94,7 +127,7 @@ func formatLogs(ctx context.Context, rawLogs io.Reader, formattedLogs chan<- for
 				}
 			}
 		}
-	case map[string]interface{}: // If it's a single object, wrap in an array
+	case map[string]interface{}: // If it's a single object, process it directly
 		payload := lf.ProcessLogEntry(v)
 		select {
 		case formattedLogs <- payload:
@@ -102,7 +135,7 @@ func formatLogs(ctx context.Context, rawLogs io.Reader, formattedLogs chan<- for
 			return ctx.Err()
 		}
 	default:
-		return errors.New("invalid JSON format")
+		return errors.New("invalid JSON format: expected object or array of objects")
 	}
 	return nil
 }
