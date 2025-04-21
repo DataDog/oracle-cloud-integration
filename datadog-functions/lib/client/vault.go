@@ -16,7 +16,7 @@ func (client *DatadogClient) refreshAPIKey(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	client.ApiKey = apiKey
+	client.apiKey = apiKey
 	return nil
 }
 

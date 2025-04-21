@@ -21,8 +21,8 @@ type apiClient interface {
 }
 
 type DatadogClient struct {
-	Client      apiClient
-	ApiKey      string
+	client      apiClient
+	apiKey      string
 	vaultRegion string
 	secretOCID  string
 }
@@ -59,15 +59,15 @@ func (client *DatadogClient) sendMessage(ctx context.Context, message []byte, ur
 	apiHeaders := map[string]string{
 		"Content-Encoding": "gzip",
 		"Content-Type":     "application/json",
-		"DD-API-KEY":       client.ApiKey,
+		"DD-API-KEY":       client.apiKey,
 	}
 	fmt.Printf("Uncompressed payload size=%d\n", len(message))
-	req, err := client.Client.PrepareRequest(ctx, url, http.MethodPost, message, apiHeaders, nil, nil, nil)
+	req, err := client.client.PrepareRequest(ctx, url, http.MethodPost, message, apiHeaders, nil, nil, nil)
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
 
-	resp, err := client.Client.CallAPI(req)
+	resp, err := client.client.CallAPI(req)
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
@@ -97,7 +97,7 @@ func NewDatadogClient() (DatadogClient, error) {
 	client := datadog.NewAPIClient(configuration)
 
 	cache = &DatadogClient{
-		Client:      client,
+		client:      client,
 		secretOCID:  secretOCID,
 		vaultRegion: homeRegion,
 	}
@@ -107,7 +107,7 @@ func NewDatadogClient() (DatadogClient, error) {
 	if err != nil {
 		return DatadogClient{}, err
 	}
-	cache.ApiKey = apiKey
+	cache.apiKey = apiKey
 	return *cache, nil
 }
 

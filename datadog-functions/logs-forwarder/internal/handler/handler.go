@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"sync"
 
-	"datadog-functions/internal/client"
+	"datadog-functions/lib/client"
 	"datadog-functions/logs-forwarder/internal/formatter"
 )
 
@@ -169,23 +169,14 @@ func sendBatch(ctx context.Context, client client.DatadogClient, url string, bat
 
 // waitForCompletion waits for all goroutines to finish and returns any error
 func waitForCompletion(wg *sync.WaitGroup, errChan chan error) error {
-	// Create a done channel to signal completion
-	done := make(chan struct{})
+	// Start a goroutine to close errChan when all work is done
 	go func() {
 		wg.Wait()
-		close(done)
+		close(errChan)
 	}()
 
-	// Wait for either an error or completion
-	select {
-	case err, ok := <-errChan:
-		if ok {
-			return err
-		}
-		return nil
-	case <-done:
-		return nil
-	}
+	// Wait for error or completion
+	return <-errChan
 }
 
 func getBatchSize() int {
