@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"sync"
 
 	"datadog-functions/internal/client"
 	"datadog-functions/logs-forwarder/internal/formatter"
@@ -19,19 +20,11 @@ var datadogClientFunc = client.NewDatadogClientWithSite
 const DefaultBatchSize = 1000
 
 // MyHandler processes logs from an input reader and sends them to Datadog in batches.
-// It reads necessary environment variables, deserializes the logs, and processes them in batches.
-// If any error occurs during the process, it writes an error response to the output writer.
-//
-// Parameters:
-//   - ctx: The context for the handler.
-//   - in: The input reader containing serialized logs data.
-//   - out: The output writer to write responses.
-//
-// The function performs the following steps:
-//  1. Reads environment variables for site and apiKey.
-//  2. Deserializes the logs data from the input reader.
-//  3. Processes the logs in batches, sending them to Datadog.
-//  4. Writes a success response if all logs are processed successfully, or an error response if any step fails.
+// It uses a streaming approach with parallel API calls:
+// 1. Reads logs one by one from input
+// 2. Formats each log using the formatter
+// 3. Batches formatted logs
+// 4. Sends batches to Datadog using a worker pool
 func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	ddclient, site, err := datadogClientFunc()
 	if err != nil {
@@ -41,66 +34,158 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	}
 	url := fmt.Sprintf("https://http-intake.logs.%s/api/v2/logs", site)
 
-	logs, err := getSerializedLogsData(in)
-	if err != nil {
+	// Create channels and wait group
+	formattedLogs := make(chan formatter.LogPayload, DefaultBatchSize)
+	errChan := make(chan error, 1)
+	var wg sync.WaitGroup
+
+	// Start the pipeline
+	startLogsFormatter(ctx, &wg, in, formattedLogs, errChan)
+	startLogsSender(ctx, &wg, ddclient, url, formattedLogs, errChan)
+
+	// Wait for completion and handle errors
+	if err := waitForCompletion(&wg, errChan); err != nil {
 		log.Println(err)
 		writeResponse(out, "error", "", err)
 		return
 	}
 
-	batchSize := getBatchSize()
-	fmt.Printf("Received %d logs to process with a batch size of %d\n", len(logs), batchSize)
-
-	for i := 0; i < len(logs); i += batchSize {
-		end := i + batchSize
-		if end > len(logs) {
-			end = len(logs)
-		}
-		err = processLogs(ctx, ddclient, url, logs[i:end])
-		if err != nil {
-			log.Printf("Error processing logs in batch %d: %v", i/batchSize+1, err)
-			writeResponse(out, "error", "", err)
-			return
-		}
-	}
 	writeResponse(out, "success", "Logs sent to Datadog", nil)
 }
 
-func getSerializedLogsData(rawLogs io.Reader) ([]map[string]interface{}, error) {
+// startLogsFormatter starts the goroutine that reads and formats logs
+func startLogsFormatter(ctx context.Context, wg *sync.WaitGroup, in io.Reader, formattedLogs chan<- formatter.LogPayload, errChan chan<- error) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		if err := formatLogs(ctx, in, formattedLogs); err != nil {
+			select {
+			case errChan <- err:
+			case <-ctx.Done():
+			}
+			return
+		}
+		close(formattedLogs)
+	}()
+}
+
+func formatLogs(ctx context.Context, rawLogs io.Reader, formattedLogs chan<- formatter.LogPayload) error {
 	// Decode incoming JSON payload
 	var body interface{}
 	err := json.NewDecoder(rawLogs).Decode(&body)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
+	lf, err := formatter.NewLogFormatter()
+	if err != nil {
+		return err
+	}
 	// Normalize input into a slice of maps
-	var logs []map[string]interface{}
 	switch v := body.(type) {
 	case []interface{}: // If it's an array, convert to []map[string]interface{}
 		for _, item := range v {
 			if logMap, ok := item.(map[string]interface{}); ok {
-				logs = append(logs, logMap)
+				payload := lf.ProcessLogEntry(logMap)
+				select {
+				case formattedLogs <- payload:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
 			}
 		}
 	case map[string]interface{}: // If it's a single object, wrap in an array
-		logs = append(logs, v)
+		payload := lf.ProcessLogEntry(v)
+		select {
+		case formattedLogs <- payload:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	default:
-		return nil, errors.New("invalid JSON format")
-	}
-	return logs, nil
-}
-
-func processLogs(ctx context.Context, client client.DatadogClient, url string, logs []map[string]interface{}) error {
-	logsMsg, err := formatter.GenerateLogsMsg(logs)
-	if err != nil {
-		return err
-	}
-	err = client.SendMessageToDatadog(ctx, logsMsg, url)
-	if err != nil {
-		return err
+		return errors.New("invalid JSON format")
 	}
 	return nil
+}
+
+// startLogsSender starts the goroutine that batches logs and manages API workers
+func startLogsSender(ctx context.Context, wg *sync.WaitGroup, client client.DatadogClient, url string, formattedLogs <-chan formatter.LogPayload, errChan chan<- error) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := batchAndSendLogs(ctx, client, url, formattedLogs); err != nil {
+			select {
+			case errChan <- err:
+			case <-ctx.Done():
+			}
+			return
+		}
+	}()
+}
+
+// batchAndSendLogs reads formatted logs from channel, batches them, and sends to Datadog
+func batchAndSendLogs(ctx context.Context, client client.DatadogClient, url string, formattedLogs <-chan formatter.LogPayload) error {
+	batchSize := getBatchSize()
+	batch := make([]formatter.LogPayload, 0, batchSize)
+
+	// Process logs and create batches
+	for logData := range formattedLogs {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			batch = append(batch, logData)
+
+			// Send batch if full
+			if len(batch) >= batchSize {
+				if err := sendBatch(ctx, client, url, batch); err != nil {
+					return fmt.Errorf("failed to send batch to Datadog: %w", err)
+				}
+				batch = batch[:0]
+			}
+		}
+	}
+
+	// Send any remaining logs
+	if len(batch) > 0 {
+		if err := sendBatch(ctx, client, url, batch); err != nil {
+			return fmt.Errorf("failed to send final batch to Datadog: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func sendBatch(ctx context.Context, client client.DatadogClient, url string, batch []formatter.LogPayload) error {
+	jsonData, err := json.Marshal(batch)
+	if err != nil {
+		return fmt.Errorf("failed to marshal batch: %w", err)
+	}
+
+	if err := client.SendMessageToDatadog(ctx, jsonData, url); err != nil {
+		return fmt.Errorf("failed to send batch to Datadog: %w", err)
+	}
+	return nil
+}
+
+// waitForCompletion waits for all goroutines to finish and returns any error
+func waitForCompletion(wg *sync.WaitGroup, errChan chan error) error {
+	// Create a done channel to signal completion
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	// Wait for either an error or completion
+	select {
+	case err, ok := <-errChan:
+		if ok {
+			return err
+		}
+		return nil
+	case <-done:
+		return nil
+	}
 }
 
 func getBatchSize() int {

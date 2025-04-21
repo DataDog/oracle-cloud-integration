@@ -1,7 +1,6 @@
 package formatter
 
 import (
-	"encoding/json"
 	"os"
 	"strings"
 )
@@ -9,8 +8,8 @@ import (
 const DD_SERVICE = "oci"
 const DD_SOURCE = "oci.logs"
 
-// ProcessedLog represents the transformed log format.
-type logPayload struct {
+// LogPayload represents the transformed log format.
+type LogPayload struct {
 	OCISource string                 `json:"ocisource,omitempty"`
 	Timestamp string                 `json:"timestamp,omitempty"`
 	Data      map[string]interface{} `json:"data,omitempty"`
@@ -21,31 +20,41 @@ type logPayload struct {
 	DDTags    string                 `json:"ddtags,omitempty"`
 }
 
-// GenerateLogsMsg generates a JSON-encoded byte slice from a slice of log entries.
-// It applies redaction to each log entry based on an exclusion list and adds tags to each log payload.
-// Parameters:
-// - logs: A slice of maps where each map represents a log entry with string keys and interface{} values.
-// Returns:
-// - A byte slice containing the JSON-encoded log payloads.
-// - An error if any occurs during the process of getting the exclusion list or marshaling the JSON data.
-func GenerateLogsMsg(logs []map[string]interface{}) ([]byte, error) {
+type LogFormatter struct {
+	Service string
+	Tags    string
+	Exclude map[string]struct{}
+}
+
+func NewLogFormatter() (*LogFormatter, error) {
 	excludeSet, err := getExcludeList()
 	if err != nil {
 		return nil, err
 	}
-	tags := getTags()
-	logPayloads := make([]logPayload, len(logs))
-	for i, log := range logs {
-		applyRedaction(log, excludeSet)
-		logPayload := formatLog(log)
-		logPayload.DDTags = tags
-		logPayloads[i] = logPayload
+	return &LogFormatter{
+		Service: DD_SERVICE,
+		Tags:    getTags(),
+		Exclude: excludeSet,
+	}, nil
+}
+
+// ProcessLogEntry processes a single log entry and returns the formatted LogPayload.
+// All formatting details like redaction are handled internally.
+func (lf *LogFormatter) ProcessLogEntry(log map[string]interface{}) LogPayload {
+	// Apply redaction
+	applyRedaction(log, lf.Exclude)
+
+	// Format and return the log
+	return LogPayload{
+		OCISource: getFieldValue(log, "source", false).(string),
+		Timestamp: getFieldValue(log, "time", false).(string),
+		Data:      getFieldValue(log, "data", true).(map[string]interface{}),
+		DDSource:  getSource(log),
+		Service:   lf.Service,
+		Type:      getFieldValue(log, "type", false).(string),
+		Oracle:    getFieldValue(log, "oracle", true).(map[string]interface{}),
+		DDTags:    lf.Tags,
 	}
-	jsonData, err := json.Marshal(logPayloads)
-	if err != nil {
-		return nil, err
-	}
-	return jsonData, nil
 }
 
 // getTags validates the DATADOG_TAGS format: "key:value,key2:value2"
@@ -63,18 +72,6 @@ func getTags() string {
 	}
 
 	return tags
-}
-
-func formatLog(log map[string]interface{}) logPayload {
-	return logPayload{
-		OCISource: getFieldValue(log, "source", false).(string),
-		Timestamp: getFieldValue(log, "time", false).(string),
-		Data:      getFieldValue(log, "data", true).(map[string]interface{}),
-		DDSource:  getSource(log),
-		Service:   DD_SERVICE,
-		Type:      getFieldValue(log, "type", false).(string),
-		Oracle:    getFieldValue(log, "oracle", true).(map[string]interface{}),
-	}
 }
 
 func getFieldValue(log map[string]interface{}, field string, isMap bool) interface{} {

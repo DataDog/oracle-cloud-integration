@@ -29,7 +29,7 @@ var singleLogEntry = map[string]interface{}{
 	"type":        "com.oraclecloud.sch.serviceconnector.runlog",
 }
 
-var expectedSingleLogEntry = logPayload{
+var expectedSingleLogEntry = LogPayload{
 	OCISource: "Log_Connector",
 	Timestamp: "2024-09-29T18:10:45.130Z",
 	Data: map[string]interface{}{
@@ -58,26 +58,26 @@ func deepCopyMap(src map[string]interface{}) map[string]interface{} {
 	return dst
 }
 
-func deepCopyStruct(src logPayload) logPayload {
+func deepCopyStruct(src LogPayload) LogPayload {
 	bytes, _ := json.Marshal(src)
-	var dst logPayload
+	var dst LogPayload
 	json.Unmarshal(bytes, &dst)
 	return dst
 }
 
-func TestGenerateLogsMsg(t *testing.T) {
+func TestProcessLogEntry(t *testing.T) {
 	// Set up environment variable for tags
 	os.Setenv("DATADOG_TAGS", "env:prod,version:1.0")
 
 	tests := []struct {
 		name     string
 		logs     []map[string]interface{}
-		expected []logPayload
+		expected []LogPayload
 	}{
 		{
 			name:     "Single log entry",
 			logs:     []map[string]interface{}{singleLogEntry},
-			expected: []logPayload{expectedSingleLogEntry},
+			expected: []LogPayload{expectedSingleLogEntry},
 		},
 		{
 			name: "Log type = audit",
@@ -88,8 +88,8 @@ func TestGenerateLogsMsg(t *testing.T) {
 					return entry
 				}(),
 			},
-			expected: []logPayload{
-				func() logPayload {
+			expected: []LogPayload{
+				func() LogPayload {
 					entry := deepCopyStruct(expectedSingleLogEntry)
 					entry.DDSource = "oci.audit"
 					entry.Oracle["loggroupid"] = "_Audit"
@@ -99,16 +99,17 @@ func TestGenerateLogsMsg(t *testing.T) {
 		},
 	}
 
+	lf, err := NewLogFormatter()
+	assert.NoError(t, err)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := GenerateLogsMsg(tt.logs)
-			assert.NoError(t, err)
-
-			var logPayloads []logPayload
-			err = json.Unmarshal(result, &logPayloads)
-			assert.NoError(t, err)
-
-			assert.Equal(t, tt.expected, logPayloads)
+			var results []LogPayload
+			for _, log := range tt.logs {
+				result := lf.ProcessLogEntry(log)
+				results = append(results, result)
+			}
+			assert.Equal(t, tt.expected, results)
 		})
 	}
 }
