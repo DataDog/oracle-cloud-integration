@@ -210,7 +210,7 @@ func sendBatch(ctx context.Context, client client.DatadogClient, url string, bat
 	if err != nil {
 		return fmt.Errorf("failed to marshal batch: %w", err)
 	}
-
+	fmt.Printf("Logs batch size=%d\n", len(batch))
 	if err := client.SendMessageToDatadog(ctx, jsonData, url); err != nil {
 		return fmt.Errorf("failed to send batch to Datadog: %w", err)
 	}

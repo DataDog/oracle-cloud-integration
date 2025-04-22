@@ -61,7 +61,7 @@ func (client *DatadogClient) sendMessage(ctx context.Context, message []byte, ur
 		"Content-Type":     "application/json",
 		"DD-API-KEY":       client.apiKey,
 	}
-	fmt.Printf("Uncompressed payload size=%d\n", len(message))
+	fmt.Printf("Uncompressed payload size=%.2fKB\n", float64(len(message))/1024.0)
 	req, err := client.client.PrepareRequest(ctx, url, http.MethodPost, message, apiHeaders, nil, nil, nil)
 	if err != nil {
 		return http.StatusInternalServerError, err
