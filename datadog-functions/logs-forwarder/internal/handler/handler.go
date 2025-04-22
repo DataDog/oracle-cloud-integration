@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -19,11 +18,11 @@ import (
 var datadogClientFunc = client.NewDatadogClientWithSite
 
 const (
-	// DefaultBatchSize is the number of logs to accumulate before sending to Datadog
-	DefaultBatchSize = 1000
+	// defaultBatchSize is the number of logs to accumulate before sending to Datadog
+	defaultBatchSize = 1000
 
-	// FormatterTimeout is the maximum duration allowed for log formatting operations
-	FormatterTimeout = 3 * time.Minute
+	// formatterTimeout is the maximum duration allowed for log formatting operations
+	formatterTimeout = 3 * time.Minute
 )
 
 // MyHandler is an Oracle Cloud Function that forwards logs to Datadog.
@@ -51,7 +50,7 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	url := fmt.Sprintf("https://http-intake.logs.%s/api/v2/logs", site)
 
 	// Create channels and wait group
-	formattedLogs := make(chan formatter.LogPayload, DefaultBatchSize)
+	formattedLogs := make(chan formatter.LogPayload, defaultBatchSize)
 	errChan := make(chan error, 1)
 	var wg sync.WaitGroup
 
@@ -76,14 +75,23 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 // - Format each log entry
 // - Send formatted logs through the channel
 // - Handle context cancellation and timeouts
+// - Recover from panics and report them as errors
 // - Close the formattedLogs channel when done
 func startLogsFormatter(ctx context.Context, wg *sync.WaitGroup, in io.Reader, formattedLogs chan<- formatter.LogPayload, errChan chan<- error) {
 	wg.Add(1)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				select {
+				case errChan <- fmt.Errorf("formatter panic: %v", r):
+				case <-ctx.Done():
+				}
+			}
+		}()
 		defer wg.Done()
 
 		// Create a context with timeout
-		ctx, cancel := context.WithTimeout(ctx, FormatterTimeout)
+		ctx, cancel := context.WithTimeout(ctx, formatterTimeout)
 		defer cancel()
 
 		if err := formatLogs(ctx, in, formattedLogs); err != nil {
@@ -91,7 +99,7 @@ func startLogsFormatter(ctx context.Context, wg *sync.WaitGroup, in io.Reader, f
 			case errChan <- fmt.Errorf("formatter error: %w", err):
 			case <-ctx.Done():
 				if ctx.Err() == context.DeadlineExceeded {
-					errChan <- fmt.Errorf("formatter timed out after %v", FormatterTimeout)
+					errChan <- fmt.Errorf("formatter timed out after %v", formatterTimeout)
 				} else {
 					errChan <- ctx.Err()
 				}
@@ -106,11 +114,21 @@ func startLogsFormatter(ctx context.Context, wg *sync.WaitGroup, in io.Reader, f
 // It supports both single log entries and arrays of logs.
 // The function will stop processing if the context is cancelled.
 func formatLogs(ctx context.Context, rawLogs io.Reader, formattedLogs chan<- formatter.LogPayload) error {
-	// Decode incoming JSON payload
-	var body interface{}
-	err := json.NewDecoder(rawLogs).Decode(&body)
-	if err != nil {
+	// Decode incoming JSON payload - could be either a single log or an array of logs
+	var body json.RawMessage
+	if err := json.NewDecoder(rawLogs).Decode(&body); err != nil {
 		return fmt.Errorf("failed to decode JSON: %w", err)
+	}
+
+	// Try to decode as array first
+	var logs []map[string]any
+	if err := json.Unmarshal(body, &logs); err != nil {
+		// Not an array, try single object
+		var singleLog map[string]any
+		if err := json.Unmarshal(body, &singleLog); err != nil {
+			return fmt.Errorf("invalid JSON format: expected object or array of objects: %w", err)
+		}
+		logs = []map[string]any{singleLog}
 	}
 
 	lf, err := formatter.NewLogFormatter()
@@ -118,29 +136,16 @@ func formatLogs(ctx context.Context, rawLogs io.Reader, formattedLogs chan<- for
 		return fmt.Errorf("failed to create log formatter: %w", err)
 	}
 
-	// Normalize input into a slice of maps
-	switch v := body.(type) {
-	case []interface{}: // If it's an array, convert to []map[string]interface{}
-		for _, item := range v {
-			if logMap, ok := item.(map[string]interface{}); ok {
-				payload := lf.ProcessLogEntry(logMap)
-				select {
-				case formattedLogs <- payload:
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
-		}
-	case map[string]interface{}: // If it's a single object, process it directly
-		payload := lf.ProcessLogEntry(v)
+	// Process each log entry
+	for _, logMap := range logs {
+		payload := lf.ProcessLogEntry(logMap)
 		select {
 		case formattedLogs <- payload:
 		case <-ctx.Done():
 			return ctx.Err()
 		}
-	default:
-		return errors.New("invalid JSON format: expected object or array of objects")
 	}
+
 	return nil
 }
 
@@ -148,6 +153,14 @@ func formatLogs(ctx context.Context, rawLogs io.Reader, formattedLogs chan<- for
 func startLogsSender(ctx context.Context, wg *sync.WaitGroup, client client.DatadogClient, url string, formattedLogs <-chan formatter.LogPayload, errChan chan<- error) {
 	wg.Add(1)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				select {
+				case errChan <- fmt.Errorf("sender panic: %v", r):
+				case <-ctx.Done():
+				}
+			}
+		}()
 		defer wg.Done()
 		if err := batchAndSendLogs(ctx, client, url, formattedLogs); err != nil {
 			select {
@@ -219,12 +232,12 @@ func waitForCompletion(wg *sync.WaitGroup, errChan chan error) error {
 func getBatchSize() int {
 	batchSizeStr := os.Getenv("DD_BATCH_SIZE")
 	if batchSizeStr == "" {
-		return DefaultBatchSize
+		return defaultBatchSize
 	}
 
 	batchSize, err := strconv.Atoi(batchSizeStr)
 	if err != nil || batchSize <= 0 {
-		return DefaultBatchSize
+		return defaultBatchSize
 	}
 	return batchSize
 }

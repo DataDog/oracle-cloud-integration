@@ -19,7 +19,7 @@ func TestMyHandler_Success(t *testing.T) {
 	os.Setenv("HOME_REGION", "us-ashburn-1")
 
 	// Mock input logs
-	logs := []map[string]interface{}{
+	logs := []map[string]any{
 		{"message": "log1"},
 		{"message": "log2"},
 		{"message": "log3"},
@@ -56,10 +56,10 @@ func TestMyHandler_BatchProcessing(t *testing.T) {
 	}()
 
 	// Create test logs
-	logs := []map[string]interface{}{
-		{"message": "log1", "source": "test", "time": "2024-01-01T00:00:00Z", "type": "test.log", "data": map[string]interface{}{}, "oracle": map[string]interface{}{}},
-		{"message": "log2", "source": "test", "time": "2024-01-01T00:00:00Z", "type": "test.log", "data": map[string]interface{}{}, "oracle": map[string]interface{}{}},
-		{"message": "log3", "source": "test", "time": "2024-01-01T00:00:00Z", "type": "test.log", "data": map[string]interface{}{}, "oracle": map[string]interface{}{}},
+	logs := []map[string]any{
+		{"message": "log1", "source": "test", "time": "2024-01-01T00:00:00Z", "type": "test.log", "data": map[string]any{}, "oracle": map[string]any{}},
+		{"message": "log2", "source": "test", "time": "2024-01-01T00:00:00Z", "type": "test.log", "data": map[string]any{}, "oracle": map[string]any{}},
+		{"message": "log3", "source": "test", "time": "2024-01-01T00:00:00Z", "type": "test.log", "data": map[string]any{}, "oracle": map[string]any{}},
 	}
 	logsBytes, _ := json.Marshal(logs)
 	in := bytes.NewReader(logsBytes)
@@ -94,20 +94,20 @@ func TestFormatLogs(t *testing.T) {
 				{
 					OCISource: "test",
 					Timestamp: "2024-01-01T00:00:00Z",
-					Data:      map[string]interface{}{},
+					Data:      map[string]any{},
 					DDSource:  "oci.logs",
 					Service:   "oci",
 					Type:      "test.log",
-					Oracle:    map[string]interface{}{},
+					Oracle:    map[string]any{},
 				},
 				{
 					OCISource: "test",
 					Timestamp: "2024-01-01T00:00:00Z",
-					Data:      map[string]interface{}{},
+					Data:      map[string]any{},
 					DDSource:  "oci.logs",
 					Service:   "oci",
 					Type:      "test.log",
-					Oracle:    map[string]interface{}{},
+					Oracle:    map[string]any{},
 				},
 			},
 			wantErr: false,
@@ -119,11 +119,11 @@ func TestFormatLogs(t *testing.T) {
 				{
 					OCISource: "test",
 					Timestamp: "2024-01-01T00:00:00Z",
-					Data:      map[string]interface{}{},
+					Data:      map[string]any{},
 					DDSource:  "oci.logs",
 					Service:   "oci",
 					Type:      "test.log",
-					Oracle:    map[string]interface{}{},
+					Oracle:    map[string]any{},
 				},
 			},
 			wantErr: false,

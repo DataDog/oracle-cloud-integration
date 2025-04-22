@@ -7,17 +7,18 @@ import (
 
 const DD_SERVICE = "oci"
 const DD_SOURCE = "oci.logs"
+const AUDIT_LOGGROUP_ID = "_Audit"
 
 // LogPayload represents the transformed log format.
 type LogPayload struct {
-	OCISource string                 `json:"ocisource,omitempty"`
-	Timestamp string                 `json:"timestamp,omitempty"`
-	Data      map[string]interface{} `json:"data,omitempty"`
-	DDSource  string                 `json:"ddsource,omitempty"`
-	Service   string                 `json:"service"`
-	Type      string                 `json:"type,omitempty"`
-	Oracle    map[string]interface{} `json:"oracle,omitempty"`
-	DDTags    string                 `json:"ddtags,omitempty"`
+	OCISource string         `json:"ocisource,omitempty"`
+	Timestamp string         `json:"timestamp,omitempty"`
+	Data      map[string]any `json:"data,omitempty"`
+	DDSource  string         `json:"ddsource,omitempty"`
+	Service   string         `json:"service"`
+	Type      string         `json:"type,omitempty"`
+	Oracle    map[string]any `json:"oracle,omitempty"`
+	DDTags    string         `json:"ddtags,omitempty"`
 }
 
 type LogFormatter struct {
@@ -40,7 +41,7 @@ func NewLogFormatter() (*LogFormatter, error) {
 
 // ProcessLogEntry processes a single log entry and returns the formatted LogPayload.
 // All formatting details like redaction are handled internally.
-func (lf *LogFormatter) ProcessLogEntry(log map[string]interface{}) LogPayload {
+func (lf *LogFormatter) ProcessLogEntry(log map[string]any) LogPayload {
 	// Apply redaction
 	applyRedaction(log, lf.Exclude)
 
@@ -48,11 +49,11 @@ func (lf *LogFormatter) ProcessLogEntry(log map[string]interface{}) LogPayload {
 	return LogPayload{
 		OCISource: getFieldValue(log, "source", false).(string),
 		Timestamp: getFieldValue(log, "time", false).(string),
-		Data:      getFieldValue(log, "data", true).(map[string]interface{}),
+		Data:      getFieldValue(log, "data", true).(map[string]any),
 		DDSource:  getSource(log),
 		Service:   lf.Service,
 		Type:      getFieldValue(log, "type", false).(string),
-		Oracle:    getFieldValue(log, "oracle", true).(map[string]interface{}),
+		Oracle:    getFieldValue(log, "oracle", true).(map[string]any),
 		DDTags:    lf.Tags,
 	}
 }
@@ -74,12 +75,12 @@ func getTags() string {
 	return tags
 }
 
-func getFieldValue(log map[string]interface{}, field string, isMap bool) interface{} {
+func getFieldValue(log map[string]any, field string, isMap bool) any {
 	if isMap {
-		if val, ok := log[field].(map[string]interface{}); ok {
+		if val, ok := log[field].(map[string]any); ok {
 			return val
 		}
-		return make(map[string]interface{})
+		return make(map[string]any)
 	}
 
 	if val, ok := log[field].(string); ok {
@@ -88,9 +89,9 @@ func getFieldValue(log map[string]interface{}, field string, isMap bool) interfa
 	return ""
 }
 
-func getSource(log map[string]interface{}) string {
-	oracle := getFieldValue(log, "oracle", true).(map[string]interface{})
-	if loggroupID, exists := oracle["loggroupid"].(string); exists && loggroupID == "_Audit" {
+func getSource(log map[string]any) string {
+	oracle := getFieldValue(log, "oracle", true).(map[string]any)
+	if loggroupID, exists := oracle["loggroupid"].(string); exists && loggroupID == AUDIT_LOGGROUP_ID {
 		return "oci.audit"
 	}
 

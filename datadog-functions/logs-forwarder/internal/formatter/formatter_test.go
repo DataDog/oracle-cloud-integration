@@ -8,14 +8,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var singleLogEntry = map[string]interface{}{
-	"data": map[string]interface{}{
+var singleLogEntry = map[string]any{
+	"data": map[string]any{
 		"level":       "INFO",
 		"message":     "Hello World",
 		"messageType": "CONNECTOR_RUN_COMPLETED",
 	},
 	"id": "6b9819cf-d004-4dbc-9978-b713e743ad08",
-	"oracle": map[string]interface{}{
+	"oracle": map[string]any{
 		"compartmentid": "comp",
 		"ingestedtime":  "2024-09-29T18:10:45.130Z",
 		"loggroupid":    "lgid",
@@ -32,7 +32,7 @@ var singleLogEntry = map[string]interface{}{
 var expectedSingleLogEntry = LogPayload{
 	OCISource: "Log_Connector",
 	Timestamp: "2024-09-29T18:10:45.130Z",
-	Data: map[string]interface{}{
+	Data: map[string]any{
 		"level":       "INFO",
 		"message":     "Hello World",
 		"messageType": "CONNECTOR_RUN_COMPLETED",
@@ -40,7 +40,7 @@ var expectedSingleLogEntry = LogPayload{
 	DDSource: "oci.sch",
 	Service:  "oci",
 	Type:     "com.oraclecloud.sch.serviceconnector.runlog",
-	Oracle: map[string]interface{}{
+	Oracle: map[string]any{
 		"compartmentid": "comp",
 		"ingestedtime":  "2024-09-29T18:10:45.130Z",
 		"loggroupid":    "lgid",
@@ -51,9 +51,9 @@ var expectedSingleLogEntry = LogPayload{
 	DDTags: "env:prod,version:1.0",
 }
 
-func deepCopyMap(src map[string]interface{}) map[string]interface{} {
+func deepCopyMap(src map[string]any) map[string]any {
 	bytes, _ := json.Marshal(src)
-	var dst map[string]interface{}
+	var dst map[string]any
 	json.Unmarshal(bytes, &dst)
 	return dst
 }
@@ -71,20 +71,20 @@ func TestProcessLogEntry(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		logs     []map[string]interface{}
+		logs     []map[string]any
 		expected []LogPayload
 	}{
 		{
 			name:     "Single log entry",
-			logs:     []map[string]interface{}{singleLogEntry},
+			logs:     []map[string]any{singleLogEntry},
 			expected: []LogPayload{expectedSingleLogEntry},
 		},
 		{
 			name: "Log type = audit",
-			logs: []map[string]interface{}{
-				func() map[string]interface{} {
+			logs: []map[string]any{
+				func() map[string]any {
 					entry := deepCopyMap(singleLogEntry)
-					entry["oracle"].(map[string]interface{})["loggroupid"] = "_Audit"
+					entry["oracle"].(map[string]any)["loggroupid"] = AUDIT_LOGGROUP_ID
 					return entry
 				}(),
 			},
@@ -92,7 +92,7 @@ func TestProcessLogEntry(t *testing.T) {
 				func() LogPayload {
 					entry := deepCopyStruct(expectedSingleLogEntry)
 					entry.DDSource = "oci.audit"
-					entry.Oracle["loggroupid"] = "_Audit"
+					entry.Oracle["loggroupid"] = AUDIT_LOGGROUP_ID
 					return entry
 				}(),
 			},
