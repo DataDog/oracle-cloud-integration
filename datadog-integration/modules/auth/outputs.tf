@@ -1,5 +1,5 @@
 output "user_id" {
-  value = oci_identity_user.dd_auth_user.id
+  value = oci_identity_user.dd_auth.id
 }
 
 output "private_key" {

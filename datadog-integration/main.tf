@@ -22,8 +22,6 @@ module "auth" {
   current_user_id  = var.current_user_ocid
   compartment_name = local.compartment_name
   compartment_id   = module.compartment.id
-  forward_metrics  = var.metrics_image_tag != "" ? true : false
-  forward_logs     = var.logs_image_tag != "" ? true : false
 }
 
 module "networking" {
@@ -39,11 +37,10 @@ module "functions" {
   compartment_id    = module.compartment.id
   subnet_id         = module.networking.subnet_id
   tags              = local.tags
-  metrics_image_tag = var.metrics_image_tag
-  logs_image_tag    = var.logs_image_tag
   datadog_site      = var.datadog_site
   home_region       = local.home_region_name
   api_key_secret_id = length(module.kms) > 0 ? module.kms[0].api_key_secret_id : ""
+  region_key        = local.oci_regions[var.region].key
 }
 
 module "integration" {

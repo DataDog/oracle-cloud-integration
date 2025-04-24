@@ -42,19 +42,3 @@ variable "datadog_site" {
   type        = string
   description = "The Datadog site to send data to (e.g., datadoghq.com, datadoghq.eu)"
 }
-
-#*************************************
-#         Tenancy Options
-#*************************************
-
-variable "metrics_image_tag" {
-  type        = string
-  description = "Image tag for forwarding metrics to Datadog"
-  default     = ""
-}
-
-variable "logs_image_tag" {
-  type        = string
-  description = "Image tag for forwarding logs to Datadog"
-  default     = ""
-}
