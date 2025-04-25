@@ -11,6 +11,6 @@ terraform {
 resource "restapi_object" "datadog_tenancy_integration" {
   path         = "/api/v2/integration/oci/tenancy"
   data         = local.request_data
-  id_attribute = "data/attributes/tenancy_ocid"
+  id_attribute = "data/id"
   read_path    = "/api/v2/integration/oci/tenancies/{id}"
 }

@@ -29,18 +29,6 @@ variable "subnet_id" {
   description = "The OCID of the subnet to be used for the function app"
 }
 
-variable "metrics_image_tag" {
-  type        = string
-  description = "Image tag for forwarding metrics to Datadog"
-  default     = ""
-}
-
-variable "logs_image_tag" {
-  type        = string
-  description = "Image tag for forwarding logs to Datadog"
-  default     = ""
-}
-
 variable "home_region" {
   type        = string
   description = "The name of the home region"
@@ -49,4 +37,9 @@ variable "home_region" {
 variable "api_key_secret_id" {
   type        = string
   description = "The secret ID for the API key"
+}
+
+variable "region_key" {
+  type        = string
+  description = "The 3 letter key of the region used."
 }

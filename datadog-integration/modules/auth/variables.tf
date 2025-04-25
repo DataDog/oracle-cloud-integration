@@ -29,12 +29,3 @@ variable "current_user_id" {
   type        = string
 }
 
-variable "forward_metrics" {
-  description = "Forward metrics to Datadog"
-  type        = bool
-}
-
-variable "forward_logs" {
-  description = "Forward logs to Datadog"
-  type        = bool
-}

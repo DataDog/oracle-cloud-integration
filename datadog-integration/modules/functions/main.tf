@@ -20,7 +20,6 @@ resource "oci_functions_application" "dd_function_app" {
 }
 
 resource "oci_functions_function" "logs_function" {
-  count          = var.logs_image_tag != "" ? 1 : 0
   application_id = oci_functions_application.dd_function_app.id
   display_name   = "dd-logs-forwarder"
   memory_in_mbs  = "1024"
@@ -29,7 +28,6 @@ resource "oci_functions_function" "logs_function" {
 }
 
 resource "oci_functions_function" "metrics_function" {
-  count          = var.metrics_image_tag != "" ? 1 : 0
   application_id = oci_functions_application.dd_function_app.id
   display_name   = "dd-metrics-forwarder"
   memory_in_mbs  = "512"

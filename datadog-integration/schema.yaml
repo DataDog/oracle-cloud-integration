@@ -1,7 +1,7 @@
 # Title shown in Application Information tab.
-title: Datadog Log Forwarding Infrastructure
+title: Datadog Forwarding Infrastructure
 # Sub Title shown in Application Information tab.
-description: Setting up infrastructure for sending OCI Logs to Datadog
+description: Setting up infrastructure for sending OCI metrics and logs to Datadog
 schemaVersion: 1.1.0
 version: 1.0
 locale: en
@@ -61,17 +61,3 @@ variables:
     description: The site for Datadog.
     required: true
 
-# Tenancy Options
-  metrics_image_tag:
-    title: Metrics Image Tag
-    type: string
-    description: Image tag for forwarding metrics to Datadog.
-    required: false
-    default: ""
-
-  logs_image_tag:
-    title: Logs Image Tag
-    type: string
-    description: Image tag for forwarding logs to Datadog.
-    required: false
-    default: ""
