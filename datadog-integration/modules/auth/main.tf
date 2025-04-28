@@ -5,7 +5,18 @@ terraform {
       source  = "oracle/oci"
       version = "5.46.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "3.5.1"
+    }
   }
+}
+
+resource "random_string" "random_string" {
+  length = 4
+  numeric = true
+  special = false
+  upper = false
 }
 
 resource "oci_identity_user" "dd_auth" {

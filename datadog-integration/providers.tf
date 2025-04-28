@@ -19,8 +19,9 @@ terraform {
 }
 
 provider "restapi" {
+  create_method = "POST"
   update_method = "PATCH"
-  uri           = "https://${var.datadog_site}"
+  uri           = "https://api.${var.datadog_site}"
   headers = {
     "DD-API-KEY"         = var.datadog_api_key
     "DD-APPLICATION-KEY" = var.datadog_app_key
