@@ -27,6 +27,7 @@ locals {
   freeform_tags = {
     datadog-terraform = "true"
   }
+  oci_cost_tenancy       = "ocid1.tenancy.oc1..aaaaaaaaned4fkpkisbwjlr56u7cj63lf3wffbilvqknstgtvzub7vhqkggq"
 }
 
 resource "oci_identity_dynamic_group" "serviceconnector_group" {
@@ -112,7 +113,8 @@ resource "oci_identity_policy" "metrics_policy" {
     "Allow dynamic-group Default/${local.dynamic_group_name} to use fn-function in tenancy",
     "Allow dynamic-group Default/${local.dynamic_group_name} to use fn-invocation in tenancy",
     "Allow group Default/${oci_identity_group.read_policy_group.name} to read all-resources in tenancy",
-    "Allow group Default/${oci_identity_group.write_user_group.name} to manage repos in tenancy where ANY {request.permission = 'REPOSITORY_READ', request.permission = 'REPOSITORY_UPDATE', request.permission = 'REPOSITORY_CREATE'}"
+    "Allow group Default/${oci_identity_group.write_user_group.name} to manage repos in tenancy where ANY {request.permission = 'REPOSITORY_READ', request.permission = 'REPOSITORY_UPDATE', request.permission = 'REPOSITORY_CREATE'}",
+    "Allow group Default/${oci_identity_group.read_policy_group.name} to read objects in tenancy ${local.oci_cost_tenancy}",
   ]
   defined_tags  = {}
   freeform_tags = local.freeform_tags
