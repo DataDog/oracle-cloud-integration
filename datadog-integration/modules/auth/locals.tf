@@ -1,5 +1,4 @@
 locals {
-  user_name        = var.user_name
   user_group_name  = "${var.user_name}-admin"
   user_policy_name = "${var.user_name}-policy"
   dg_sch_name      = "dd-dynamic-group-connectorhubs"
