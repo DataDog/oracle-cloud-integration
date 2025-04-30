@@ -27,7 +27,6 @@ locals {
   freeform_tags = {
     datadog-terraform = "true"
   }
-  oci_cost_tenancy       = "ocid1.tenancy.oc1..aaaaaaaaned4fkpkisbwjlr56u7cj63lf3wffbilvqknstgtvzub7vhqkggq"
 }
 
 resource "oci_identity_dynamic_group" "serviceconnector_group" {
@@ -109,12 +108,14 @@ resource "oci_identity_policy" "metrics_policy" {
   compartment_id = var.tenancy_ocid
   description    = "[DO NOT REMOVE] Policy to have any connector hub read from monitoring source and write to a target function"
   name           = local.datadog_metrics_policy
-  statements = ["Allow dynamic-group Default/${local.dynamic_group_name} to read metrics in tenancy",
+  statements = [
+    "Define tenancy usage-report as ocid1.tenancy.oc1..aaaaaaaaned4fkpkisbwjlr56u7cj63lf3wffbilvqknstgtvzub",
+    "Allow dynamic-group Default/${local.dynamic_group_name} to read metrics in tenancy",
     "Allow dynamic-group Default/${local.dynamic_group_name} to use fn-function in tenancy",
     "Allow dynamic-group Default/${local.dynamic_group_name} to use fn-invocation in tenancy",
     "Allow group Default/${oci_identity_group.read_policy_group.name} to read all-resources in tenancy",
     "Allow group Default/${oci_identity_group.write_user_group.name} to manage repos in tenancy where ANY {request.permission = 'REPOSITORY_READ', request.permission = 'REPOSITORY_UPDATE', request.permission = 'REPOSITORY_CREATE'}",
-    "Allow group Default/${oci_identity_group.read_policy_group.name} to read objects in tenancy ${local.oci_cost_tenancy}",
+    "Endorse group Default/${oci_identity_group.read_policy_group.name} to read objects in tenancy usage-report",
   ]
   defined_tags  = {}
   freeform_tags = local.freeform_tags

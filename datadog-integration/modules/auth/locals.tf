@@ -4,7 +4,6 @@ locals {
   dg_sch_name      = "dd-dynamic-group-connectorhubs"
   dg_fn_name       = "dd-dynamic-group-functions"
   dg_policy_name   = "dd-dynamic-group-policy"
-  oci_cost_tenancy = "ocid1.tenancy.oc1..aaaaaaaaned4fkpkisbwjlr56u7cj63lf3wffbilvqknstgtvzub7vhqkggq"
   matching_domain  = data.oci_identity_user.current_user.email == null ? [for k, v in data.oci_identity_domains_user.user_in_domain : k if v.emails != null][0] : null
   email            = data.oci_identity_user.current_user.email != null ? data.oci_identity_user.current_user.email : data.oci_identity_domains_user.user_in_domain[local.matching_domain].emails[0].value
 }
