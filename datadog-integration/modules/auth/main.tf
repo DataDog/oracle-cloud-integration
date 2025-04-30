@@ -50,7 +50,7 @@ resource "oci_identity_policy" "dd_auth" {
     "Allow group ${oci_identity_group.dd_auth.name} to read all-resources in tenancy",
     "Allow group ${oci_identity_group.dd_auth.name} to manage serviceconnectors in compartment ${var.compartment_name}",
     "Allow group ${oci_identity_group.dd_auth.name} to manage functions-family in compartment ${var.compartment_name} where ANY {request.permission = 'FN_FUNCTION_UPDATE', request.permission = 'FN_FUNCTION_LIST', request.permission = 'FN_APP_LIST'}",
-    "Allow group ${oci_identity_group.dd_auth.name} to read objects in tenancy usage-report"
+    "Endorse group ${oci_identity_group.dd_auth.name} to read objects in tenancy usage-report"
   ]
   freeform_tags = var.tags
 }
