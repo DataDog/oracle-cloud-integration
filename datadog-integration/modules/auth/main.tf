@@ -46,9 +46,11 @@ resource "oci_identity_policy" "dd_auth" {
   description    = "[DO NOT REMOVE] Policies required by Datadog User"
   name           = local.user_policy_name
   statements = [
+    "Define tenancy usage-report as ocid1.tenancy.oc1..aaaaaaaaned4fkpkisbwjlr56u7cj63lf3wffbilvqknstgtvzub",
     "Allow group ${oci_identity_group.dd_auth.name} to read all-resources in tenancy",
     "Allow group ${oci_identity_group.dd_auth.name} to manage serviceconnectors in compartment ${var.compartment_name}",
-    "Allow group ${oci_identity_group.dd_auth.name} to manage functions-family in compartment ${var.compartment_name} where ANY {request.permission = 'FN_FUNCTION_UPDATE', request.permission = 'FN_FUNCTION_LIST', request.permission = 'FN_APP_LIST'}"
+    "Allow group ${oci_identity_group.dd_auth.name} to manage functions-family in compartment ${var.compartment_name} where ANY {request.permission = 'FN_FUNCTION_UPDATE', request.permission = 'FN_FUNCTION_LIST', request.permission = 'FN_APP_LIST'}",
+    "Endorse group ${oci_identity_group.dd_auth.name} to read objects in tenancy usage-report"
   ]
   freeform_tags = var.tags
 }
