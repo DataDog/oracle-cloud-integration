@@ -43,3 +43,13 @@ variable "tenancy_ocid" {
   type        = string
   description = "The OCID of the tenancy."
 }
+
+variable "subscribed_regions" {
+  type        = list(string)
+  description = "The list of subscribed regions"
+}
+
+variable "datadog_resource_compartment_id" {
+  type        = string
+  description = "The compartment id in which datadog resources are present."
+}
