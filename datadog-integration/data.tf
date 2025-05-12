@@ -1,6 +1,3 @@
-data "oci_identity_tenancy" "tenancy_metadata" {
+data "oci_identity_region_subscriptions" "subscribed_regions" {
   tenancy_id = var.tenancy_ocid
-}
-
-data "oci_identity_regions" "all_regions" {
 }

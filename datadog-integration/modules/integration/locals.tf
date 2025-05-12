@@ -12,7 +12,12 @@ locals {
         auth_credentials : {
           fingerprint : var.public_key_finger_print
           private_key : var.private_key
+        },
+        regions_config : {
+          available : var.subscribed_regions
         }
+        dd_compartment_id : var.datadog_resource_compartment_id
+        dd_stack_id : try(data.external.stack_info.result.stack_id, "")
       }
     }
   }
