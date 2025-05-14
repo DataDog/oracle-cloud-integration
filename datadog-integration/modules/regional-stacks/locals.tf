@@ -1,5 +1,5 @@
 locals {
-  registry_host      = lower("${var.region_key}.ocir.io/iduhc9hzgn3o")
+  registry_host      = lower("${var.region_key}.ocir.io/iddfxd5j9l2o")
   metrics_image_path = "${local.registry_host}/oci-datadog-forwarder/metrics:latest"
   logs_image_path    = "${local.registry_host}/oci-datadog-forwarder/logs:latest"
 

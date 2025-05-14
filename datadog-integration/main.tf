@@ -39,59 +39,8 @@ module "integration" {
   private_key                     = module.auth[0].private_key
   public_key_finger_print         = module.auth[0].public_key_fingerprint
   user_ocid                       = module.auth[0].user_id
-  subscribed_regions              = local.subscribed_regions_list
+  subscribed_regions              = local.supported_regions_list
   datadog_resource_compartment_id = module.compartment.id
 }
 
-resource "terraform_data" "regional_stack_zip" {
-  provisioner "local-exec" {
-    working_dir = "${path.module}/modules/regional-stacks"
-    command     = "rm dd_regional_stack.zip;zip -r dd_regional_stack.zip ./*.tf"
-  }
-  triggers_replace = {
-    "key" = timestamp()
-  }
-}
-
-resource "terraform_data" "regional_stacks_create_apply" {
-  depends_on = [terraform_data.regional_stack_zip]
-  input = {
-    compartment = module.compartment.id
-  }
-  for_each = local.subscribed_regions_set
-  provisioner "local-exec" {
-    working_dir = path.module
-    when        = create
-    command     = <<EOT
-
-    echo "Checking any existing stacks in the compartment and destroy them...."
-
-    chmod +x ${path.module}/delete_stack.sh; ${path.module}/delete_stack.sh ${self.input.compartment} ${each.key}
-
-    STACK_ID=$(oci resource-manager stack create --compartment-id ${self.input.compartment} --display-name datadog-regional-stack-${each.key} \
-      --config-source ${path.module}/modules/regional-stacks/dd_regional_stack.zip  --variables '{"tenancy_ocid": "${var.tenancy_ocid}", "region": "${each.key}", \
-      "compartment_ocid": "${self.input.compartment}", "datadog_site": "${var.datadog_site}", "api_key_secret_id": "${module.kms[0].api_key_secret_id}", \
-      "home_region": "${local.home_region_name}", "region_key": "${local.subscribed_regions_map[each.key].region_key}"}' \
-      --query "data.id" --raw-output --region ${each.key})
-    
-    echo "Created Stack ID: $STACK_ID in region ${each.key}"
-
-    # Create and wait for apply job
-    
-    echo "Apply Job for stack: $STACK_ID in region ${each.key}"
-    JOB_ID=$(oci resource-manager job create-apply-job --stack-id $STACK_ID --wait-for-state SUCCEEDED --wait-for-state FAILED --execution-plan-strategy AUTO_APPROVED --region ${each.key} --query "data.id")
-
-    EOT
-  }
-
-  provisioner "local-exec" {
-    working_dir = path.module
-    when        = destroy
-    command     = <<EOT
-    echo "Destroying........."
-    chmod +x ${path.module}/delete_stack.sh && ${path.module}/delete_stack.sh ${self.input.compartment} ${each.key}
-    
-    EOT
-  }
-}
 

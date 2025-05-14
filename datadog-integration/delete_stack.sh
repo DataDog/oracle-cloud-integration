@@ -2,8 +2,9 @@
 
 COMPARTMENT=$1
 REGION=$2
+DISPLAY_NAME=$3
 
-STACK_IDS=($(oci --region "$REGION" resource-manager stack list --compartment-id $COMPARTMENT --raw-output | jq -r '.data[]."id"'))
+STACK_IDS=($(oci --region "$REGION" resource-manager stack list --compartment-id $COMPARTMENT --display-name $DISPLAY_NAME --raw-output | jq -r '.data[]."id"'))
 
 if [[ -z "$STACK_IDS" ]]; then
   echo "No stacks found in the compartment."
