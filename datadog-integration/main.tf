@@ -24,25 +24,6 @@ module "auth" {
   compartment_id   = module.compartment.id
 }
 
-module "networking" {
-  source         = "./modules/networking"
-  compartment_id = module.compartment.id
-  tags           = local.tags
-}
-
-module "functions" {
-  source            = "./modules/functions"
-  region            = var.region
-  tenancy_id        = var.tenancy_ocid
-  compartment_id    = module.compartment.id
-  subnet_id         = module.networking.subnet_id
-  tags              = local.tags
-  datadog_site      = var.datadog_site
-  home_region       = local.home_region_name
-  api_key_secret_id = length(module.kms) > 0 ? module.kms[0].api_key_secret_id : ""
-  region_key        = local.subscribed_regions_map[var.region].region_key
-}
-
 module "integration" {
   depends_on = [module.kms]
   source     = "./modules/integration"
@@ -58,6 +39,8 @@ module "integration" {
   private_key                     = module.auth[0].private_key
   public_key_finger_print         = module.auth[0].public_key_fingerprint
   user_ocid                       = module.auth[0].user_id
-  subscribed_regions              = local.subscribed_regions_list
+  subscribed_regions              = local.supported_regions_list
   datadog_resource_compartment_id = module.compartment.id
 }
+
+

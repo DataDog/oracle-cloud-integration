@@ -5,6 +5,7 @@
 
 # Terraform
 *.tfvars
+*.zip
 terraform.tfstate
 .terraform*
 terraform.tfstate*

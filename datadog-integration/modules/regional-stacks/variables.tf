@@ -1,4 +1,4 @@
-variable "tenancy_id" {
+variable "tenancy_ocid" {
   type        = string
   description = "OCI tenant OCID, more details can be found at https://docs.cloud.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm#five"
 }
@@ -8,9 +8,9 @@ variable "region" {
   description = "OCI Region as documented at https://docs.cloud.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm"
 }
 
-variable "compartment_id" {
+variable "compartment_ocid" {
   type        = string
-  description = "The OCID of the compartment where the function app will be created"
+  description = "The OCID of the compartment where the resources be created"
 }
 
 variable "datadog_site" {
@@ -21,12 +21,9 @@ variable "datadog_site" {
 variable "tags" {
   type        = map(string)
   description = "A map of tags to assign to the resource"
-  default     = {}
-}
-
-variable "subnet_id" {
-  type        = string
-  description = "The OCID of the subnet to be used for the function app"
+  default = {
+    ownedby = "datadog"
+  }
 }
 
 variable "home_region" {
