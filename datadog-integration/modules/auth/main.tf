@@ -22,11 +22,6 @@ resource "tls_private_key" "this" {
   rsa_bits  = 2048
 }
 
-resource "oci_identity_api_key" "this" {
-  user_id   = oci_identity_user.dd_auth.id
-  key_value = tls_private_key.this.public_key_pem
-}
-
 resource "oci_identity_group" "dd_auth" {
   # Required
   compartment_id = var.tenancy_id

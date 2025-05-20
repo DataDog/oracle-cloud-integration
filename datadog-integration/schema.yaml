@@ -12,31 +12,16 @@ variableGroups:
       - ${region}
       - ${compartment_ocid}
       - ${current_user_ocid}
+    visible: false
   - title: "Datadog Environment"
     variables:
       - ${datadog_app_key}
       - ${datadog_api_key}
       - ${datadog_site}
-  - title: "Tenancy Options"
-    variables:
-      - ${metrics_image_tag}
-      - ${logs_image_tag}
+    visible: false
 
 variables:
-# Tenancy
-  tenancy_ocid:
-      visible: false
-
-  region:
-    visible: false
-
-  compartment_ocid:
-    visible: false
-  
-  current_user_ocid:
-    visible: false
-
-# Datadog Environment
+  # Datadog Environment
   datadog_api_key:
     title: Datadog API Key
     type: string
@@ -54,10 +39,9 @@ variables:
     sensitive: true
     password: true
     confirmation: true
-  
+
   datadog_site:
     title: Datadog Site
     type: string
     description: The site for Datadog.
     required: true
-

@@ -10,7 +10,6 @@ locals {
         user_ocid : var.user_ocid
         config_version : local.config_version
         auth_credentials : {
-          fingerprint : var.public_key_finger_print
           private_key : var.private_key
         },
         regions_config : {
