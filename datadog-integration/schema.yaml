@@ -26,9 +26,9 @@ variableGroups:
 variables:
   # Advanced Options
   allow_datadog_env_changes:
-    title: Allow Datadog Environment Variable Changes
+    title: Override Datadog Variables
     type: boolean
-    description: Enable or disable the ability to modify Datadog environment variables
+    description: Click to view/modify pre-set Stack variables
     required: false
     default: false
 
