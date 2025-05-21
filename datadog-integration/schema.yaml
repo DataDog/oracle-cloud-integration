@@ -13,14 +13,25 @@ variableGroups:
       - ${compartment_ocid}
       - ${current_user_ocid}
     visible: false
+  - title: "Advanced Options"
+    variables:
+      - ${allow_datadog_env_changes}
   - title: "Datadog Environment"
     variables:
       - ${datadog_app_key}
       - ${datadog_api_key}
       - ${datadog_site}
-    visible: false
+    visible: ${allow_datadog_env_changes}
 
 variables:
+  # Advanced Options
+  allow_datadog_env_changes:
+    title: Allow Datadog Environment Variable Changes
+    type: boolean
+    description: Enable or disable the ability to modify Datadog environment variables
+    required: false
+    default: false
+
   # Datadog Environment
   datadog_api_key:
     title: Datadog API Key
