@@ -37,7 +37,6 @@ module "integration" {
   home_region                     = local.home_region_name
   tenancy_ocid                    = var.tenancy_ocid
   private_key                     = module.auth[0].private_key
-  public_key_finger_print         = module.auth[0].public_key_fingerprint
   user_ocid                       = module.auth[0].user_id
   subscribed_regions              = local.supported_regions_list
   datadog_resource_compartment_id = module.compartment.id

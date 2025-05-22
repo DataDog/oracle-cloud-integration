@@ -24,11 +24,6 @@ variable "private_key" {
   description = "The private key of the service account user for authentication"
 }
 
-variable "public_key_finger_print" {
-  type        = string
-  description = "The public key fingerptint of the service account user for authentication"
-}
-
 variable "user_ocid" {
   type        = string
   description = "The OCID of the service account user created for authentication."

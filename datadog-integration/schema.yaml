@@ -12,31 +12,27 @@ variableGroups:
       - ${region}
       - ${compartment_ocid}
       - ${current_user_ocid}
+    visible: false
+  - title: "Advanced Options"
+    variables:
+      - ${allow_datadog_env_changes}
   - title: "Datadog Environment"
     variables:
       - ${datadog_app_key}
       - ${datadog_api_key}
       - ${datadog_site}
-  - title: "Tenancy Options"
-    variables:
-      - ${metrics_image_tag}
-      - ${logs_image_tag}
+    visible: ${allow_datadog_env_changes}
 
 variables:
-# Tenancy
-  tenancy_ocid:
-      visible: false
+  # Advanced Options
+  allow_datadog_env_changes:
+    title: Override Datadog Variables
+    type: boolean
+    description: Click to view/modify pre-set Stack variables
+    required: false
+    default: false
 
-  region:
-    visible: false
-
-  compartment_ocid:
-    visible: false
-  
-  current_user_ocid:
-    visible: false
-
-# Datadog Environment
+  # Datadog Environment
   datadog_api_key:
     title: Datadog API Key
     type: string
@@ -54,10 +50,9 @@ variables:
     sensitive: true
     password: true
     confirmation: true
-  
+
   datadog_site:
     title: Datadog Site
     type: string
     description: The site for Datadog.
     required: true
-
