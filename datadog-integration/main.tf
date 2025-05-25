@@ -24,6 +24,16 @@ module "auth" {
   compartment_id   = module.compartment.id
 }
 
+module "key" {
+  source           = "./modules/key"
+  count            = var.region == local.home_region_name ? 1 : 0
+  existing_user_id = module.auth[0].user_id
+  tenancy_ocid     = var.tenancy_ocid
+  compartment_ocid = module.compartment.id
+  region           = var.region
+  depends_on       = [module.auth]
+}
+
 module "integration" {
   depends_on = [module.kms]
   source     = "./modules/integration"
@@ -36,7 +46,7 @@ module "integration" {
   datadog_site                    = var.datadog_site
   home_region                     = local.home_region_name
   tenancy_ocid                    = var.tenancy_ocid
-  private_key                     = module.auth[0].private_key
+  private_key                     = module.key[0].private_key
   user_ocid                       = module.auth[0].user_id
   subscribed_regions              = local.supported_regions_list
   datadog_resource_compartment_id = module.compartment.id
