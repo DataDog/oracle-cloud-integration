@@ -8,14 +8,9 @@ terraform {
   }
 }
 
-locals {
-  idcs_endpoint = data.oci_identity_domain.selected_domain.url
-}
-
 resource "oci_identity_domains_user" "dd_auth" {
   count = var.existing_user_id == null ? 1 : 0
-  # Required
-  idcs_endpoint = local.idcs_endpoint
+  idcs_endpoint = var.idcs_endpoint
   schemas       = ["urn:ietf:params:scim:schemas:core:2.0:User", "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"]
   user_name     = var.user_name
   emails {
@@ -32,8 +27,7 @@ resource "oci_identity_domains_user" "dd_auth" {
 
 resource "oci_identity_domains_group" "dd_auth" {
   count = var.existing_group_id == null ? 1 : 0
-  # Required
-  idcs_endpoint = local.idcs_endpoint
+  idcs_endpoint = var.idcs_endpoint
   schemas       = ["urn:ietf:params:scim:schemas:core:2.0:Group"]
   display_name  = local.user_group_name
 
@@ -60,8 +54,7 @@ resource "oci_identity_policy" "dd_auth" {
 }
 
 resource "oci_identity_domains_dynamic_resource_group" "service_connector" {
-  # Required
-  idcs_endpoint = local.idcs_endpoint
+  idcs_endpoint = var.idcs_endpoint
   schemas       = ["urn:ietf:params:scim:schemas:oracle:idcs:DynamicResourceGroup"]
   display_name  = local.dg_sch_name
   description   = "[DO NOT REMOVE] Dynamic group for forwarding by service connector"
@@ -69,8 +62,7 @@ resource "oci_identity_domains_dynamic_resource_group" "service_connector" {
 }
 
 resource "oci_identity_domains_dynamic_resource_group" "forwarding_function" {
-  # Required
-  idcs_endpoint = local.idcs_endpoint
+  idcs_endpoint = var.idcs_endpoint
   schemas       = ["urn:ietf:params:scim:schemas:oracle:idcs:DynamicResourceGroup"]
   display_name  = local.dg_fn_name
   description   = "[DO NOT REMOVE] Dynamic group for forwarding functions"

@@ -18,14 +18,19 @@ variable "tenancy_ocid" {
 }
 
 variable "existing_user_id" {
-  description = "The OCID of the existing user to create the API key for"
+  description = "The OCID of the user for whom to create the API key"
   type        = string
 }
 
-variable "domain_name" {
-  description = "The name of the identity domain. If not provided, the default domain will be used."
+variable "idcs_endpoint" {
+  description = "The IDCS endpoint URL for the domain"
   type        = string
-  default     = "Default"
+}
+
+variable "tags" {
+  description = "A map of tags to assign to the resource"
+  type        = map(string)
+  default     = {}
 }
 
 variable "auth_method" {

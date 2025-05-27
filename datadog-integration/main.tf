@@ -1,8 +1,14 @@
 module "compartment" {
   source                = "./modules/compartment"
-  compartment_name      = local.compartment_name
+  compartment_name      = var.compartment_name
   parent_compartment_id = var.tenancy_ocid
   tags                  = local.tags
+}
+
+module "domain" {
+  source = "./modules/domain"
+  domain_name = var.domain_name
+  tenancy_id  = var.tenancy_ocid
 }
 
 module "kms" {
@@ -20,8 +26,10 @@ module "auth" {
   tenancy_id       = var.tenancy_ocid
   tags             = local.tags
   current_user_id  = var.current_user_ocid
-  compartment_name = local.compartment_name
   compartment_id   = module.compartment.id
+  idcs_endpoint    = module.domain.idcs_endpoint
+  existing_user_id = var.existing_user_id
+  existing_group_id = var.existing_group_id
 }
 
 module "key" {
@@ -31,11 +39,12 @@ module "key" {
   tenancy_ocid     = var.tenancy_ocid
   compartment_ocid = module.compartment.id
   region           = var.region
+  idcs_endpoint    = module.domain.idcs_endpoint
   depends_on       = [module.auth]
 }
 
 module "integration" {
-  depends_on = [module.kms]
+  depends_on = [module.auth, module.key, module.kms]
   source     = "./modules/integration"
   providers = {
     restapi = restapi

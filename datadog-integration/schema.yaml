@@ -13,30 +13,38 @@ variableGroups:
       - ${compartment_ocid}
       - ${current_user_ocid}
     visible: false
-  - title: "Advanced Options"
-    variables:
-      - ${allow_datadog_env_changes}
   - title: "Datadog Environment"
     variables:
       - ${datadog_app_key}
       - ${datadog_api_key}
       - ${datadog_site}
-    visible: ${allow_datadog_env_changes}
+  - title: "Subnet Search String"
+    variables:
+      - ${vcn_search_string}
+  - title: "Uncommon User Options"
+    variables:
+      - ${compartment_name}
+      - ${domain_name}
+      - ${existing_user_id}
+      - ${existing_group_id}
 
 variables:
-  # Advanced Options
-  allow_datadog_env_changes:
-    title: Override Datadog Variables
-    type: boolean
-    description: Click to view/modify pre-set Stack variables
+  # Networking Options
+  vcn_search_string:
+    title: Subnet Search String
+    type: string
+    description: >
+      String to match existing subnets. If not provided, a new VCN with a private subnet 
+      will be created in each region.
+      If provided, the first subnet in each region who name matches the search string will be used.
     required: false
-    default: false
+    default: null
 
   # Datadog Environment
   datadog_api_key:
     title: Datadog API Key
     type: string
-    description: The API key for sending message to datadog endpoints.
+    description: The API key for sending messages to Datadog endpoints.
     required: true
     sensitive: true
     password: true
@@ -45,7 +53,7 @@ variables:
   datadog_app_key:
     title: Datadog APP Key
     type: string
-    description: The APP key for establishing integration with Datadog.
+    description: The APP key for creating and updating an integration with Datadog.
     required: true
     sensitive: true
     password: true
@@ -54,5 +62,46 @@ variables:
   datadog_site:
     title: Datadog Site
     type: string
-    description: The site for Datadog.
+    description: The site for Datadog endpoints (datadoghq.com, datadoghq.eu, etc.)
     required: true
+
+  # User Options
+  compartment_name:
+    title: Compartment Name
+    type: string
+    description: >
+      <em>This is not common.</em>
+      Name of the compartment to create or use for Datadog resources. If a compartment with this name already exists, it will be used and not created a new one.
+      If not provided, a new compartment named "Datadog" will be created as a child of the Tenancy.
+    required: false
+    default: "Datadog"
+
+  domain_name:
+    title: Domain Name
+    type: string
+    description: > 
+      <em>This is not common. It is recommend to use the Default Identity Domain unless there is a specific need.</em>
+      If using an Identity Domain that is not Default, specify it here. If supplying a User and Group, they must belong to that Identity Domain.
+      The user running the Terraform Stack must also belong to that Identity Domain.
+    required: false
+    default: "Default"
+
+  existing_user_id:
+    title: Existing User ID
+    type: string
+    description: >
+      <em>This is not common. It is recommended to let the Terraform Stack create a new user.</em>
+      If using a pre-existing OCI User for DDOG authentication, specify its OCID here. It must belong to the domain specified in the Domain Name variable.
+      It must also be a member of the group specified in the Group ID variable.
+    required: false
+    default: null
+
+  existing_group_id:
+    title: Existing Group ID
+    type: string
+    description: >
+      <em>This is not common. It is recommended to let the Terraform Stack create a new group.</em>
+      If using a pre-existing OCI Group for DDOG authentication, specify its OCID here. It must belong to the domain specified in the Domain Name variable.
+      It must also contain the user specified in the User ID variable.
+    required: false
+    default: null

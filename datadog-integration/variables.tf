@@ -2,6 +2,12 @@
 #         TF auth Requirements
 #*************************************
 
+variable "compartment_name" {
+  type        = string
+  description = "Name of the compartment to create or use for Datadog resources. If a compartment with this name already exists, it will be used instead of creating a new one."
+  default     = "Datadog"
+}
+
 variable "compartment_ocid" {
   type        = string
   description = "Compartment where terraform script is being executed"
@@ -41,4 +47,32 @@ variable "datadog_app_key" {
 variable "datadog_site" {
   type        = string
   description = "The Datadog site to send data to (e.g., datadoghq.com, datadoghq.eu)"
+}
+
+#*************************************
+#         Advanced Usage Variables
+#*************************************  
+
+variable "vcn_search_string" {
+  type        = string
+  description = "String to search for existing VCNs. If not provided, a new VCN will be created in each region."
+  default     = null
+}
+
+variable "domain_name" {
+  type        = string
+  description = "If using an Identity Domain that is not Default, specify the domain name"
+  default     = "Default"
+}
+
+variable "existing_user_id" {
+  type        = string
+  description = "The OCID of the existing user to use for DDOG authentication"
+  default     = null
+}
+
+variable "existing_group_id" {
+  type        = string
+  description = "The OCID of the existing group to use for DDOG authentication"
+  default     = null
 }

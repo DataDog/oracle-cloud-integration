@@ -25,8 +25,8 @@ variable "current_user_id" {
   type        = string
 }
 
-variable "domain_name" {
-  description = "The name of the identity domain to use"
+variable "idcs_endpoint" {
+  description = "The IDCS endpoint URL for the domain"
   type        = string
 }
 

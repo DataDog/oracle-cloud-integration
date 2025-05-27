@@ -8,15 +8,28 @@ terraform {
   }
 }
 
-resource "oci_functions_application" "dd_function_app" {
+# Data source to find subnet by partial name when subnet_partial_name is provided
+data "oci_core_subnets" "existing_subnet" {
+  count = var.subnet_partial_name != "" ? 1 : 0
+  
   compartment_id = var.compartment_ocid
-  display_name   = "dd-function-app"
-  freeform_tags  = var.tags
-  shape          = "GENERIC_X86_ARM"
-  subnet_ids = [
-    module.vcn.subnet_id[local.subnet],
-  ]
-  config = local.config
+  filter {
+    name   = "display_name"
+    values = [var.subnet_partial_name]
+    regex  = true
+  }
+}
+
+# Validation to ensure subnet is found when subnet_partial_name is provided
+resource "null_resource" "validate_subnet" {
+  count = var.subnet_partial_name != "" ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = length(data.oci_core_subnets.existing_subnet[0].subnets) > 0
+      error_message = "No subnet found matching partial name '${var.subnet_partial_name}'"
+    }
+  }
 }
 
 resource "oci_functions_function" "logs_function" {
@@ -36,7 +49,8 @@ resource "oci_functions_function" "metrics_function" {
 }
 
 module "vcn" {
-  source                   = "oracle-terraform-modules/vcn/oci"
+  count  = var.subnet_partial_name == "" ? 1 : 0
+  source = "oracle-terraform-modules/vcn/oci"
   version                  = "3.6.0"
   compartment_id           = var.compartment_ocid
   freeform_tags            = var.tags
@@ -59,3 +73,15 @@ module "vcn" {
   service_gateway_display_name = local.service_gateway
 }
 
+resource "oci_functions_application" "dd_function_app" {
+  compartment_id = var.compartment_ocid
+  display_name   = "dd-function-app"
+  freeform_tags  = var.tags
+  shape          = "GENERIC_X86_ARM"
+  subnet_ids = [
+    local.subnet_id
+  ]
+  config = local.config
+
+  depends_on = [null_resource.validate_subnet]
+}

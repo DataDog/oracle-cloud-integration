@@ -1,5 +1,3 @@
-
-
 resource "terraform_data" "regional_stack_zip" {
   provisioner "local-exec" {
     working_dir = "${path.module}/modules/regional-stacks"
@@ -57,7 +55,8 @@ resource "null_resource" "regional_stacks_create_apply" {
       STACK_ID=$(oci resource-manager stack create --compartment-id ${module.compartment.id} --display-name $STACK_NAME \
       --config-source ${path.module}/modules/regional-stacks/dd_regional_stack.zip  --variables '{"tenancy_ocid": "${var.tenancy_ocid}", "region": "${each.key}", \
       "compartment_ocid": "${module.compartment.id}", "datadog_site": "${var.datadog_site}", "api_key_secret_id": "${module.kms[0].api_key_secret_id}", \
-      "home_region": "${local.home_region_name}", "region_key": "${local.subscribed_regions_map[each.key].region_key}"}' \
+      "home_region": "${local.home_region_name}", "region_key": "${local.subscribed_regions_map[each.key].region_key}", \
+      "subnet_partial_name": "${var.vcn_search_string}"}' \
       --query "data.id" --raw-output --region ${each.key})
       echo "Created Stack ID: $STACK_ID in region ${each.key}"
     else

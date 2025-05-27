@@ -6,10 +6,6 @@ output "group_id" {
   value = var.existing_group_id != null ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].id
 }
 
-output "domain_id" {
-  value = data.oci_identity_domain.selected_domain.id
-}
-
 output "service_connector_dynamic_group_id" {
   description = "The OCID of the service connector dynamic group"
   value       = oci_identity_domains_dynamic_resource_group.service_connector.id

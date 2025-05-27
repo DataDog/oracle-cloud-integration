@@ -3,7 +3,6 @@ locals {
     ownedby = "datadog"
   }
 
-  compartment_name = "Datadog"
   user_name        = "dd-svc"
 
   home_region_name = [

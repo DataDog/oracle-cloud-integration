@@ -21,4 +21,7 @@ locals {
   nat_gateway     = "${local.vcn_name}-natgateway"
   service_gateway = "${local.vcn_name}-servicegateway"
   subnet          = "${local.vcn_name}-private-subnet"
+  
+  # Subnet selection logic
+  subnet_id = var.subnet_partial_name != "" ? data.oci_core_subnets.existing_subnet[0].subnets[0].id : module.vcn[0].subnet_id[local.subnet]
 }

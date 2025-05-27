@@ -40,3 +40,9 @@ variable "region_key" {
   type        = string
   description = "The 3 letter key of the region used."
 }
+
+variable "subnet_partial_name" {
+  type        = string
+  description = "Optional partial name of an existing subnet to use (e.g., 'datadog' will match 'xxx-datadog-yyy'). If not provided, a new subnet will be created."
+  default     = ""
+}
