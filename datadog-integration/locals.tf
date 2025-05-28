@@ -4,7 +4,6 @@ locals {
   }
 
   compartment_name = "Datadog"
-  user_name        = "dd-svc"
 
   home_region_name = [
     for region in data.oci_identity_region_subscriptions.subscribed_regions.region_subscriptions : region.region_name
@@ -12,9 +11,22 @@ locals {
   ][0]
 
   is_current_region_home_region = (var.region == local.home_region_name)
-
 }
 
+#Auth Variables
+locals {
+  user_name        = "dd-svc"
+  user_group_name  = "${local.user_name}-admin"
+  user_group_policy_name = "${local.user_name}-policy"
+  dg_sch_name      = "dd-dynamic-group-connectorhubs"
+  dg_fn_name       = "dd-dynamic-group-functions"
+  dg_policy_name   = "dd-dynamic-group-policy"
+}
+
+locals {
+  validation_error = data.external.pre_checks.result["error"]
+  fail = data.external.pre_checks.result["status"] == "error" ? file("${local.validation_error}") : ""
+}
 
 # Variables for regions
 locals {

@@ -7,7 +7,7 @@ module "compartment" {
 
 module "kms" {
   source          = "./modules/kms"
-  count           = var.region == local.home_region_name ? 1 : 0
+  count           = local.is_current_region_home_region ? 1 : 0
   compartment_id  = module.compartment.id
   datadog_api_key = var.datadog_api_key
   tags            = local.tags
@@ -15,18 +15,23 @@ module "kms" {
 
 module "auth" {
   source           = "./modules/auth"
-  count            = var.region == local.home_region_name ? 1 : 0
+  count            = local.is_current_region_home_region ? 1 : 0
   user_name        = local.user_name
   tenancy_id       = var.tenancy_ocid
   tags             = local.tags
   current_user_id  = var.current_user_ocid
   compartment_name = local.compartment_name
   compartment_id   = module.compartment.id
+  user_group_name           = local.user_group_name
+  user_group_policy_name    = local.user_group_policy_name
+  dg_sch_name              = local.dg_sch_name
+  dg_fn_name               = local.dg_fn_name
+  dg_policy_name           = local.dg_policy_name
 }
 
 module "key" {
   source           = "./modules/key"
-  count            = var.region == local.home_region_name ? 1 : 0
+  count            = local.is_current_region_home_region ? 1 : 0
   existing_user_id = module.auth[0].user_id
   tenancy_ocid     = var.tenancy_ocid
   compartment_ocid = module.compartment.id
@@ -52,4 +57,9 @@ module "integration" {
   datadog_resource_compartment_id = module.compartment.id
 }
 
-
+resource "terraform_data" "precheck_marker_cleanup" {
+  provisioner "local-exec" {
+    when    = destroy
+    command = "rm -f .terraform/dd_prechecks_done || true"
+  }
+}

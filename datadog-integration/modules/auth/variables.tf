@@ -29,3 +29,28 @@ variable "current_user_id" {
   type        = string
 }
 
+variable "user_group_name" {
+  description = "Name of the user group to be created or used."
+  type        = string
+}
+
+variable "user_group_policy_name" {
+  description = "Name of the policy to be created or used for user group."
+  type        = string
+}
+
+variable "dg_sch_name" {
+  description = "Name of the dynamic group for connector hubs."
+  type        = string
+}
+
+variable "dg_fn_name" {
+  description = "Name of the dynamic group for functions."
+  type        = string
+}
+
+variable "dg_policy_name" {
+  description = "Name of the policy for dynamic groups."
+  type        = string
+}
+
