@@ -4,6 +4,8 @@ import json
 import subprocess
 import os
 
+OK_STATUS = "ok"
+ERROR_STATUS = "error"
 DEFAULT_DOMAIN_NAME = "Default"
 MIN_VAULT_QUOTA = 1
 MIN_CONNECTOR_HUB_QUOTA_PER_REGION = 1
@@ -33,8 +35,9 @@ def find_user_domain(user_ocid, tenancy_ocid):
             result = subprocess.check_output(cmd).decode().strip()
             if result and result != 'null':
                 return domain["display_name"], endpoint
-        except Exception:
-            pass
+        except Exception as e:
+            # Unexpected error, print and continue to next domain
+            print(f"Unexpected error in find_user_domain: {e}", file=sys.stderr)
     return None, None
 
 def _list_domains(tenancy_ocid):
@@ -90,12 +93,12 @@ def _resource_exists(resource_type: ResourceType, name, domain_endpoint=None, co
 def validate_home_region(is_home_region):
     if not is_home_region:
         return "Current user is not in the home region."
-    return "ok"
+    return OK_STATUS
 
 def validate_default_domain(domain_name):
     if domain_name != DEFAULT_DOMAIN_NAME:
         return "Current user is not in the default domain."
-    return "ok"
+    return OK_STATUS
 
 def validate_pre_existing_resources(params, domain_endpoint):
     existing = []
@@ -113,7 +116,7 @@ def validate_pre_existing_resources(params, domain_endpoint):
         existing.append(f"Dynamic Group Policy {params['dg_policy_name']}")
     if existing:
         return f"{', '.join(existing)} already exists."
-    return "ok"
+    return OK_STATUS
 
 def validate_vault_quota(tenancy_ocid):
     cmd = [
@@ -128,8 +131,7 @@ def validate_vault_quota(tenancy_ocid):
         available = data["data"].get("available", 0)
         if available < MIN_VAULT_QUOTA:
             return "No vaults can be created: vault quota exhausted."
-        else:
-            return "ok"
+        return OK_STATUS
     except Exception as e:
         return f"Failed to check vault quota: {str(e)}"
 
@@ -153,7 +155,7 @@ def validate_connector_hub_quota(tenancy_ocid, supported_regions):
             print(f"Failed to check connector hub quota in region {region}: {str(e)}")
     if insufficient:
         return f"Insufficient connector hub quota in regions: {', '.join(insufficient)}"
-    return "ok"
+    return OK_STATUS
 
 def main():
     # If marker file exists, always return success
@@ -161,7 +163,7 @@ def main():
         os.makedirs(MARKER_DIR)
         
     if os.path.exists(MARKER_FILE):
-        print(json.dumps({"status": "ok"}))
+        print(json.dumps({"status": OK_STATUS}))
         return
 
     params = json.load(sys.stdin)
@@ -171,42 +173,45 @@ def main():
     supported_regions = json.loads(params.get("supported_regions", "[]"))
 
     errors = []
-    # Find domain name and domain endpoint for further checks
-    domain_name, domain_endpoint = find_user_domain(user_id, tenancy_ocid)
 
     # Validation 1: Home region check
     is_home_region = params.get("is_home_region", "false").lower() == "true"
     result = validate_home_region(is_home_region)
-    if result != "ok":
+    if result != OK_STATUS:
         errors.append(result)
     
-    # Validation 2: Default domain check
-    result = validate_default_domain(domain_name)
-    if result != "ok":
-        errors.append(result)
-    
-    # Validation 3: Pre-existing resources check
-    result = validate_pre_existing_resources(params, domain_endpoint)
-    if result != "ok":
-        errors.append(result)
+        # Find domain name and domain endpoint for further checks
+    domain_name, domain_endpoint = find_user_domain(user_id, tenancy_ocid)
+    if domain_name is not None and domain_endpoint is not None:
+        # Validation 2: Default domain check
+        result = validate_default_domain(domain_name)
+        if result != OK_STATUS:
+            errors.append(result)
+        
+        # Validation 3: Pre-existing resources check
+        result = validate_pre_existing_resources(params, domain_endpoint)
+        if result != OK_STATUS:
+            errors.append(result)
+    else:
+        errors.append("User not found in any domain")
 
     # Validation 4: Vault quota check
     result = validate_vault_quota(tenancy_ocid)
-    if result != "ok":
+    if result != OK_STATUS:
         errors.append(result)
 
     # Validation 5: Connector hub quota check
     result = validate_connector_hub_quota(tenancy_ocid, supported_regions)
-    if result != "ok":
+    if result != OK_STATUS:
         errors.append(result)
 
     if errors:
-        print(json.dumps({"error": "; ".join(errors), "status": "error"}))
+        print(json.dumps({"error": "; ".join(errors), "status": ERROR_STATUS}))
     else:
         # On first success, create marker file
         with open(MARKER_FILE, "w") as f:
             f.write("OCI Datadog pre-checks passed. DO NOT DELETE this file unless you want pre-checks to run again.\n")
-        print(json.dumps({"status": "ok"}))
+        print(json.dumps({"status": OK_STATUS}))
 
 
 if __name__ == "__main__":
