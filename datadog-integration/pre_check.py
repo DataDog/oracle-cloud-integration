@@ -7,8 +7,8 @@ import os
 OK_STATUS = "ok"
 ERROR_STATUS = "error"
 DEFAULT_DOMAIN_NAME = "Default"
-MIN_VAULT_QUOTA = 1
-MIN_CONNECTOR_HUB_QUOTA_PER_REGION = 1
+MIN_AVAILABLE_VAULT = 1
+MIN_AVAILABLE_CONNECTOR_HUB = 1
 MARKER_DIR = os.path.join(os.getcwd(), ".terraform")
 MARKER_FILE = os.path.join(MARKER_DIR, "dd_prechecks_done")
 
@@ -95,6 +95,11 @@ def validate_home_region(is_home_region):
         return "Current user is not in the home region."
     return OK_STATUS
 
+def validate_home_region_support(home_region, supported_regions):
+    if home_region not in supported_regions:
+        return f"Home region {home_region} is not supported by Datadog."
+    return OK_STATUS
+
 def validate_default_domain(domain_name):
     if domain_name != DEFAULT_DOMAIN_NAME:
         return "Current user is not in the default domain."
@@ -118,43 +123,40 @@ def validate_pre_existing_resources(params, domain_endpoint):
         return f"{', '.join(existing)} already exists."
     return OK_STATUS
 
-def validate_vault_quota(tenancy_ocid):
+def validate_vault_quota(tenancy_ocid, home_region):
     cmd = [
         "oci", "limits", "resource-availability", "get",
         "--service-name", "kms",
         "--limit-name", "virtual-vault-count",
-        "--compartment-id", tenancy_ocid
+        "--compartment-id", tenancy_ocid,
+        "--region", home_region
     ]
     try:
         result = subprocess.check_output(cmd).decode()
         data = json.loads(result)
         available = data["data"].get("available", 0)
-        if available < MIN_VAULT_QUOTA:
+        if available < MIN_AVAILABLE_VAULT:
             return "No vaults can be created: vault quota exhausted."
         return OK_STATUS
     except Exception as e:
         return f"Failed to check vault quota: {str(e)}"
 
-def validate_connector_hub_quota(tenancy_ocid, supported_regions):
-    insufficient = []
-    for region in supported_regions:
-        cmd = [
-            "oci", "limits", "resource-availability", "get",
-            "--service-name", "service-connector-hub",
-            "--limit-name", "service-connector-count",
-            "--compartment-id", tenancy_ocid,
-            "--region", region
-        ]
-        try:
-            result = subprocess.check_output(cmd).decode()
-            data = json.loads(result)
-            available = data["data"].get("available", 0)
-            if available < MIN_CONNECTOR_HUB_QUOTA_PER_REGION:
-                insufficient.append(region)
-        except Exception as e:
-            print(f"Failed to check connector hub quota in region {region}: {str(e)}")
-    if insufficient:
-        return f"Insufficient connector hub quota in regions: {', '.join(insufficient)}"
+def validate_connector_hub_quota(tenancy_ocid, home_region):
+    cmd = [
+        "oci", "limits", "resource-availability", "get",
+        "--service-name", "service-connector-hub",
+        "--limit-name", "service-connector-count",
+        "--compartment-id", tenancy_ocid,
+        "--region", home_region
+    ]
+    try:
+        result = subprocess.check_output(cmd).decode()
+        data = json.loads(result)
+        available = data["data"].get("available", 0)
+        if available < MIN_AVAILABLE_CONNECTOR_HUB:
+            return f"Insufficient connector hub quota in region {home_region}: {available} available, {MIN_AVAILABLE_CONNECTOR_HUB} required."
+    except Exception as e:
+        return f"Failed to check connector hub quota in region {home_region}: {str(e)}"
     return OK_STATUS
 
 def main():
@@ -169,39 +171,45 @@ def main():
     params = json.load(sys.stdin)
     user_id = params["user_id"]
     tenancy_ocid = params.get("tenancy_id")
+    home_region = params.get("home_region")
+    is_home_region = params.get("is_home_region", "false").lower() == "true"
     # supported_regions is passed as a JSON string from Terraform external data source
     supported_regions = json.loads(params.get("supported_regions", "[]"))
 
     errors = []
 
     # Validation 1: Home region check
-    is_home_region = params.get("is_home_region", "false").lower() == "true"
     result = validate_home_region(is_home_region)
     if result != OK_STATUS:
         errors.append(result)
+
+    # Validation 2: Home region support check
+    result = validate_home_region_support(home_region, supported_regions)
+    if result != OK_STATUS:
+        errors.append(result)
     
-        # Find domain name and domain endpoint for further checks
+    # Find domain name and domain endpoint for further checks
     domain_name, domain_endpoint = find_user_domain(user_id, tenancy_ocid)
     if domain_name is not None and domain_endpoint is not None:
-        # Validation 2: Default domain check
+        # Validation 3: Default domain check
         result = validate_default_domain(domain_name)
         if result != OK_STATUS:
             errors.append(result)
         
-        # Validation 3: Pre-existing resources check
+        # Validation 4: Pre-existing resources check
         result = validate_pre_existing_resources(params, domain_endpoint)
         if result != OK_STATUS:
             errors.append(result)
     else:
         errors.append("User not found in any domain")
 
-    # Validation 4: Vault quota check
-    result = validate_vault_quota(tenancy_ocid)
+    # Validation 5: Vault quota check
+    result = validate_vault_quota(tenancy_ocid, home_region)
     if result != OK_STATUS:
         errors.append(result)
 
-    # Validation 5: Connector hub quota check
-    result = validate_connector_hub_quota(tenancy_ocid, supported_regions)
+    # Validation 6: Connector hub quota check
+    result = validate_connector_hub_quota(tenancy_ocid, home_region)
     if result != OK_STATUS:
         errors.append(result)
 

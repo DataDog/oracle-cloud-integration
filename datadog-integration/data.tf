@@ -18,6 +18,7 @@ data "external" "pre_checks" {
   query = {
     tenancy_id = var.tenancy_ocid
     is_home_region = local.is_current_region_home_region
+    home_region = local.home_region_name
     supported_regions = jsonencode(local.supported_regions_list)
     user_id = var.current_user_ocid
     user_name = local.user_name
