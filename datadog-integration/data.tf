@@ -12,20 +12,12 @@ data "external" "supported_regions" {
   }
 }
 
-data "external" "pre_checks" {
-  program = ["python3", "${path.module}/pre_check.py"]
+data "oci_identity_domains" "all_domains" {
+  compartment_id = var.tenancy_ocid
+}
 
-  query = {
-    tenancy_id = var.tenancy_ocid
-    is_home_region = local.is_current_region_home_region
-    home_region = local.home_region_name
-    supported_regions = jsonencode(local.supported_regions_list)
-    user_id = var.current_user_ocid
-    user_name = local.user_name
-    user_group_name = local.user_group_name
-    user_group_policy_name = local.user_group_policy_name
-    dg_sch_name = local.dg_sch_name
-    dg_fn_name = local.dg_fn_name
-    dg_policy_name = local.dg_policy_name
-  }
+data "oci_identity_domains_user" "user_in_domain" {
+  for_each      = { for d in data.oci_identity_domains.all_domains.domains : d.id => d }
+  idcs_endpoint = each.value.url
+  user_id       = var.current_user_ocid
 }

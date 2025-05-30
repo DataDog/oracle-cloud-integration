@@ -13,7 +13,7 @@ resource "oci_identity_user" "dd_auth" {
   compartment_id = var.tenancy_id
   description    = "[DO NOT REMOVE] Read only user created for fetching resources metadata which is used by Datadog Integrations"
   name           = var.user_name
-  email          = local.email
+  email          = var.email
   freeform_tags  = var.tags
 }
 

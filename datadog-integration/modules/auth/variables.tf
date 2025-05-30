@@ -54,3 +54,8 @@ variable "dg_policy_name" {
   type        = string
 }
 
+variable "email" {
+  description = "The email address for the user."
+  type        = string
+}
+

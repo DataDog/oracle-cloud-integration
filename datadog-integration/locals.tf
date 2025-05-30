@@ -21,11 +21,15 @@ locals {
   dg_sch_name      = "dd-dynamic-group-connectorhubs"
   dg_fn_name       = "dd-dynamic-group-functions"
   dg_policy_name   = "dd-dynamic-group-policy"
-}
+  matching_domain_id  = [for k, v in data.oci_identity_domains_user.user_in_domain : k if v.emails != null][0]
+  matching_domain = [
+    for d in data.oci_identity_domains.all_domains.domains : d
+    if d.id == local.matching_domain_id
+  ][0]
 
-locals {
-  validation_error = data.external.pre_checks.result["error"]
-  fail = data.external.pre_checks.result["status"] == "error" ? file("${local.validation_error}") : ""
+  domain_display_name = local.matching_domain.display_name
+  idcs_endpoint      = local.matching_domain.url
+  email            = data.oci_identity_domains_user.user_in_domain[local.matching_domain_id].emails[0].value
 }
 
 # Variables for regions
@@ -42,8 +46,6 @@ locals {
     for region in local.subscribed_regions :
     region.region_name => region
   })
-
-
-
+  
   subscribed_regions_set = toset(local.subscribed_regions_list)
 }

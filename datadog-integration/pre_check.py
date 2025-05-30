@@ -1,60 +1,19 @@
 from enum import Enum
-import sys
 import json
 import subprocess
-import os
+import argparse
 
 OK_STATUS = "ok"
 ERROR_STATUS = "error"
 DEFAULT_DOMAIN_NAME = "Default"
 MIN_AVAILABLE_VAULT = 1
 MIN_AVAILABLE_CONNECTOR_HUB = 1
-MARKER_DIR = os.path.join(os.getcwd(), ".terraform")
-MARKER_FILE = os.path.join(MARKER_DIR, "dd_prechecks_done")
 
 class ResourceType(Enum):
     USER = "user"
     GROUP = "group"
     POLICY = "policy"
     DYNAMIC_GROUP = "dynamic_group"
-
-def find_user_domain(user_ocid, tenancy_ocid):
-    """
-    Returns (domain_display_name, domain_endpoint) for the user if found, else (None, None)
-    """
-    domains = _list_domains(tenancy_ocid)
-    for domain in domains:
-        endpoint = domain["url"]
-        cmd = [
-            "oci", "identity-domains", "users", "list",
-            "--endpoint", endpoint,
-            "--query", f"data.resources[?ocid=='{user_ocid}'] | [0]",
-            "--raw-output"
-        ]
-        try:
-            result = subprocess.check_output(cmd).decode().strip()
-            if result and result != 'null':
-                return domain["display_name"], endpoint
-        except Exception as e:
-            # Unexpected error, print and continue to next domain
-            print(f"Unexpected error in find_user_domain: {e}", file=sys.stderr)
-    return None, None
-
-def _list_domains(tenancy_ocid):
-    cmd = [
-        "oci", "iam", "domain", "list",
-        "--all",
-        "--compartment-id", tenancy_ocid,
-        "--query", "data[].{id:id, url:url, display_name:\"display-name\"}",
-        "--raw-output"
-    ]
-    result = subprocess.check_output(cmd).decode()
-    try:
-        domains = json.loads(result)
-    except Exception:
-        # Fallback for raw-output as lines
-        domains = [json.loads(line) for line in result.strip().split('\n') if line.strip()]
-    return domains
 
 def _resource_exists(resource_type: ResourceType, name, domain_endpoint=None, compartment_id=None):
     if resource_type == ResourceType.USER:
@@ -159,66 +118,81 @@ def validate_connector_hub_quota(tenancy_ocid, home_region):
         return f"Failed to check connector hub quota in region {home_region}: {str(e)}"
     return OK_STATUS
 
-def main():
-    # If marker file exists, always return success
-    if not os.path.exists(MARKER_DIR):
-        os.makedirs(MARKER_DIR)
-        
-    if os.path.exists(MARKER_FILE):
-        print(json.dumps({"status": OK_STATUS}))
-        return
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--tenancy-id", required=True)
+    parser.add_argument("--is-home-region", required=True)
+    parser.add_argument("--home-region", required=True)
+    parser.add_argument("--supported-regions", required=True)
+    parser.add_argument("--user-id", required=True)
+    parser.add_argument("--user-name", required=True)
+    parser.add_argument("--user-group-name", required=True)
+    parser.add_argument("--user-group-policy-name", required=True)
+    parser.add_argument("--dg-sch-name", required=True)
+    parser.add_argument("--dg-fn-name", required=True)
+    parser.add_argument("--dg-policy-name", required=True)
+    parser.add_argument("--domain-display-name", required=True)
+    parser.add_argument("--idcs-endpoint", required=True)
+    return parser.parse_args()
 
-    params = json.load(sys.stdin)
-    user_id = params["user_id"]
-    tenancy_ocid = params.get("tenancy_id")
-    home_region = params.get("home_region")
-    is_home_region = params.get("is_home_region", "false").lower() == "true"
-    # supported_regions is passed as a JSON string from Terraform external data source
-    supported_regions = json.loads(params.get("supported_regions", "[]"))
+def main():
+    args = parse_args()
+    params = {
+        "user_id": args.user_id,
+        "tenancy_id": args.tenancy_id,
+        "home_region": args.home_region,
+        "is_home_region": str(args.is_home_region).lower() == "true",
+        "supported_regions": json.loads(args.supported_regions),
+        "user_name": args.user_name,
+        "user_group_name": args.user_group_name,
+        "user_group_policy_name": args.user_group_policy_name,
+        "dg_sch_name": args.dg_sch_name,
+        "dg_fn_name": args.dg_fn_name,
+        "dg_policy_name": args.dg_policy_name,
+        "domain_display_name": args.domain_display_name,
+        "idcs_endpoint": args.idcs_endpoint,
+    }
 
     errors = []
 
     # Validation 1: Home region check
-    result = validate_home_region(is_home_region)
+    result = validate_home_region(params["is_home_region"])
     if result != OK_STATUS:
         errors.append(result)
 
     # Validation 2: Home region support check
-    result = validate_home_region_support(home_region, supported_regions)
+    result = validate_home_region_support(params["home_region"], params["supported_regions"])
     if result != OK_STATUS:
         errors.append(result)
     
     # Find domain name and domain endpoint for further checks
-    domain_name, domain_endpoint = find_user_domain(user_id, tenancy_ocid)
-    if domain_name is not None and domain_endpoint is not None:
+    if params["domain_display_name"] is not None and params["idcs_endpoint"] is not None:
         # Validation 3: Default domain check
-        result = validate_default_domain(domain_name)
+        result = validate_default_domain(params["domain_display_name"])
         if result != OK_STATUS:
             errors.append(result)
         
         # Validation 4: Pre-existing resources check
-        result = validate_pre_existing_resources(params, domain_endpoint)
+        result = validate_pre_existing_resources(params, params["idcs_endpoint"])
         if result != OK_STATUS:
             errors.append(result)
     else:
         errors.append("User not found in any domain")
 
     # Validation 5: Vault quota check
-    result = validate_vault_quota(tenancy_ocid, home_region)
+    result = validate_vault_quota(params["tenancy_id"], params["home_region"])
     if result != OK_STATUS:
         errors.append(result)
 
     # Validation 6: Connector hub quota check
-    result = validate_connector_hub_quota(tenancy_ocid, home_region)
+    result = validate_connector_hub_quota(params["tenancy_id"], params["home_region"])
     if result != OK_STATUS:
         errors.append(result)
 
     if errors:
         print(json.dumps({"error": "; ".join(errors), "status": ERROR_STATUS}))
+        exit(1)
     else:
-        # On first success, create marker file
-        with open(MARKER_FILE, "w") as f:
-            f.write("OCI Datadog pre-checks passed. DO NOT DELETE this file unless you want pre-checks to run again.\n")
         print(json.dumps({"status": OK_STATUS}))
 
 
