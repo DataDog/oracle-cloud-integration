@@ -2,6 +2,7 @@ from enum import Enum
 import json
 import subprocess
 import argparse
+import sys
 
 OK_STATUS = "ok"
 ERROR_STATUS = "error"
@@ -191,7 +192,7 @@ def main():
 
     if errors:
         print(json.dumps({"error": "; ".join(errors), "status": ERROR_STATUS}))
-        exit(1)
+        sys.exit(1)
     else:
         print(json.dumps({"status": OK_STATUS}))
 
