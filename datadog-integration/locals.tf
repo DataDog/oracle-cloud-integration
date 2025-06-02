@@ -4,7 +4,6 @@ locals {
   }
 
   compartment_name = "Datadog"
-  user_name        = "dd-svc"
 
   home_region_name = [
     for region in data.oci_identity_region_subscriptions.subscribed_regions.region_subscriptions : region.region_name
@@ -12,9 +11,26 @@ locals {
   ][0]
 
   is_current_region_home_region = (var.region == local.home_region_name)
-
 }
 
+#Auth Variables
+locals {
+  user_name        = "dd-svc"
+  user_group_name  = "${local.user_name}-admin"
+  user_group_policy_name = "${local.user_name}-policy"
+  dg_sch_name      = "dd-dynamic-group-connectorhubs"
+  dg_fn_name       = "dd-dynamic-group-functions"
+  dg_policy_name   = "dd-dynamic-group-policy"
+  matching_domain_id  = [for k, v in data.oci_identity_domains_user.user_in_domain : k if v.emails != null][0]
+  matching_domain = [
+    for d in data.oci_identity_domains.all_domains.domains : d
+    if d.id == local.matching_domain_id
+  ][0]
+
+  domain_display_name = local.matching_domain.display_name
+  idcs_endpoint      = local.matching_domain.url
+  email            = data.oci_identity_domains_user.user_in_domain[local.matching_domain_id].emails[0].value
+}
 
 # Variables for regions
 locals {
@@ -30,8 +46,6 @@ locals {
     for region in local.subscribed_regions :
     region.region_name => region
   })
-
-
-
+  
   subscribed_regions_set = toset(local.subscribed_regions_list)
 }

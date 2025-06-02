@@ -9,6 +9,15 @@ data "external" "supported_regions" {
   query = {
     region         = each.key
     regionKey      = each.value.region_key
-    compartment-id = module.compartment.id
   }
+}
+
+data "oci_identity_domains" "all_domains" {
+  compartment_id = var.tenancy_ocid
+}
+
+data "oci_identity_domains_user" "user_in_domain" {
+  for_each      = { for d in data.oci_identity_domains.all_domains.domains : d.id => d }
+  idcs_endpoint = each.value.url
+  user_id       = var.current_user_ocid
 }

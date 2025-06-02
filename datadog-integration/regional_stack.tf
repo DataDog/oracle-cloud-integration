@@ -1,6 +1,5 @@
-
-
 resource "terraform_data" "regional_stack_zip" {
+  depends_on = [null_resource.precheck_marker]
   provisioner "local-exec" {
     working_dir = "${path.module}/modules/regional-stacks"
     command     = "rm dd_regional_stack.zip;zip -r dd_regional_stack.zip ./*.tf"
@@ -12,6 +11,7 @@ resource "terraform_data" "regional_stack_zip" {
 
 # A dummy resource unique to the current stack. All the regional stacks are created with this id in their names.
 resource "terraform_data" "stack_digest" {
+  depends_on = [null_resource.precheck_marker]
   provisioner "local-exec" {
     working_dir = path.module
     command     = "echo $JOB_ID"
