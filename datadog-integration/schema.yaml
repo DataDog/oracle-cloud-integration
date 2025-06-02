@@ -13,24 +13,13 @@ variableGroups:
       - ${compartment_ocid}
       - ${current_user_ocid}
     visible: false
-  - title: "Advanced Options"
-    variables:
-      - ${allow_datadog_env_changes}
   - title: "Datadog Environment"
     variables:
       - ${datadog_app_key}
       - ${datadog_api_key}
       - ${datadog_site}
-    visible: ${allow_datadog_env_changes}
 
 variables:
-  # Advanced Options
-  allow_datadog_env_changes:
-    title: Override Datadog Variables
-    type: boolean
-    description: Click to view/modify pre-set Stack variables
-    required: false
-    default: false
 
   # Datadog Environment
   datadog_api_key:
