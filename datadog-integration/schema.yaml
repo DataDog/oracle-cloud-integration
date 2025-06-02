@@ -21,7 +21,6 @@ variableGroups:
       - ${datadog_app_key}
       - ${datadog_api_key}
       - ${datadog_site}
-    visible: ${allow_datadog_env_changes}
 
 variables:
   # Advanced Options
@@ -41,6 +40,7 @@ variables:
     sensitive: true
     password: true
     confirmation: true
+    visible: ${allow_datadog_env_changes}
 
   datadog_app_key:
     title: Datadog APP Key
@@ -50,9 +50,11 @@ variables:
     sensitive: true
     password: true
     confirmation: true
+    visible: ${allow_datadog_env_changes}
 
   datadog_site:
     title: Datadog Site
     type: string
     description: The site for Datadog.
     required: true
+    visible: ${allow_datadog_env_changes}
