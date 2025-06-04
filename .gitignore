@@ -6,6 +6,19 @@
 # Terraform
 *.tfvars
 *.zip
-terraform.tfstate
 .terraform*
 terraform.tfstate*
+*.tfstate
+*.tfstate.*
+*.tfvars
+
+# Examples directory
+examples/
+
+# IDE files
+.vscode/
+*.swp
+*.swo
+
+# OS files
+Thumbs.db
