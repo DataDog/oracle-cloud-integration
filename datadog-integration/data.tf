@@ -21,3 +21,7 @@ data "oci_identity_domains_user" "user_in_domain" {
   idcs_endpoint = each.value.url
   user_id       = var.current_user_ocid
 }
+
+data "oci_identity_domain" "domain" {
+  domain_id = local.matching_domain_id
+}

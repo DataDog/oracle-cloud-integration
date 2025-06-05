@@ -3,14 +3,14 @@ locals {
     ownedby = "datadog"
   }
 
-  compartment_name = "Datadog"
-
   home_region_name = [
     for region in data.oci_identity_region_subscriptions.subscribed_regions.region_subscriptions : region.region_name
     if region.is_home_region
   ][0]
 
   is_current_region_home_region = (var.region == local.home_region_name)
+
+  new_compartment_name = "Datadog"
 }
 
 #Auth Variables
@@ -26,10 +26,16 @@ locals {
     for d in data.oci_identity_domains.all_domains.domains : d
     if d.id == local.matching_domain_id
   ][0]
+  user_email = data.oci_identity_domains_user.user_in_domain[local.matching_domain_id].emails[0].value
 
   domain_display_name = local.matching_domain.display_name
   idcs_endpoint       = local.matching_domain.url
-  email               = data.oci_identity_domains_user.user_in_domain[local.matching_domain_id].emails[0].value
+
+  # Domain-specific values (previously from domain module)
+  domain_idcs_endpoint = data.oci_identity_domain.domain.url
+
+  actual_user_name  = (var.existing_user_id == null || var.existing_user_id == "") ? local.user_name : null
+  actual_group_name = (var.existing_group_id == null || var.existing_group_id == "") ? local.user_group_name : null
 }
 
 # Variables for regions
@@ -48,4 +54,8 @@ locals {
   })
 
   subscribed_regions_set = toset(local.subscribed_regions_list)
+
+  # regions in domain
+  regions_in_domain     = flatten([[data.oci_identity_domain.domain.home_region], [for region in data.oci_identity_domain.domain.replica_regions : region.region]])
+  regions_in_domain_set = toset(local.regions_in_domain)
 }

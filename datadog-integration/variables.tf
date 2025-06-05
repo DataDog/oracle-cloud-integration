@@ -42,3 +42,31 @@ variable "datadog_site" {
   type        = string
   description = "The Datadog site to send data to (e.g., datadoghq.com, datadoghq.eu)"
 }
+
+#*************************************
+#         Advanced Usage Variables
+#*************************************  
+
+variable "vcn_search_string" {
+  type        = string
+  description = "String to search for existing VCNs. If not provided, a new VCN will be created in each region."
+  default     = ""
+}
+
+variable "compartment_id" {
+  type        = string
+  description = "OCID of the compartment to create or use for Datadog resources. If null, a compartment named 'Datadog' will be created in the tenancy."
+  default     = null
+}
+
+variable "existing_user_id" {
+  type        = string
+  description = "The OCID of the existing user to use for DDOG authentication"
+  default     = null
+}
+
+variable "existing_group_id" {
+  type        = string
+  description = "The OCID of the existing group to use for DDOG authentication"
+  default     = null
+}

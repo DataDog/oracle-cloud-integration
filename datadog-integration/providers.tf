@@ -3,17 +3,19 @@ terraform {
   required_providers {
     oci = {
       source  = "oracle/oci"
-      version = "5.46.0"
-    }
-    tls = {
-      source = "hashicorp/tls"
-    }
-    http = {
-      source = "hashicorp/http"
+      version = ">=7.1.0"
     }
     restapi = {
       source  = "Mastercard/restapi"
       version = "1.20.0"
+    }
+    external = {
+      source  = "hashicorp/external"
+      version = ">= 2.0"
+    }
+    null = {
+      source  = "hashicorp/null"
+      version = ">= 3.0"
     }
   }
 }

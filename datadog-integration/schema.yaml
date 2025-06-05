@@ -18,23 +18,63 @@ variableGroups:
       - ${datadog_app_key}
       - ${datadog_api_key}
       - ${datadog_site}
+  - title: "Optional Subnet Selection"
+    variables:
+      - ${choose_subnet}
+      - ${vcn_search_string}
+  - title: "Advanced Options"
+    variables:
+      - ${show_advanced_options}
+      - ${compartment_id}
+      - ${existing_group_id}
+      - ${existing_user_id}
 
 variables:
+  choose_subnet:
+    title: Choose Subnet
+    type: boolean
+    description: >
+      Enable subnet selection via search string.
+    required: false
+    default: false
+
+  show_advanced_options:
+    title: Show Advanced Options
+    type: boolean
+    description: >
+      Enable Compartment, User and Group selection.
+    required: false
+    default: false
+
+  # Networking Options
+  vcn_search_string:
+    title: Subnet Search String
+    type: string
+    description: >
+      String to match existing subnets. 
+      If provided, the first subnet in each region whose name matches the search string will be used.
+      If not provided, a new VCN with a private subnet that can connect to the
+      Datadog endpoint will be created in each region.
+    required: false      
+    default: ""
+    visible: ${choose_subnet}
 
   # Datadog Environment
   datadog_api_key:
     title: Datadog API Key
     type: string
-    description: The API key for sending message to datadog endpoints.
+    description: > 
+      The API key for sending messages to Datadog endpoints. See <a href="https://docs.datadoghq.com/account_management/api-app-keys/" target="_blank">Datadog API Key</a> for more information.
     required: true
     sensitive: true
     password: true
     confirmation: true
 
   datadog_app_key:
-    title: Datadog APP Key
+    title: Datadog Application Key
     type: string
-    description: The APP key for establishing integration with Datadog.
+    description: >
+      The Application key for creating and updating an integration with Datadog. See <a href="https://docs.datadoghq.com/account_management/api-app-keys/" target="_blank">Datadog Application Key</a> for more information.
     required: true
     sensitive: true
     password: true
@@ -43,5 +83,39 @@ variables:
   datadog_site:
     title: Datadog Site
     type: string
-    description: The site for Datadog.
+    description: >
+      The site name for your Organization's Datadog endpoint (e.g. datadoghq.com, datadoghq.eu, etc.)
+      This is the "Site Parameter" in the following <a href="https://docs.datadoghq.com/getting_started/site/#access-the-datadog-site" target="_blank">table from the Datadog documentation</a> .
     required: true
+
+  compartment_id:
+    title: Compartment Selection
+    description: >
+      <strong>This is not common.</strong>
+      Choose an existing compartment to place all the resources created by Datadog.
+    type: oci:identity:compartment:id
+    required: false
+    default: null
+    visible: ${show_advanced_options}
+
+  existing_user_id:
+    title: Existing User ID
+    type: string
+    description: >
+      <strong>This is not common. It is recommended to let the Terraform Stack create a new user.</strong>
+      If using a pre-existing OCI User for Datadog authentication, specify its OCID here. It <strong>must</strong> belong to the domain specified in the Domain Name variable.
+      It <strong>must</strong> also be a member of the group specified in the Existing Group ID variable. Both the Group and User <strong>must</strong> be specified.
+    required: false
+    default: null
+    visible: ${show_advanced_options}
+
+  existing_group_id:
+    title: Existing Group ID
+    type: string
+    description: >
+      <strong>This is not common. It is recommended to let the Terraform Stack create a new group.</strong>
+      If using a pre-existing OCI Group for Datadog authentication, specify its OCID here. It <strong>must</strong> belong to the domain specified in the Domain Name variable.
+      It <strong>must</strong> also contain the User specified in the User ID variable. Both the Group and User <strong>must</strong> be specified, or neither should be specified.
+    required: false
+    default: null
+    visible: ${show_advanced_options}

@@ -1,3 +1,11 @@
+# Validation check to ensure subscribed regions match regions in domain
+check "regions_consistency" {
+  assert {
+    condition     = length(setsubtract(local.subscribed_regions_set, local.regions_in_domain_set)) == 0 && length(setsubtract(local.regions_in_domain_set, local.subscribed_regions_set)) == 0
+    error_message = "Subscribed regions (${join(", ", sort(tolist(local.subscribed_regions_set)))}) do not match regions in domain (${join(", ", sort(tolist(local.regions_in_domain_set)))}). This indicates a configuration mismatch between the tenancy's subscribed regions and the identity domain's available regions."
+  }
+}
+
 resource "terraform_data" "regional_stack_zip" {
   depends_on = [null_resource.precheck_marker]
   provisioner "local-exec" {
@@ -17,6 +25,7 @@ resource "terraform_data" "stack_digest" {
     command     = "echo $JOB_ID"
   }
 }
+
 
 # Using a null resource because we want this to be applied on every execution.
 resource "null_resource" "regional_stacks_create_apply" {
@@ -57,7 +66,8 @@ resource "null_resource" "regional_stacks_create_apply" {
       STACK_ID=$(oci resource-manager stack create --compartment-id ${module.compartment.id} --display-name $STACK_NAME \
       --config-source ${path.module}/modules/regional-stacks/dd_regional_stack.zip  --variables '{"tenancy_ocid": "${var.tenancy_ocid}", "region": "${each.key}", \
       "compartment_ocid": "${module.compartment.id}", "datadog_site": "${var.datadog_site}", "api_key_secret_id": "${module.kms[0].api_key_secret_id}", \
-      "home_region": "${local.home_region_name}", "region_key": "${local.subscribed_regions_map[each.key].region_key}"}' \
+      "home_region": "${local.home_region_name}", "region_key": "${local.subscribed_regions_map[each.key].region_key}", \
+      "subnet_partial_name": "${var.vcn_search_string}"}' \
       --query "data.id" --raw-output --region ${each.key})
       echo "Created Stack ID: $STACK_ID in region ${each.key}"
     else
