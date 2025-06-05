@@ -62,7 +62,7 @@ def validate_home_region_support(home_region, supported_regions):
 
 def validate_default_domain(domain_name):
     if domain_name != DEFAULT_DOMAIN_NAME:
-        return "Current user is not in the default domain."
+        print("Current user is not in the Default domain: ",domain_name)
     return OK_STATUS
 
 def validate_pre_existing_resources(params, domain_endpoint):

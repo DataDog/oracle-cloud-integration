@@ -27,4 +27,17 @@ locals {
   nat_gateway     = "${local.vcn_name}-natgateway"
   service_gateway = "${local.vcn_name}-servicegateway"
   subnet          = "${local.vcn_name}-private-subnet"
+
+  # Subnet region validation when OCID is provided (handles both 3-letter codes and full names)
+  subnet_region_from_ocid = var.subnet_ocid != "" ? split(".", var.subnet_ocid)[3] : ""
+  
+  # Check if the region from OCID matches current region (either by full name or region key)
+  # Convert extracted region to uppercase for comparison since region_key is uppercase
+  subnet_region_matches = var.subnet_ocid == "" || (
+    local.subnet_region_from_ocid == var.region || 
+    upper(local.subnet_region_from_ocid) == var.region_key
+  )
+  
+  # Simple subnet selection logic: use provided OCID or create new
+  subnet_id = var.subnet_ocid != "" ? var.subnet_ocid : module.vcn[0].subnet_id[local.subnet]
 }
