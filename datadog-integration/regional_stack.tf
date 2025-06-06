@@ -58,6 +58,9 @@ resource "null_resource" "regional_stacks_create_apply" {
       --config-source ${path.module}/modules/regional-stacks/dd_regional_stack.zip  --variables '{"tenancy_ocid": "${var.tenancy_ocid}", "region": "${each.key}", \
       "compartment_ocid": "${module.compartment.id}", "datadog_site": "${var.datadog_site}", "api_key_secret_id": "${module.kms[0].api_key_secret_id}", \
       "home_region": "${local.home_region_name}", "region_key": "${local.subscribed_regions_map[each.key].region_key}"}' \
+      --wait-for-state ACTIVE \
+      --max-wait-seconds 120 \
+      --wait-interval-seconds 5 \
       --query "data.id" --raw-output --region ${each.key})
       echo "Created Stack ID: $STACK_ID in region ${each.key}"
     else
@@ -69,7 +72,26 @@ resource "null_resource" "regional_stacks_create_apply" {
     # Create and wait for apply job
     
     echo "Apply Job for stack: $STACK_ID in region ${each.key}"
-    JOB_ID=$(oci resource-manager job create-apply-job --stack-id $STACK_ID $WAIT_COMMAND --execution-plan-strategy AUTO_APPROVED --region ${each.key} --query "data.id")
+    
+    # Retry job creation up to 5 times with 6 second intervals
+    JOB_ID=""
+    for attempt in {1..5}; do
+      echo "Attempting to create job (attempt $attempt/5)..."
+      if JOB_ID=$(oci resource-manager job create-apply-job --stack-id $STACK_ID $WAIT_COMMAND --execution-plan-strategy AUTO_APPROVED --region ${each.key} --query "data.id" 2>/dev/null); then
+        echo "Job created successfully: $JOB_ID for region ${each.key}"
+        break
+      else
+        echo "Job creation failed on attempt $attempt"
+        if [ $attempt -lt 5 ]; then
+          echo "Waiting 6 seconds before retry..."
+          sleep 6
+        fi
+      fi
+    done
+    
+    if [ -z "$JOB_ID" ]; then
+      echo "WARNING: Failed to create job after 5 attempts for region ${each.key}. Continuing with next region..."
+    fi
 
     EOT
   }
