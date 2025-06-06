@@ -77,7 +77,7 @@ resource "null_resource" "regional_stacks_create_apply" {
     JOB_ID=""
     for attempt in {1..5}; do
       echo "Attempting to create job (attempt $attempt/5)..."
-      if JOB_ID=$(oci resource-manager job create-apply-job --stack-id $STACK_ID $WAIT_COMMAND --execution-plan-strategy AUTO_APPROVED --region ${each.key} --query "data.id" 2>/dev/null); then
+      if JOB_ID=$(oci resource-manager job create-apply-job --stack-id $STACK_ID $WAIT_COMMAND --execution-plan-strategy AUTO_APPROVED --region ${each.key} --query "data.id"); then
         echo "Job created successfully: $JOB_ID for region ${each.key}"
         break
       else
