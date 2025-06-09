@@ -22,7 +22,7 @@ resource "terraform_data" "stack_digest" {
 resource "null_resource" "regional_stacks_create_apply" {
   depends_on = [terraform_data.regional_stack_zip, terraform_data.stack_digest]
   # Not using local.supported_region_set here because that is determined during apply time and terraform needs to be aware of exact length during plan stage
-  for_each   = local.subscribed_regions_set
+  for_each = local.subscribed_regions_set
   provisioner "local-exec" {
     working_dir = path.module
     command     = <<EOT
@@ -85,7 +85,7 @@ resource "terraform_data" "regional_stacks_destroy" {
   depends_on = [terraform_data.regional_stack_zip, terraform_data.stack_digest]
   for_each   = local.subscribed_regions_set
   input = {
-    compartment = module.compartment.id
+    compartment     = module.compartment.id
     stack_digest_id = terraform_data.stack_digest.id
   }
 

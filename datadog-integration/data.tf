@@ -7,8 +7,8 @@ data "external" "supported_regions" {
   program  = ["bash", "${path.module}/docker_image_check.sh"]
 
   query = {
-    region         = each.key
-    regionKey      = each.value.region_key
+    region    = each.key
+    regionKey = each.value.region_key
   }
 }
 
