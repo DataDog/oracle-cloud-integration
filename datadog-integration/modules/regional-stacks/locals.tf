@@ -2,6 +2,12 @@ locals {
   registry_host      = lower("${var.region_key}.ocir.io/iddfxd5j9l2o")
   metrics_image_path = "${local.registry_host}/oci-datadog-forwarder/metrics:latest"
   logs_image_path    = "${local.registry_host}/oci-datadog-forwarder/logs:latest"
+  token_base_path    = "https://${var.region_key}.ocir.io/20180419/docker/token?service=${var.region_key}.ocir.io&scope=repository:iddfxd5j9l2o/oci-datadog-forwarder"
+  token_logs         = "${local.token_base_path}/logs:pull"
+  token_metrics      = "${local.token_base_path}/metrics:pull"
+  image_base_path    = "https://${var.region_key}.ocir.io/v2/iddfxd5j9l2o/oci-datadog-forwarder"
+  image_url_logs     = "${local.image_base_path}/logs/manifests/latest"
+  image_url_metrics  = "${local.image_base_path}/metrics/manifests/latest"
 
   config = {
     "DD_SITE"                  = var.datadog_site,

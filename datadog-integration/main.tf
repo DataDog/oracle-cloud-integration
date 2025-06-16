@@ -1,8 +1,8 @@
 resource "null_resource" "precheck_marker" {
   provisioner "local-exec" {
-    when    = create
+    when       = create
     on_failure = fail
-    command = <<-EOT
+    command    = <<-EOT
       python ${path.module}/pre_check.py \
         --tenancy-id '${var.tenancy_ocid}' \
         --is-home-region '${local.is_current_region_home_region}' \
@@ -22,7 +22,7 @@ resource "null_resource" "precheck_marker" {
 }
 
 module "compartment" {
-  depends_on = [null_resource.precheck_marker]
+  depends_on            = [null_resource.precheck_marker]
   source                = "./modules/compartment"
   compartment_name      = local.compartment_name
   parent_compartment_id = var.tenancy_ocid
@@ -30,7 +30,7 @@ module "compartment" {
 }
 
 module "kms" {
-  depends_on = [null_resource.precheck_marker]
+  depends_on      = [null_resource.precheck_marker]
   source          = "./modules/kms"
   count           = local.is_current_region_home_region ? 1 : 0
   compartment_id  = module.compartment.id
@@ -39,21 +39,21 @@ module "kms" {
 }
 
 module "auth" {
-  depends_on = [null_resource.precheck_marker]
-  source           = "./modules/auth"
-  count            = local.is_current_region_home_region ? 1 : 0
-  user_name        = local.user_name
-  tenancy_id       = var.tenancy_ocid
-  tags             = local.tags
-  current_user_id  = var.current_user_ocid
-  compartment_name = local.compartment_name
-  compartment_id   = module.compartment.id
-  user_group_name           = local.user_group_name
-  user_group_policy_name    = local.user_group_policy_name
-  dg_sch_name              = local.dg_sch_name
-  dg_fn_name               = local.dg_fn_name
-  dg_policy_name           = local.dg_policy_name
-  email                    = local.email
+  depends_on             = [null_resource.precheck_marker]
+  source                 = "./modules/auth"
+  count                  = local.is_current_region_home_region ? 1 : 0
+  user_name              = local.user_name
+  tenancy_id             = var.tenancy_ocid
+  tags                   = local.tags
+  current_user_id        = var.current_user_ocid
+  compartment_name       = local.compartment_name
+  compartment_id         = module.compartment.id
+  user_group_name        = local.user_group_name
+  user_group_policy_name = local.user_group_policy_name
+  dg_sch_name            = local.dg_sch_name
+  dg_fn_name             = local.dg_fn_name
+  dg_policy_name         = local.dg_policy_name
+  email                  = local.email
 }
 
 module "key" {

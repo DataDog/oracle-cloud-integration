@@ -16,7 +16,7 @@ resource "terraform_data" "manage_api_key" {
     always_run = timestamp()
   }
   provisioner "local-exec" {
-    command = <<-EOT
+    command     = <<-EOT
       set -e
 
       # Clean up any existing key files

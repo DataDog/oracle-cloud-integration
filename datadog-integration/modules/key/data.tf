@@ -11,6 +11,6 @@ data "oci_identity_domain" "selected_domain" {
 }
 
 data "local_sensitive_file" "private_key" {
-  filename = "/tmp/sshkey"
+  filename   = "/tmp/sshkey"
   depends_on = [terraform_data.manage_api_key]
 }

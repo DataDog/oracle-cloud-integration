@@ -5,6 +5,10 @@ terraform {
       source  = "oracle/oci"
       version = "5.46.0"
     }
+    http = {
+      source  = "hashicorp/http"
+      version = "3.5.0"
+    }
   }
 }
 
@@ -25,6 +29,8 @@ resource "oci_functions_function" "logs_function" {
   memory_in_mbs  = "1024"
   freeform_tags  = var.tags
   image          = local.logs_image_path
+  image_digest   = local.image_sha_logs
+
 }
 
 resource "oci_functions_function" "metrics_function" {
@@ -33,6 +39,7 @@ resource "oci_functions_function" "metrics_function" {
   memory_in_mbs  = "512"
   freeform_tags  = var.tags
   image          = local.metrics_image_path
+  image_digest   = local.image_sha_metrics
 }
 
 module "vcn" {
