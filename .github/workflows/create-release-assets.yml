@@ -9,10 +9,13 @@ on:
 jobs:
   create-assets:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       
     - name: Create release zip files
       run: |
@@ -49,7 +52,7 @@ jobs:
         du -h *.zip
     
     - name: Upload release assets as artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       with:
         name: release-assets
         path: |
