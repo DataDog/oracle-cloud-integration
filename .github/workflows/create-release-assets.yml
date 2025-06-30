@@ -15,15 +15,15 @@ jobs:
       actions: write
     
     steps:
-    - name: Check organization membership
-      run: |
-        if ! gh api /orgs/DataDog/members/${{ github.actor }} > /dev/null 2>&1; then
-          echo "Unauthorized: Only Datadog organization members can run this workflow"
-          exit 1
-        fi
-        echo "Verified: ${{ github.actor }} is a Datadog organization member"
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    # - name: Check organization membership
+    #   run: |
+    #     if ! gh api /orgs/DataDog/members/${{ github.actor }} > /dev/null 2>&1; then
+    #       echo "Unauthorized: Only Datadog organization members can run this workflow"
+    #       exit 1
+    #     fi
+    #     echo "Verified: ${{ github.actor }} is a Datadog organization member"
+    #   env:
+    #     GITHUB_TOKEN: ${{ secrets.DATADOG_PAT }}
 
     - name: Create release zip files
       run: |
