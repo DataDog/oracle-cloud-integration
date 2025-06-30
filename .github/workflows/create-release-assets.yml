@@ -71,7 +71,7 @@ jobs:
         du -h *.zip
     
     - name: Upload release assets as artifacts
-      uses: actions/upload-artifact@@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
+      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
       with:
         name: release-assets
         path: |
