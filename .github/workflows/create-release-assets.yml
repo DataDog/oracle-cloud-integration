@@ -3,9 +3,8 @@ name: Create Release Assets
 on:
   push:
     branches:
-      - johannzhang8/github-actions-autozip-files
       - master
-  workflow_dispatch:
+      - johannzhang8/create-release-assets
 
 jobs:
   create-assets:
@@ -15,26 +14,8 @@ jobs:
       actions: write
     
     steps:
-    # - name: Check organization membership
-    #   run: |
-    #     if ! gh api /orgs/DataDog/members/${{ github.actor }} > /dev/null 2>&1; then
-    #       echo "Unauthorized: Only Datadog organization members can run this workflow"
-    #       exit 1
-    #     fi
-    #     echo "Verified: ${{ github.actor }} is a Datadog organization member"
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.DATADOG_PAT }}
-
     - name: Checkout repository
       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-
-    - name: Debug - List directory contents  
-      run: |
-        echo "Current directory: $(pwd)"
-        echo "Directory contents:"
-        ls -la
-        echo "DD directories:"
-        ls -la | grep -i datadog || echo "No DD directories"
 
     - name: Create release zip files
       run: |
