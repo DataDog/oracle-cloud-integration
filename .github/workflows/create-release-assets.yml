@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - master
-      - johannzhang8/create-release-assets
+      - johannzhang8/github-actions-autozip-files
 
 jobs:
   create-assets:
