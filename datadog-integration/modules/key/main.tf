@@ -28,7 +28,7 @@ resource "terraform_data" "manage_api_key" {
       openssl rsa -in /tmp/sshkey -pubout -out /tmp/sshkey.pem
 
       # Get user's IDCS ID
-      USER_INFO=$(oci identity-domains users list ${local.endpoint_param} ${var.auth_method} --raw-output | \
+      USER_INFO=$(oci identity-domains users list ${local.endpoint_param} ${var.auth_method} --all --raw-output | \
         jq -r '.data.resources[] | select(.ocid == "'"${local.user_id}"'") | .id')
       
       if [ -z "$USER_INFO" ] || [ "$USER_INFO" = "null" ]; then
@@ -60,7 +60,7 @@ resource "terraform_data" "manage_api_key" {
           
           # Get and delete oldest key
           OLDEST_KEY=$(oci identity-domains api-keys list ${local.endpoint_param} ${var.auth_method} \
-            --filter "user.value eq \"$USER_INFO\"" --raw-output | \
+            --filter "user.value eq \"$USER_INFO\"" --all --raw-output | \
             jq -r '.data.resources[0].id')
           
           if [ -n "$OLDEST_KEY" ] && [ "$OLDEST_KEY" != "null" ]; then
@@ -86,7 +86,7 @@ resource "terraform_data" "manage_api_key" {
       echo "Waiting for key to appear in OCI..."
       for i in {1..12}; do
         if oci identity-domains api-keys list ${local.endpoint_param} ${var.auth_method} \
-          --filter "user.value eq \"$USER_INFO\"" --raw-output | \
+          --filter "user.value eq \"$USER_INFO\"" --all --raw-output | \
           jq -e '.data.resources[] | select(.fingerprint == "'"$NEW_FINGERPRINT"'")' > /dev/null; then
           echo "Key is now visible in OCI"
           exit 0
