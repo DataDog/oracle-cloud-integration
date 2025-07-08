@@ -121,6 +121,7 @@ resource "null_resource" "region_intersection_info" {
       echo "Subscribed regions in tenancy: ${join(", ", sort(tolist(local.subscribed_regions_set)))}"
       echo "Regions available in identity domain: ${join(", ", sort(tolist(local.regions_in_domain_set)))}"
       echo "Regions with provided subnet OCIDs: ${length(local.subnet_ocids_list) > 0 ? join(", ", sort(tolist(local.subnet_regions))) : "None (will create subnets in all subscribed regions)"}"
+      echo "Regions where Docker image is available: ${join(", ", sort(tolist(local.docker_image_enabled_regions)))}"
       echo "Target regions for regional stack deployment: ${join(", ", sort(tolist(local.target_regions_for_stacks)))}"
       echo "Number of regional stacks to be created: ${length(local.target_regions_for_stacks)}"
       echo "================================================================================="
