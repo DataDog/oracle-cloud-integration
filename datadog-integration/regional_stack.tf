@@ -24,6 +24,9 @@ resource "terraform_data" "stack_digest" {
 resource "null_resource" "regional_stacks_create_apply" {
   depends_on = [null_resource.precheck_marker, null_resource.region_intersection_info, terraform_data.regional_stack_zip, terraform_data.stack_digest, module.compartment, module.auth, module.kms]
   # Using intersection of subscribed regions, domain regions, and subnet regions
+  # keep this here since we need the list to be available at plan time
+  # this is why we cannot use the final_regions_for_stacks local variable
+  # and we have logic to exit early if the region is not supported
   for_each = local.target_regions_for_stacks
   provisioner "local-exec" {
     working_dir = path.module

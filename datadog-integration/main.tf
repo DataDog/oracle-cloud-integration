@@ -111,7 +111,7 @@ resource "null_resource" "subnet_region_validation" {
 
 # Output region intersection logic and validate region consistency
 resource "null_resource" "region_intersection_info" {
-  depends_on = [null_resource.subnet_region_validation]
+  depends_on = [null_resource.subnet_region_validation,data.external.supported_regions]
   
   provisioner "local-exec" {
     when       = create
@@ -246,7 +246,7 @@ module "key" {
 }
 
 module "integration" {
-  depends_on = [null_resource.precheck_marker, module.auth, module.key, module.kms]
+  depends_on = [null_resource.precheck_marker, module.auth, module.key, module.kms,null_resource.regional_stacks_create_apply]
   source     = "./modules/integration"
   providers = {
     restapi = restapi
@@ -259,7 +259,7 @@ module "integration" {
   tenancy_ocid                    = var.tenancy_ocid
   private_key                     = module.key[0].private_key
   user_ocid                       = module.auth[0].user_id
-  subscribed_regions              = tolist(local.target_regions_for_stacks)
+  subscribed_regions              = tolist(local.final_regions_for_stacks)
   datadog_resource_compartment_id = module.compartment.id
 }
 
