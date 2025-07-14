@@ -148,10 +148,10 @@ locals {
     for region in local.subscribed_regions_list : region if contains(tolist(local.regions_in_domain_set), region)
   ])
 
-# final set reported to Datadog
-final_regions_for_stacks = toset([
-  for region in local.target_regions_for_stacks : region
-  if contains(tolist(local.docker_image_enabled_regions), region)
-])
+  # final set reported to Datadog
+  final_regions_for_stacks = toset([
+    for region in local.target_regions_for_stacks : region
+      if contains(tolist(local.docker_image_enabled_regions), region)
+  ])
 
 }

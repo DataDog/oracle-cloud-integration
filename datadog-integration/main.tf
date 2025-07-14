@@ -132,12 +132,11 @@ resource "null_resource" "region_intersection_info" {
       
       if [ ! -z "$SUBSCRIBED_MINUS_DOMAIN" ] || [ ! -z "$DOMAIN_MINUS_SUBSCRIBED" ]; then
         echo ""
-        echo "ERROR: Subscribed regions do not match regions in domain."
+        echo "WARNING: Subscribed regions do not match regions in domain."
         echo "This indicates a configuration mismatch between the tenancy's subscribed regions and the identity domain's available regions."
         echo ""
         echo "Subscribed regions: ${join(", ", sort(tolist(local.subscribed_regions_set)))}"
         echo "Regions in domain: ${join(", ", sort(tolist(local.regions_in_domain_set)))}"
-        exit 1
       fi
       
       # Check if any regional stacks will be created
