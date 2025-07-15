@@ -134,10 +134,24 @@ locals {
     ]) > 1
   ]
 
-  # Intersection of subscribed regions, regions in domain, and subnet regions (compatible with Terraform <= 1.5.x)
+  docker_image_enabled_regions = toset([
+    for region in keys(local.subscribed_regions_list) : region
+    if local.supported_regions[region].result.failure == ""
+  ])
+
+  # Intersection of subscribed regions, regions in domain, subnet regions (compatible with Terraform <= 1.5.x)
   # Only create regional stacks for regions that meet all three criteria
   target_regions_for_stacks = length(local.subnet_ocids_list) > 0 ? toset([
     for region in local.subscribed_regions_list : region
     if contains(tolist(local.regions_in_domain_set), region) && contains(tolist(local.subnet_regions), region)
-  ]) : local.subscribed_regions_set
+  ]) : toset([
+    for region in local.subscribed_regions_list : region if contains(tolist(local.regions_in_domain_set), region)
+  ])
+
+  # final set reported to Datadog
+  final_regions_for_stacks = toset([
+    for region in local.target_regions_for_stacks : region
+      if contains(tolist(local.docker_image_enabled_regions), region)
+  ])
+
 }

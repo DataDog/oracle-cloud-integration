@@ -111,7 +111,7 @@ resource "null_resource" "subnet_region_validation" {
 
 # Output region intersection logic and validate region consistency
 resource "null_resource" "region_intersection_info" {
-  depends_on = [null_resource.subnet_region_validation]
+  depends_on = [null_resource.subnet_region_validation,data.external.supported_regions]
   
   provisioner "local-exec" {
     when       = create
@@ -121,6 +121,7 @@ resource "null_resource" "region_intersection_info" {
       echo "Subscribed regions in tenancy: ${join(", ", sort(tolist(local.subscribed_regions_set)))}"
       echo "Regions available in identity domain: ${join(", ", sort(tolist(local.regions_in_domain_set)))}"
       echo "Regions with provided subnet OCIDs: ${length(local.subnet_ocids_list) > 0 ? join(", ", sort(tolist(local.subnet_regions))) : "None (will create subnets in all subscribed regions)"}"
+      echo "Regions where Docker image is available: ${join(", ", sort(tolist(local.docker_image_enabled_regions)))}"
       echo "Target regions for regional stack deployment: ${join(", ", sort(tolist(local.target_regions_for_stacks)))}"
       echo "Number of regional stacks to be created: ${length(local.target_regions_for_stacks)}"
       echo "================================================================================="
@@ -131,12 +132,11 @@ resource "null_resource" "region_intersection_info" {
       
       if [ ! -z "$SUBSCRIBED_MINUS_DOMAIN" ] || [ ! -z "$DOMAIN_MINUS_SUBSCRIBED" ]; then
         echo ""
-        echo "ERROR: Subscribed regions do not match regions in domain."
+        echo "WARNING: Subscribed regions do not match regions in domain."
         echo "This indicates a configuration mismatch between the tenancy's subscribed regions and the identity domain's available regions."
         echo ""
         echo "Subscribed regions: ${join(", ", sort(tolist(local.subscribed_regions_set)))}"
         echo "Regions in domain: ${join(", ", sort(tolist(local.regions_in_domain_set)))}"
-        exit 1
       fi
       
       # Check if any regional stacks will be created
@@ -245,7 +245,7 @@ module "key" {
 }
 
 module "integration" {
-  depends_on = [null_resource.precheck_marker, module.auth, module.key, module.kms]
+  depends_on = [null_resource.precheck_marker, module.auth, module.key, module.kms,null_resource.regional_stacks_create_apply]
   source     = "./modules/integration"
   providers = {
     restapi = restapi
@@ -258,7 +258,7 @@ module "integration" {
   tenancy_ocid                    = var.tenancy_ocid
   private_key                     = module.key[0].private_key
   user_ocid                       = module.auth[0].user_id
-  subscribed_regions              = tolist(local.target_regions_for_stacks)
+  subscribed_regions              = tolist(local.final_regions_for_stacks)
   datadog_resource_compartment_id = module.compartment.id
 }
 
