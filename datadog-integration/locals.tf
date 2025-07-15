@@ -135,7 +135,7 @@ locals {
   ]
 
   docker_image_enabled_regions = toset([
-    for region in keys(local.subscribed_regions_list) : region
+    for region in local.subscribed_regions_list : region
     if local.supported_regions[region].result.failure == ""
   ])
 
