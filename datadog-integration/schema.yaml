@@ -18,11 +18,11 @@ variableGroups:
       - ${datadog_app_key}
       - ${datadog_api_key}
       - ${datadog_site}
-  - title: "(Optional) Choose Specific Subnet(s)"
+  - title: "(Optional) Choose specific subnet(s)"
     variables:
       - ${choose_subnet}
       - ${subnet_ocids}
-  - title: "(Optional) Advanced Configuration"
+  - title: "(Optional) Advanced configuration"
     variables:
       - ${show_advanced_options}
       - ${compartment_id}
@@ -31,12 +31,11 @@ variableGroups:
 
 variables:
   choose_subnet:
-    title: Choose Specific Subnet(s)
+    title: Choose specific subnet(s)
     type: boolean
     description: |
-      Use an existing subnet for the Datadog QuickStart stack.
-      
-      (Recommended): If left blank, a new Virtual cloud network (VCN) and subnet will be created.
+      <strong>This is uncommon.</strong> Use existing subnets for the Datadog QuickStart stack.
+      <strong>(Recommended): If left blank, a new Virtual cloud network (VCN) and subnet will be created in each region that the tenancy is subscribed to.</strong>
     required: false
     default: false
 
@@ -44,15 +43,14 @@ variables:
     title: Use advanced options
     type: boolean
     description: |
-      Use an existing Compartment, Group, and User for the Datadog QuickStart stack.
-
-      (Recommended): If left blank, a new Compartment, Group, and User will be created.
+      <strong>This is uncommon.</strong> Use an existing Compartment, Group, and User for the Datadog QuickStart stack.
+      <strong>(Recommended): If left blank, a new Compartment, Group, and User will be created.</strong>
     required: false
     default: false
 
   # Networking Options
   subnet_ocids:
-    title: Subnet OCIDs
+    title: Subnet IDs
     type: text
     multiline: true
     description: |
@@ -60,8 +58,8 @@ variables:
       The Datadog QuickStart stack will be deployed in the region corresponding to each subnet. 
       Each subnet OCID should be in the format: ocid1.subnet.oc[0-9].* 
       Example: ocid1.subnet.oc1.iad.abcedfgh. 
-      (Recommended): If left blank, a new Virtual cloud network (VCN) and subnet will be created in each region in this tenancy.
-    required: false      
+      <strong>(Recommended): If left blank, a new Virtual cloud network (VCN) and subnet will be created in each region in this tenancy.</strong>
+    required: false
     default: ""
     visible: ${choose_subnet}
 
@@ -97,8 +95,8 @@ variables:
   compartment_id:
     title: Compartment
     description: |
-      <strong>This is uncommon.</strong>
-      Choose an existing compartment to place all the resources created by Datadog.
+      Select a Compartment in which all Datadog QuickStack resources will be created.
+      <strong>(Recommended): If left blank, a new Compartment will be created.</strong>
     type: oci:identity:compartment:id
     required: false
     default: null
@@ -108,9 +106,8 @@ variables:
     title: User ID
     type: string
     description: |
-      <strong>This is uncommon.</strong>
       Provide the OCID of an existing OCI User for Datadog authentication. If you provide a Group, User ID cannot be left blank. The OCI User must belong to the current Identity Domain and be a member of the specified Group. 
-      (Recommended): If both Group and User are left blank, a new Group and User will be created in the current Identity Domain.
+      <strong>(Recommended): If both Group and User are left blank, a new Group and User will be created in the current Identity Domain.</strong>
     required: false
     default: null
     visible: ${show_advanced_options}
@@ -119,9 +116,8 @@ variables:
     title: Group ID
     type: string
     description: |
-      <strong>This is uncommon.</strong>
       Provide the OCID of an existing OCI Group for Datadog authentication. If you provide a Group, User ID cannot be left blank. The Group must belong to the current Identity Domain. 
-      (Recommended): If both Group and User are left blank, a new Group and User will be created in the current Identity Domain.
+      <strong>(Recommended): If both Group and User are left blank, a new Group and User will be created in the current Identity Domain.</strong>
     required: false
     default: null
     visible: ${show_advanced_options}
