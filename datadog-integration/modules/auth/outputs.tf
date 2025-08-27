@@ -1,9 +1,9 @@
 output "user_id" {
-  value = var.existing_user_id != null ? var.existing_user_id : oci_identity_domains_user.dd_auth[0].ocid
+  value = (var.existing_user_id != null && var.existing_user_id != "") ? var.existing_user_id : oci_identity_domains_user.dd_auth[0].ocid
 }
 
 output "group_id" {
-  value = var.existing_group_id != null ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid
+  value = (var.existing_group_id != null && var.existing_group_id != "") ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid
 }
 
 output "service_connector_dynamic_group_id" {
