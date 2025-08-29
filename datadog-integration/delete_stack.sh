@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Suppress OCI CLI warnings
+export OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING=True
+
 COMPARTMENT=$1
 REGION=$2
 DISPLAY_NAME=$3

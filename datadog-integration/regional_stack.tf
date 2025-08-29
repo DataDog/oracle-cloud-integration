@@ -31,6 +31,8 @@ resource "null_resource" "regional_stacks_create_apply" {
   provisioner "local-exec" {
     working_dir = path.module
     command     = <<EOT
+    # Suppress OCI CLI warnings
+    export OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING=True
 
     echo "Checking if the region ${each.key} is supported or not"
     VALUE="${local.supported_regions[each.key].result.failure}"
