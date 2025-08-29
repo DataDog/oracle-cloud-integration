@@ -1,6 +1,6 @@
 locals {
   user_id = var.existing_user_id
-  # Always get the IDCS endpoint from the selected domain
-  idcs_endpoint = data.oci_identity_domain.selected_domain.url
+  # Use the IDCS endpoint passed from parent module
+  idcs_endpoint  = var.idcs_endpoint
   endpoint_param = "--endpoint ${local.idcs_endpoint}"
 }

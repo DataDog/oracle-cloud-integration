@@ -3,20 +3,13 @@ terraform {
   required_providers {
     oci = {
       source  = "oracle/oci"
-      version = "5.46.0"
+      version = ">=7.1.0"
+    }
+    http = {
+      source  = "hashicorp/http"
+      version = "3.5.0"
     }
   }
-}
-
-resource "oci_functions_application" "dd_function_app" {
-  compartment_id = var.compartment_ocid
-  display_name   = "dd-function-app"
-  freeform_tags  = var.tags
-  shape          = "GENERIC_X86_ARM"
-  subnet_ids = [
-    module.vcn.subnet_id[local.subnet],
-  ]
-  config = local.config
 }
 
 resource "oci_functions_function" "logs_function" {
@@ -25,6 +18,8 @@ resource "oci_functions_function" "logs_function" {
   memory_in_mbs  = "1024"
   freeform_tags  = var.tags
   image          = local.logs_image_path
+  image_digest   = length(local.image_sha_logs) > 0 ? local.image_sha_logs : null
+
 }
 
 resource "oci_functions_function" "metrics_function" {
@@ -33,9 +28,11 @@ resource "oci_functions_function" "metrics_function" {
   memory_in_mbs  = "512"
   freeform_tags  = var.tags
   image          = local.metrics_image_path
+  image_digest   = length(local.image_sha_metrics) > 0 ? local.image_sha_metrics : null
 }
 
 module "vcn" {
+  count                    = var.subnet_ocid == "" ? 1 : 0
   source                   = "oracle-terraform-modules/vcn/oci"
   version                  = "3.6.0"
   compartment_id           = var.compartment_ocid
@@ -59,3 +56,13 @@ module "vcn" {
   service_gateway_display_name = local.service_gateway
 }
 
+resource "oci_functions_application" "dd_function_app" {
+  compartment_id = var.compartment_ocid
+  display_name   = "dd-function-app"
+  freeform_tags  = var.tags
+  shape          = "GENERIC_X86_ARM"
+  subnet_ids = [
+    local.subnet_id
+  ]
+  config = local.config
+}

@@ -1,8 +1,9 @@
+
 resource "terraform_data" "regional_stack_zip" {
   depends_on = [null_resource.precheck_marker]
   provisioner "local-exec" {
     working_dir = "${path.module}/modules/regional-stacks"
-    command     = "rm dd_regional_stack.zip;zip -r dd_regional_stack.zip ./*.tf"
+    command     = "rm -f dd_regional_stack.zip && zip -r dd_regional_stack.zip ./*.tf"
   }
   triggers_replace = {
     "key" = timestamp()
@@ -18,14 +19,20 @@ resource "terraform_data" "stack_digest" {
   }
 }
 
+
 # Using a null resource because we want this to be applied on every execution.
 resource "null_resource" "regional_stacks_create_apply" {
-  depends_on = [terraform_data.regional_stack_zip, terraform_data.stack_digest]
-  # Not using local.supported_region_set here because that is determined during apply time and terraform needs to be aware of exact length during plan stage
-  for_each   = local.subscribed_regions_set
+  depends_on = [null_resource.precheck_marker, null_resource.region_intersection_info, terraform_data.regional_stack_zip, terraform_data.stack_digest, module.compartment, module.auth, module.kms]
+  # Using intersection of subscribed regions, domain regions, and subnet regions
+  # keep this here since we need the list to be available at plan time
+  # this is why we cannot use the final_regions_for_stacks local variable
+  # and we have logic to exit early if the region is not supported
+  for_each = local.target_regions_for_stacks
   provisioner "local-exec" {
     working_dir = path.module
     command     = <<EOT
+    # Suppress OCI CLI warnings
+    export OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING=True
 
     echo "Checking if the region ${each.key} is supported or not"
     VALUE="${local.supported_regions[each.key].result.failure}"
@@ -57,7 +64,8 @@ resource "null_resource" "regional_stacks_create_apply" {
       STACK_ID=$(oci resource-manager stack create --compartment-id ${module.compartment.id} --display-name $STACK_NAME \
       --config-source ${path.module}/modules/regional-stacks/dd_regional_stack.zip  --variables '{"tenancy_ocid": "${var.tenancy_ocid}", "region": "${each.key}", \
       "compartment_ocid": "${module.compartment.id}", "datadog_site": "${var.datadog_site}", "api_key_secret_id": "${module.kms[0].api_key_secret_id}", \
-      "home_region": "${local.home_region_name}", "region_key": "${local.subscribed_regions_map[each.key].region_key}"}' \
+      "home_region": "${local.home_region_name}", "region_key": "${local.subscribed_regions_map[each.key].region_key}", \
+      "subnet_ocid": "${lookup(local.region_to_subnet_ocid_map, each.key, "")}"}' \
       --wait-for-state ACTIVE \
       --max-wait-seconds 120 \
       --wait-interval-seconds 5 \
@@ -104,10 +112,10 @@ resource "null_resource" "regional_stacks_create_apply" {
 # Using terraform_data only for destroy because other resource data or local variables cannot be referenced in destroy block. terraform_data allows that to refer from the self reference which is not 
 # present in null_resource. This is not used during create because terraform_data is destroyed on trigger.
 resource "terraform_data" "regional_stacks_destroy" {
-  depends_on = [terraform_data.regional_stack_zip, terraform_data.stack_digest]
-  for_each   = local.subscribed_regions_set
+  depends_on = [null_resource.precheck_marker, terraform_data.regional_stack_zip, terraform_data.stack_digest]
+  for_each   = local.target_regions_for_stacks
   input = {
-    compartment = module.compartment.id
+    compartment     = module.compartment.id
     stack_digest_id = terraform_data.stack_digest.id
   }
 

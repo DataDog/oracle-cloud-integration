@@ -14,9 +14,18 @@ read -p "Enter tenancy namespace: " NAMESPACE
 read -s -p "Enter Docker password: " PASSWORD
 echo
 read -p "Enter Docker image tag (e.g., v1.0.0): " TAG
+read -p "Enter regions (comma-separated, e.g., us-phoenix-1,us-ashburn-1) or press Enter for all regions: " REGION_INPUT
 
-# Dynamically fetch region keys from OCI
-BUILD_TARGETS=($(oci iam region-subscription list | jq -r '.data[]."region-key"'))
+# Process region input and fetch region keys from OCI
+if [ -n "$REGION_INPUT" ]; then
+  # Convert comma-separated input to jq array format and filter regions
+  REGION_FILTER=$(echo "$REGION_INPUT" | sed 's/[[:space:]]*,[[:space:]]*/","/g' | sed 's/^/["/' | sed 's/$/"]/')
+  echo "Filtering for regions: $REGION_INPUT"
+  BUILD_TARGETS=($(oci iam region-subscription list | jq -r --argjson regions "$REGION_FILTER" '.data[] | select(.["region-name"] as $name | $regions | index($name)) | .["region-key"]'))
+else
+  echo "No specific regions provided. Using all available regions."
+  BUILD_TARGETS=($(oci iam region-subscription list | jq -r '.data[]."region-key"'))
+fi
 
 # Check if any regions were found
 if [ ${#BUILD_TARGETS[@]} -eq 0 ]; then
@@ -68,6 +77,9 @@ for TARGET in "${BUILD_TARGETS[@]}"; do
   LOGIN_USER="${NAMESPACE}/${USERNAME}"
   IMAGE_PATH_METRICS="${REGISTRY}/${NAMESPACE}/oci-datadog-forwarder/metrics"
   IMAGE_PATH_LOGS="${REGISTRY}/${NAMESPACE}/oci-datadog-forwarder/logs"
+
+  echo "Metrics image: $IMAGE_PATH_METRICS"
+  echo "Logs image: $IMAGE_PATH_LOGS"
 
   echo "Logging in to $REGISTRY..."
   echo "$PASSWORD" | docker login "$REGISTRY" --username "$LOGIN_USER" --password-stdin

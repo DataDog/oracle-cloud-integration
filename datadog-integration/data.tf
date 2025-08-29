@@ -7,8 +7,8 @@ data "external" "supported_regions" {
   program  = ["bash", "${path.module}/docker_image_check.sh"]
 
   query = {
-    region         = each.key
-    regionKey      = each.value.region_key
+    region    = each.key
+    regionKey = each.value.region_key
   }
 }
 
@@ -20,4 +20,8 @@ data "oci_identity_domains_user" "user_in_domain" {
   for_each      = { for d in data.oci_identity_domains.all_domains.domains : d.id => d }
   idcs_endpoint = each.value.url
   user_id       = var.current_user_ocid
+}
+
+data "oci_identity_domain" "domain" {
+  domain_id = local.matching_domain_id
 }
