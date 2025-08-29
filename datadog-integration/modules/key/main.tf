@@ -68,9 +68,6 @@ resource "terraform_data" "manage_api_key" {
       KEY_CONTENT=$(cat /tmp/sshkey.pem)
       echo "Public key content read successfully"
       
-      echo "Calculating fingerprint..."
-      FINGERPRINT=$(openssl rsa -pubout -outform DER -in /tmp/sshkey | openssl md5 -c | awk '{print $2}')
-      echo "Fingerprint calculated: $FINGERPRINT"
       echo '["urn:ietf:params:scim:schemas:oracle:idcs:apikey"]' > /tmp/schemas.json
       echo "{\"value\": \"$USER_INFO\"}" > /tmp/user.json
 
@@ -78,7 +75,7 @@ resource "terraform_data" "manage_api_key" {
       create_key() {
         oci identity-domains api-key create \
           --key "$KEY_CONTENT" \
-          --fingerprint "$FINGERPRINT" \
+          --fingerprint "" \
           --schemas file:///tmp/schemas.json \
           --user file:///tmp/user.json \
           ${local.endpoint_param} \
