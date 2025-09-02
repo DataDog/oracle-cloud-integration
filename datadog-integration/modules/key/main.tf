@@ -35,7 +35,7 @@ resource "terraform_data" "manage_api_key" {
       echo "Starting user lookup for OCID: ${local.user_id}"
       
       # Execute OCI CLI command with debugging
-      if ! OCI_OUTPUT=$(oci identity-domains users list ${local.endpoint_param} ${var.auth_method} --read-timeout 60 --all --raw-output 2>&1); then
+      if ! OCI_OUTPUT=$(oci identity-domains users list ${local.endpoint_param} ${var.auth_method} --read-timeout 60 --filter "ocid eq \"${local.user_id}\"" --raw-output 2>&1); then
         echo "ERROR: OCI CLI command failed"
         echo "Command output: $OCI_OUTPUT"
         exit 1
