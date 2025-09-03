@@ -22,14 +22,17 @@ variableGroups:
     variables:
       - ${choose_subnet}
       - ${subnet_ocids}
+  - title: "(Optional) Choose a User"
+    variables:
+      - ${choose_user}
+      - ${existing_group_id}
+      - ${existing_user_id}
   - title: "(Optional) Advanced configuration"
     variables:
       - ${show_advanced_options}
       - ${compartment_id}
       - ${domain_id}
       - ${user_email}
-      - ${existing_group_id}
-      - ${existing_user_id}
 
 variables:
   choose_subnet:
@@ -41,12 +44,21 @@ variables:
     required: false
     default: false
 
+  choose_user:
+    title: Choose a User
+    type: boolean
+    description: |
+      <strong>This is uncommon.</strong> Use an existing User and Group for the Datadog QuickStart stack.
+      <strong>(Recommended): If left blank, a new Group and User will be created in the current Identity Domain.</strong>
+    required: false
+    default: false
+
   show_advanced_options:
     title: Use advanced options
     type: boolean
     description: |
-      <strong>This is uncommon.</strong> Use an existing Compartment, Group, and User for the Datadog QuickStart stack.
-      <strong>(Recommended): If left blank, a new Compartment, Group, and User will be created.</strong>
+      <strong>This is uncommon.</strong> Use an existing Compartment and Domain for the Datadog QuickStart stack.
+      <strong>(Recommended): If left blank, a new Compartment will be created.</strong>
     required: false
     default: false
 
@@ -108,23 +120,19 @@ variables:
     title: User ID
     type: string
     description: |
-      <strong>This is uncommon.</strong>
-      Provide the OCID of an existing OCI User for Datadog authentication. If you provide a Group, User ID cannot be left blank. The OCI User must belong to the current Identity Domain and be a member of the specified Group.
-      <strong>(Recommended): If both Group and User are left blank, a new Group and User will be created in the current Identity Domain.</strong>
-    required: false
+      Provide the OCID of an existing OCI User for Datadog authentication. The OCI User must be a member of the specified Group.
+    required: true
     default: null
-    visible: ${show_advanced_options}
+    visible: ${choose_user}
 
   existing_group_id:
     title: Group ID
     type: string
     description: |
-      <strong>This is uncommon.</strong>
-      Provide the OCID of an existing OCI Group for Datadog authentication. If you provide a Group, User ID cannot be left blank. The Group must belong to the current Identity Domain.
-      <strong>(Recommended): If both Group and User are left blank, a new Group and User will be created in the current Identity Domain.</strong>
-    required: false
+      Provide the OCID of an existing OCI Group for Datadog authentication.
+    required: true
     default: null
-    visible: ${show_advanced_options}
+    visible: ${choose_user}
 
   domain_id:
     title: Domain ID
@@ -134,7 +142,11 @@ variables:
       Domain ID is the OCID of the Identity Domain to use for the Datadog QuickStart stack.
     required: false
     default: null
-    visible: ${show_advanced_options}
+    visible:
+      and:
+        - ${show_advanced_options}
+        - not:
+            - ${choose_user}
 
   user_email:
     title: User Email
@@ -142,6 +154,10 @@ variables:
     description: |
       <strong>This is required if specifying a different Domain without an existing User.</strong>
       Email address where you want OCI to send notifications about the created user.
-    required: ${show_advanced_options && existing_user_id == null && domain_id != ""}
+    required: false
     default: null
-    visible: ${show_advanced_options}
+    visible:
+      and:
+        - ${show_advanced_options}
+        - not:
+            - ${choose_user}

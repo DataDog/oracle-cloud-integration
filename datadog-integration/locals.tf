@@ -24,7 +24,7 @@ locals {
   matching_domain_id = (
     var.domain_id != null && var.domain_id != "" ?
     var.domain_id :
-    [for k, v in data.oci_identity_domains_user.user_in_domain : k if v.active != null][0]
+    [for k, v in data.oci_identity_domains_user.user_in_domain : k if v.active != null && v.emails != null][0]
   )
 
   matching_domain = [
@@ -93,18 +93,18 @@ locals {
   subnet_ocid_to_region_map = {
     for subnet_ocid in local.subnet_ocids_list :
     subnet_ocid => (
-      # Safely get the region identifier from OCID (position 3), with bounds checking
+    # Safely get the region identifier from OCID (position 3), with bounds checking
       length(split(".", subnet_ocid)) >= 4 ? (
-        # Convert region identifier to uppercase for lookup (OCIDs contain lowercase, but region_key is uppercase)
-        contains(keys(local.region_key_to_name_map), upper(split(".", subnet_ocid)[3])) ?
-        # If it's a 3-letter code, convert to full name using uppercase lookup
-        local.region_key_to_name_map[upper(split(".", subnet_ocid)[3])] :
-        # Check if it's already a full region name in our subscribed regions
+    # Convert region identifier to uppercase for lookup (OCIDs contain lowercase, but region_key is uppercase)
+      contains(keys(local.region_key_to_name_map), upper(split(".", subnet_ocid)[3])) ?
+      # If it's a 3-letter code, convert to full name using uppercase lookup
+      local.region_key_to_name_map[upper(split(".", subnet_ocid)[3])] :
+      # Check if it's already a full region name in our subscribed regions
         contains(local.subscribed_regions_set, split(".", subnet_ocid)[3]) ?
         split(".", subnet_ocid)[3] :
         # Otherwise mark as unknown for validation
         "unknown-region-${split(".", subnet_ocid)[3]}"
-      ) : "invalid-region"
+    ) : "invalid-region"
     )
   }
 
@@ -165,7 +165,7 @@ locals {
   # final set reported to Datadog
   final_regions_for_stacks = toset([
     for region in local.target_regions_for_stacks : region
-      if contains(tolist(local.docker_image_enabled_regions), region)
+    if contains(tolist(local.docker_image_enabled_regions), region)
   ])
 
 }
