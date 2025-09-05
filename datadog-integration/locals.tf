@@ -22,9 +22,24 @@ locals {
   dg_fn_name             = "dd-dynamic-group-functions"
   dg_policy_name         = "dd-dynamic-group-policy"
   matching_domain_id = (
+    # If the domain is specified, use that
     var.domain_id != null && var.domain_id != "" ?
     var.domain_id :
-    [for k, v in data.oci_identity_domains_user.user_in_domain : k if v.active != null && v.emails != null][0]
+    (
+      # If a user and group are specified, find the associated domain
+      var.existing_user_id != null && var.existing_user_id != "" ?
+      (
+        length([for k, v in data.oci_identity_domains_user.existing_user_in_domain : k if v.active != null]) > 0 ?
+        [for k, v in data.oci_identity_domains_user.existing_user_in_domain : k if v.active != null][0] :
+        null
+      ) :
+      # If no user or group is specified, find the domain associated with the current user
+      (
+        length([for k, v in data.oci_identity_domains_user.user_in_domain : k if v.active != null]) > 0 ?
+        [for k, v in data.oci_identity_domains_user.user_in_domain : k if v.active != null][0] :
+        null
+      )
+    )
   )
 
   matching_domain = [
@@ -33,13 +48,16 @@ locals {
   ][0]
 
   user_email = (
-    var.existing_user_id == null || var.existing_user_id == "" ?
-    (
-      var.user_email != null && var.user_email != "" ?
-      var.user_email:
-      data.oci_identity_domains_user.user_in_domain[local.matching_domain_id].emails[0].value
-    ) :
-    null
+    # If the email is provided, use that
+    var.user_email != null && var.user_email != "" ?
+      var.user_email :
+      (
+        var.existing_user_id != null && var.existing_user_id != "" ? (
+          null
+        ):
+          # If no user is specified, infer the email from the current logged in user
+          data.oci_identity_domains_user.user_in_domain[local.matching_domain_id].emails[0].value
+      )
   )
 
   domain_display_name = local.matching_domain.display_name
@@ -93,18 +111,18 @@ locals {
   subnet_ocid_to_region_map = {
     for subnet_ocid in local.subnet_ocids_list :
     subnet_ocid => (
-    # Safely get the region identifier from OCID (position 3), with bounds checking
+      # Safely get the region identifier from OCID (position 3), with bounds checking
       length(split(".", subnet_ocid)) >= 4 ? (
-    # Convert region identifier to uppercase for lookup (OCIDs contain lowercase, but region_key is uppercase)
-      contains(keys(local.region_key_to_name_map), upper(split(".", subnet_ocid)[3])) ?
-      # If it's a 3-letter code, convert to full name using uppercase lookup
-      local.region_key_to_name_map[upper(split(".", subnet_ocid)[3])] :
-      # Check if it's already a full region name in our subscribed regions
+        # Convert region identifier to uppercase for lookup (OCIDs contain lowercase, but region_key is uppercase)
+        contains(keys(local.region_key_to_name_map), upper(split(".", subnet_ocid)[3])) ?
+        # If it's a 3-letter code, convert to full name using uppercase lookup
+        local.region_key_to_name_map[upper(split(".", subnet_ocid)[3])] :
+        # Check if it's already a full region name in our subscribed regions
         contains(local.subscribed_regions_set, split(".", subnet_ocid)[3]) ?
         split(".", subnet_ocid)[3] :
         # Otherwise mark as unknown for validation
         "unknown-region-${split(".", subnet_ocid)[3]}"
-    ) : "invalid-region"
+      ) : "invalid-region"
     )
   }
 
@@ -165,7 +183,7 @@ locals {
   # final set reported to Datadog
   final_regions_for_stacks = toset([
     for region in local.target_regions_for_stacks : region
-    if contains(tolist(local.docker_image_enabled_regions), region)
+      if contains(tolist(local.docker_image_enabled_regions), region)
   ])
 
 }

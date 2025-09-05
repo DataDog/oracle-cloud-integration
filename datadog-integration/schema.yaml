@@ -138,8 +138,8 @@ variables:
     title: Domain ID
     type: string
     description: |
-      <strong>This is uncommon.</strong>
-      Domain ID is the OCID of the Identity Domain to use for the Datadog QuickStart stack.
+      Provide the OCID of the Identity Domain to use for the Datadog QuickStart stack.
+      <strong>(Recommended): If left blank, the current Identity Domain will be used.</strong>
     required: false
     default: null
     visible:
@@ -152,8 +152,8 @@ variables:
     title: User Email
     type: string
     description: |
-      <strong>This is required if specifying a different Domain without an existing User.</strong>
-      Email address where you want OCI to send notifications about the created user.
+      <strong>This is required if you have specified a Domain in the field above.</strong>
+      Provide the email address where you want OCI to send notifications about the created user.
     required: false
     default: null
     visible:
