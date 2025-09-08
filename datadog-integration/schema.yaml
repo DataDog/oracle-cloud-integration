@@ -45,10 +45,10 @@ variables:
     default: false
 
   choose_user:
-    title: Choose a User
+    title: Choose a Group and User for Datadog authentication
     type: boolean
     description: |
-      <strong>This is uncommon.</strong> Use an existing User and Group for the Datadog QuickStart stack.
+      <strong>This is uncommon.</strong> Use an existing Group and User to authenticate access to Datadog.
       <strong>(Recommended): If left blank, a new Group and User will be created in the current Identity Domain.</strong>
     required: false
     default: false
