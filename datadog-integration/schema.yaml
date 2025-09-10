@@ -94,7 +94,7 @@ variables:
     required: true
 
   logs_config:
-    title: Logs Config
+    title: Logs Enabled
     type: string
     description: |
       Indicates if logs should be enabled/disabled
