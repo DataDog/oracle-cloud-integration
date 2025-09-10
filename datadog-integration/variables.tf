@@ -70,3 +70,9 @@ variable "existing_group_id" {
   description = "The OCID of the existing group to use for DDOG authentication"
   default     = null
 }
+
+variable "logs_config" {
+  type        = bool
+  description = "Indicates if logs should be enabled/disabled"
+  default     = false
+}

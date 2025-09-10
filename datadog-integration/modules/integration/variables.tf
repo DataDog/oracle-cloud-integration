@@ -48,3 +48,9 @@ variable "datadog_resource_compartment_id" {
   type        = string
   description = "The compartment id in which datadog resources are present."
 }
+
+variable "logs_config" {
+  type        = bool
+  description = "Indicates if logs should be enabled/disabled"
+  default     = false
+}
