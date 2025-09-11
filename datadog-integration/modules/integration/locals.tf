@@ -18,7 +18,7 @@ locals {
         dd_compartment_id : var.datadog_resource_compartment_id
         dd_stack_id : try(data.external.stack_info.result.stack_id, "")
         logs_config : {
-          Enabled: var.logs_config
+          Enabled: var.logs_enabled
         }
       }
     }

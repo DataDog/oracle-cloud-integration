@@ -71,7 +71,7 @@ variable "existing_group_id" {
   default     = null
 }
 
-variable "logs_config" {
+variable "logs_enabled" {
   type        = bool
   description = "Indicates if logs should be enabled/disabled"
   default     = false

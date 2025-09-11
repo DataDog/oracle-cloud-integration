@@ -28,6 +28,6 @@ provider "restapi" {
     "DD-API-KEY"         = var.datadog_api_key
     "DD-APPLICATION-KEY" = var.datadog_app_key
     "Content-Type"       = "application/json"
-    "logs-config"        = "no-ui-override"
+    "Client-ID"        = "oci-orm-stack"
   }
 }
