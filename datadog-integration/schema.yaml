@@ -23,12 +23,17 @@ variableGroups:
     variables:
       - ${choose_subnet}
       - ${subnet_ocids}
+  - title: "(Optional) Choose a User"
+    variables:
+      - ${choose_user}
+      - ${existing_group_id}
+      - ${existing_user_id}
   - title: "(Optional) Advanced configuration"
     variables:
       - ${show_advanced_options}
       - ${compartment_id}
-      - ${existing_group_id}
-      - ${existing_user_id}
+      - ${domain_id}
+      - ${user_email}
 
 variables:
   choose_subnet:
@@ -40,12 +45,21 @@ variables:
     required: false
     default: false
 
+  choose_user:
+    title: Choose a Group and User for Datadog authentication
+    type: boolean
+    description: |
+      <strong>This is uncommon.</strong> Use an existing Group and User to authenticate access to Datadog.
+      <strong>(Recommended): If left blank, a new Group and User will be created in the current Identity Domain.</strong>
+    required: false
+    default: false
+
   show_advanced_options:
     title: Use advanced options
     type: boolean
     description: |
-      <strong>This is uncommon.</strong> Use an existing Compartment, Group, and User for the Datadog QuickStart stack.
-      <strong>(Recommended): If left blank, a new Compartment, Group, and User will be created.</strong>
+      <strong>This is uncommon.</strong> Use an existing Compartment and Domain for the Datadog QuickStart stack.
+      <strong>(Recommended): If left blank, a new Compartment will be created.</strong>
     required: false
     default: false
 
@@ -55,10 +69,10 @@ variables:
     type: text
     multiline: true
     description: |
-      Provide a list of OCID(s) for existing subnet(s) to use for the Datadog QuickStart stack. Enter one OCID per line. Do not add commas. 
-      The Datadog QuickStart stack will be deployed in the region corresponding to each subnet. 
-      Each subnet OCID should be in the format: ocid1.subnet.oc[0-9].* 
-      Example: ocid1.subnet.oc1.iad.abcedfgh. 
+      Provide a list of OCID(s) for existing subnet(s) to use for the Datadog QuickStart stack. Enter one OCID per line. Do not add commas.
+      The Datadog QuickStart stack will be deployed in the region corresponding to each subnet.
+      Each subnet OCID should be in the format: ocid1.subnet.oc[0-9].*
+      Example: ocid1.subnet.oc1.iad.abcedfgh.
       <strong>(Recommended): If left blank, a new Virtual cloud network (VCN) and subnet will be created in each region in this tenancy.</strong>
     required: false
     default: ""
@@ -115,18 +129,44 @@ variables:
     title: User ID
     type: string
     description: |
-      Provide the OCID of an existing OCI User for Datadog authentication. If you provide a Group, User ID cannot be left blank. The OCI User must belong to the current Identity Domain and be a member of the specified Group. 
-      <strong>(Recommended): If both Group and User are left blank, a new Group and User will be created in the current Identity Domain.</strong>
-    required: false
+      Provide the OCID of an existing OCI User for Datadog authentication. The OCI User must be a member of the specified Group.
+    required: true
     default: null
-    visible: ${show_advanced_options}
+    visible: ${choose_user}
 
   existing_group_id:
     title: Group ID
     type: string
     description: |
-      Provide the OCID of an existing OCI Group for Datadog authentication. If you provide a Group, User ID cannot be left blank. The Group must belong to the current Identity Domain. 
-      <strong>(Recommended): If both Group and User are left blank, a new Group and User will be created in the current Identity Domain.</strong>
+      Provide the OCID of an existing OCI Group for Datadog authentication.
+    required: true
+    default: null
+    visible: ${choose_user}
+
+  domain_id:
+    title: Domain ID
+    type: string
+    description: |
+      Provide the OCID of the Identity Domain to use for the Datadog QuickStart stack.
+      <strong>(Recommended): If left blank, the current Identity Domain will be used.</strong>
     required: false
     default: null
-    visible: ${show_advanced_options}
+    visible:
+      and:
+        - ${show_advanced_options}
+        - not:
+            - ${choose_user}
+
+  user_email:
+    title: User Email
+    type: string
+    description: |
+      <strong>This is required if you have specified a Domain in the field above.</strong>
+      Provide the email address where you want OCI to send notifications about the created user.
+    required: false
+    default: null
+    visible:
+      and:
+        - ${show_advanced_options}
+        - not:
+            - ${choose_user}

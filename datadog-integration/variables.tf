@@ -45,7 +45,7 @@ variable "datadog_site" {
 
 #*************************************
 #         Advanced Usage Variables
-#*************************************  
+#*************************************
 
 variable "subnet_ocids" {
   type        = string
@@ -75,4 +75,16 @@ variable "logs_enabled" {
   type        = bool
   description = "Indicates if logs should be enabled/disabled"
   default     = false
+}
+
+variable "domain_id" {
+  type        = string
+  description = "The OCID of the Identity Domain to use for the Datadog QuickStart stack"
+  default     = null
+}
+
+variable "user_email" {
+  type        = string
+  description = "Email address where you want OCI to send you notifications about the created user."
+  default     = null
 }

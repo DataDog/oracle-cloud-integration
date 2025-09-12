@@ -21,12 +21,44 @@ locals {
   dg_sch_name            = "dd-dynamic-group-connectorhubs"
   dg_fn_name             = "dd-dynamic-group-functions"
   dg_policy_name         = "dd-dynamic-group-policy"
-  matching_domain_id     = [for k, v in data.oci_identity_domains_user.user_in_domain : k if v.emails != null][0]
+  matching_domain_id = (
+    # If the domain is specified, use that
+    var.domain_id != null && var.domain_id != "" ?
+    var.domain_id :
+    (
+      # If a user and group are specified, find the associated domain
+      var.existing_user_id != null && var.existing_user_id != "" ?
+      (
+        length([for k, v in data.oci_identity_domains_user.existing_user_in_domain : k if v.active != null]) > 0 ?
+        [for k, v in data.oci_identity_domains_user.existing_user_in_domain : k if v.active != null][0] :
+        null
+      ) :
+      # If no user or group is specified, find the domain associated with the current user
+      (
+        length([for k, v in data.oci_identity_domains_user.user_in_domain : k if v.active != null]) > 0 ?
+        [for k, v in data.oci_identity_domains_user.user_in_domain : k if v.active != null][0] :
+        null
+      )
+    )
+  )
+
   matching_domain = [
     for d in data.oci_identity_domains.all_domains.domains : d
     if d.id == local.matching_domain_id
   ][0]
-  user_email = data.oci_identity_domains_user.user_in_domain[local.matching_domain_id].emails[0].value
+
+  user_email = (
+    # If the email is provided, use that
+    var.user_email != null && var.user_email != "" ?
+      var.user_email :
+      (
+        var.existing_user_id != null && var.existing_user_id != "" ? (
+          null
+        ):
+          # If no user is specified, infer the email from the current logged in user
+          data.oci_identity_domains_user.user_in_domain[local.matching_domain_id].emails[0].value
+      )
+  )
 
   domain_display_name = local.matching_domain.display_name
   idcs_endpoint       = local.matching_domain.url
