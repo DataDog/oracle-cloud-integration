@@ -18,6 +18,7 @@ variableGroups:
       - ${datadog_app_key}
       - ${datadog_api_key}
       - ${datadog_site}
+      - ${logs_enabled}
   - title: "(Optional) Choose specific subnet(s)"
     variables:
       - ${choose_subnet}
@@ -105,6 +106,14 @@ variables:
       The site name for your Organization's Datadog endpoint (e.g. datadoghq.com, datadoghq.eu, etc.)
       This is the "Site Parameter" in the following <a href="https://docs.datadoghq.com/getting_started/site/#access-the-datadog-site" target="_blank">table from the Datadog documentation</a> .
     required: true
+
+  logs_enabled:
+    title: Logs Enabled
+    type: string
+    description: |
+      Indicates if logs should be enabled/disabled
+    required: false
+    default: false
 
   compartment_id:
     title: Compartment

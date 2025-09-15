@@ -71,6 +71,12 @@ variable "existing_group_id" {
   default     = null
 }
 
+variable "logs_enabled" {
+  type        = bool
+  description = "Indicates if logs should be enabled/disabled"
+  default     = false
+}
+
 variable "domain_id" {
   type        = string
   description = "The OCID of the Identity Domain to use for the Datadog QuickStart stack"
