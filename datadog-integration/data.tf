@@ -14,6 +14,7 @@ data "external" "supported_regions" {
 
 data "oci_identity_domains" "all_domains" {
   compartment_id = var.tenancy_ocid
+  state          = "ACTIVE"
 }
 
 data "oci_identity_domains_user" "user_in_domain" {
@@ -23,13 +24,13 @@ data "oci_identity_domains_user" "user_in_domain" {
 }
 
 data "oci_identity_domains_user" "existing_user_in_domain" {
-  for_each = var.existing_user_id != null && var.existing_user_id != "" ? { for d in data.oci_identity_domains.all_domains.domains : d.id => d } : {}
+  for_each      = var.existing_user_id != null && var.existing_user_id != "" ? { for d in data.oci_identity_domains.all_domains.domains : d.id => d } : {}
   idcs_endpoint = each.value.url
   user_id       = var.existing_user_id
 }
 
 data "oci_identity_domains_groups" "existing_group_in_domain" {
-  for_each = var.existing_group_id != null && var.existing_group_id != "" ? { for d in data.oci_identity_domains.all_domains.domains : d.id => d } : {}
+  for_each      = var.existing_group_id != null && var.existing_group_id != "" ? { for d in data.oci_identity_domains.all_domains.domains : d.id => d } : {}
   idcs_endpoint = each.value.url
   group_filter  = "ocid eq \"${var.existing_group_id}\""
 }
