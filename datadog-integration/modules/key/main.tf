@@ -5,127 +5,75 @@ terraform {
       source  = "oracle/oci"
       version = ">=7.1.0"
     }
-    local = {
-      source  = "hashicorp/local"
-      version = ">= 2.0.0"
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
+    time = {
+      source  = "hashicorp/time"
+      version = "~> 0.9"
     }
   }
 }
 
-resource "terraform_data" "manage_api_key" {
-  triggers_replace = {
-    always_run = timestamp()
+# Generate RSA private key for API authentication
+# This key is rotated on every apply to comply with security policies
+resource "tls_private_key" "datadog_api_key" {
+  algorithm = "RSA"
+  rsa_bits  = 2048
+
+  # Force key rotation on every apply for security compliance
+  lifecycle {
+    replace_triggered_by = [terraform_data.key_rotation_trigger]
   }
-  provisioner "local-exec" {
-    command     = <<-EOT
-      set -e
+}
 
-      # Suppress OCI CLI warnings
-      export OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING=True
+# Trigger to force key rotation on every apply
+resource "terraform_data" "key_rotation_trigger" {
+  input = timestamp()
+}
 
-      # Clean up any existing key files
-      rm -f /tmp/sshkey*
+# Data source to get user's IDCS ID from their OCID
+# Note: Identity Domains data sources retrieve all users, we filter in Terraform
+data "oci_identity_domains_users" "user_lookup" {
+  idcs_endpoint = var.idcs_endpoint
+}
 
-      # Generate private key in PKCS8 format
-      ssh-keygen -b 2048 -t rsa -m PKCS8 -f /tmp/sshkey -q -N "" -C "oci-api-key"
-      openssl rsa -in /tmp/sshkey -pubout -out /tmp/sshkey.pem
-      echo "SSH key pair generated successfully"
+# Local to find the specific user by OCID
+locals {
+  user_idcs_id = [
+    for user in data.oci_identity_domains_users.user_lookup.users :
+    user.id if try(user.ocid, "") == var.existing_user_id
+  ][0]
+}
 
-      # Get user's IDCS ID
-      echo "Starting user lookup for OCID: ${local.user_id}"
-      
-      # Execute OCI CLI command with debugging
-      if ! OCI_OUTPUT=$(oci identity-domains users list ${local.endpoint_param} ${var.auth_method} --read-timeout 60 --filter "ocid eq \"${local.user_id}\"" --raw-output 2>&1); then
-        echo "ERROR: OCI CLI command failed"
-        echo "Command output: $OCI_OUTPUT"
-        exit 1
-      fi
-      
-      echo "OCI CLI command completed successfully"
-      echo "Parsing JSON response with jq..."
-      
-      # Parse JSON with jq
-      if ! USER_INFO=$(echo "$OCI_OUTPUT" | jq -r '.data.resources[] | select(.ocid == "'"${local.user_id}"'") | .id' 2>&1); then
-        echo "ERROR: jq parsing failed"
-        echo "Raw OCI output (first 1000 chars):"
-        echo "$OCI_OUTPUT" | head -c 1000
-        exit 1
-      fi
-      
-      echo "JSON parsing completed. User ID: $USER_INFO"
-      
-      if [ -z "$USER_INFO" ] || [ "$USER_INFO" = "null" ]; then
-        echo "ERROR: Failed to find user with OCID: ${local.user_id}"
-        echo "Raw OCI output (first 1000 chars):"
-        echo "$OCI_OUTPUT" | head -c 1000
-        exit 1
-      fi
-      
-      echo "User lookup successful. Proceeding to key creation..."
-
-      # Prepare key creation
-      echo "Reading public key content..."
-      KEY_CONTENT=$(cat /tmp/sshkey.pem)
-      echo "Public key content read successfully"
-      
-      echo '["urn:ietf:params:scim:schemas:oracle:idcs:apikey"]' > /tmp/schemas.json
-      echo "{\"value\": \"$USER_INFO\"}" > /tmp/user.json
-
-      # Function to create API key
-      create_key() {
-        oci identity-domains api-key create \
-          --key "$KEY_CONTENT" \
-          --fingerprint "" \
-          --schemas file:///tmp/schemas.json \
-          --user file:///tmp/user.json \
-          ${local.endpoint_param} \
-          ${var.auth_method}
-      }
-
-      # Try to create key, handle quota limit if needed
-      if ! UPLOAD_OUTPUT=$(create_key 2>&1); then
-        if echo "$UPLOAD_OUTPUT" | grep -q "maximum quota limit"; then
-          echo "API key limit reached, removing oldest key..."
-          
-          # Get and delete oldest key
-          OLDEST_KEY=$(oci identity-domains api-keys list ${local.endpoint_param} ${var.auth_method} \
-            --filter "user.value eq \"$USER_INFO\"" --all --raw-output | \
-            jq -r '.data.resources[0].id')
-          
-          if [ -n "$OLDEST_KEY" ] && [ "$OLDEST_KEY" != "null" ]; then
-            oci identity-domains api-key delete --api-key-id "$OLDEST_KEY" --force ${local.endpoint_param} ${var.auth_method}
-            UPLOAD_OUTPUT=$(create_key 2>&1) || { echo "Failed to create new key after deletion"; exit 1; }
-          else
-            echo "No existing keys found to delete"
-            exit 1
-          fi
-        else
-          echo "Failed to create key: $UPLOAD_OUTPUT"
-          exit 1
-        fi
-      fi
-
-      # Extract and save fingerprint
-      NEW_FINGERPRINT=$(echo "$UPLOAD_OUTPUT" | jq -r '.data.fingerprint')
-      if [ -z "$NEW_FINGERPRINT" ] || [ "$NEW_FINGERPRINT" = "null" ]; then
-        echo "Failed to get fingerprint from response: $UPLOAD_OUTPUT"
-        exit 1
-      fi
-      # Wait for key to appear
-      echo "Waiting for key to appear in OCI..."
-      for i in {1..12}; do
-        if oci identity-domains api-keys list ${local.endpoint_param} ${var.auth_method} \
-          --filter "user.value eq \"$USER_INFO\"" --all --raw-output | \
-          jq -e '.data.resources[] | select(.fingerprint == "'"$NEW_FINGERPRINT"'")' > /dev/null; then
-          echo "Key is now visible in OCI"
-          exit 0
-        fi
-        echo "Waiting... ($i/12)"
-        sleep 5
-      done
-      echo "ERROR: Key did not appear in OCI after polling"
-      exit 1
-    EOT
-    interpreter = ["/bin/bash", "-c"]
+# Create API key for the user using native Terraform resource
+resource "oci_identity_domains_api_key" "datadog_key" {
+  idcs_endpoint = var.idcs_endpoint
+  
+  # The key value in PEM format
+  key = tls_private_key.datadog_api_key.public_key_pem
+  
+  # Required schemas for Identity Domains API key
+  schemas = ["urn:ietf:params:scim:schemas:oracle:idcs:apikey"]
+  
+  # Link to the user
+  user {
+    value = local.user_idcs_id
   }
+
+  # Lifecycle policy for key rotation
+  # create_before_destroy ensures smooth rotation:
+  # 1. New key is created first
+  # 2. Downstream resources (integration) updated with new key
+  # 3. Old key is deleted
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Optional: Add a time_sleep to allow for eventual consistency
+resource "time_sleep" "wait_for_key_propagation" {
+  depends_on      = [oci_identity_domains_api_key.datadog_key]
+  create_duration = "30s"
 }
