@@ -136,6 +136,46 @@ resource "terraform_data" "validate_enabled_regions" {
   }
 }
 
+# Data source to check if integration already exists in state
+data "external" "check_integration_exists" {
+  program = ["bash", "-c", <<-EOT
+    # Check if integration resource exists in terraform state
+    if terraform state list 2>/dev/null | grep -q "module.integration\[0\].restapi_object.datadog_tenancy_integration"; then
+      echo '{"exists": "true"}'
+    else
+      echo '{"exists": "false"}'
+    fi
+  EOT
+  ]
+}
+
+# Check 11: Prevent cost collection at initial creation
+resource "terraform_data" "validate_cost_collection_timing" {
+  count = var.cost_collection_enabled ? 1 : 0
+  
+  lifecycle {
+    precondition {
+      condition     = data.external.check_integration_exists.result.exists == "true"
+      error_message = <<-EOF
+        ╔════════════════════════════════════════════════════════════════════════════╗
+        ║                    COST COLLECTION TIMING ERROR                            ║
+        ╠════════════════════════════════════════════════════════════════════════════╣
+        ║ Cost collection cannot be enabled during initial integration creation.    ║
+        ║                                                                            ║
+        ║ This is a known limitation - cost collection must be enabled after the    ║
+        ║ integration is created.                                                   ║
+        ║                                                                            ║
+        ║ To proceed:                                                               ║
+        ║   1. Set cost_collection_enabled = false                                  ║
+        ║   2. Run terraform apply to create the integration                        ║
+        ║   3. Set cost_collection_enabled = true                                   ║
+        ║   4. Run terraform apply again to enable cost collection                  ║
+        ╚════════════════════════════════════════════════════════════════════════════╝
+      EOF
+    }
+  }
+}
+
 # Marker resource to indicate all prechecks have passed
 # Other resources can depend on this instead of null_resource.precheck_marker
 resource "terraform_data" "prechecks_complete" {
@@ -145,6 +185,7 @@ resource "terraform_data" "prechecks_complete" {
     terraform_data.validate_vault_quota,
     terraform_data.validate_connector_hub_quota,
     terraform_data.validate_enabled_regions,
+    terraform_data.validate_cost_collection_timing,
   ]
 }
 
