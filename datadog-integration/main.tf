@@ -184,7 +184,7 @@ module "compartment" {
 module "kms" {
   depends_on      = [terraform_data.prechecks_complete]
   source          = "./modules/kms"
-  count           = local.is_current_region_home_region ? 1 : 0
+  count           = (local.is_current_region_home_region && var.enable_vault) ? 1 : 0
   compartment_id  = module.compartment.id
   datadog_api_key = var.datadog_api_key
   tags            = local.tags
@@ -238,7 +238,15 @@ module "integration" {
   user_ocid                       = module.auth[0].user_id
   subscribed_regions              = tolist(local.final_regions_for_stacks)
   datadog_resource_compartment_id = module.compartment.id
-  logs_enabled                     = var.logs_enabled
+  logs_enabled                    = var.logs_enabled
+  metrics_enabled                 = var.metrics_enabled
+  resources_enabled               = var.resources_enabled
+  cost_collection_enabled         = var.cost_collection_enabled
+  enabled_regions                 = var.enabled_regions
+  logs_enabled_services           = var.logs_enabled_services
+  logs_compartment_tag_filters    = var.logs_compartment_tag_filters
+  metrics_enabled_services        = var.metrics_enabled_services
+  metrics_compartment_tag_filters = var.metrics_compartment_tag_filters
 }
 
 

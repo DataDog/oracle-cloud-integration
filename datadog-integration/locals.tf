@@ -186,4 +186,7 @@ locals {
       if contains(tolist(local.docker_image_enabled_regions), region)
   ])
 
+  # Vault secret ID - empty when vault is disabled
+  api_key_secret_id = var.enable_vault && length(module.kms) > 0 ? module.kms[0].api_key_secret_id : ""
+
 }
