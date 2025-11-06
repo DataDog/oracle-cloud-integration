@@ -19,6 +19,9 @@ variableGroups:
       - ${datadog_api_key}
       - ${datadog_site}
       - ${logs_enabled}
+      - ${metrics_enabled}
+      - ${resources_enabled}
+      - ${cost_collection_enabled}
   - title: "(Optional) Choose specific subnet(s)"
     variables:
       - ${choose_subnet}
@@ -28,6 +31,12 @@ variableGroups:
       - ${choose_user}
       - ${existing_group_id}
       - ${existing_user_id}
+  - title: "(Optional) Advanced Collection Configuration"
+    variables:
+      - ${logs_enabled_services}
+      - ${logs_compartment_tag_filters}
+      - ${metrics_enabled_services}
+      - ${metrics_compartment_tag_filters}
   - title: "(Optional) Advanced configuration"
     variables:
       - ${show_advanced_options}
@@ -112,6 +121,30 @@ variables:
     type: string
     description: |
       Indicates if logs should be enabled/disabled
+    required: false
+    default: false
+
+  metrics_enabled:
+    title: Metrics Enabled
+    type: boolean
+    description: |
+      Indicates if metrics should be enabled/disabled
+    required: false
+    default: true
+
+  resources_enabled:
+    title: Resources Enabled
+    type: boolean
+    description: |
+      Indicates if resource collection should be enabled/disabled
+    required: false
+    default: true
+
+  cost_collection_enabled:
+    title: Cost Collection Enabled
+    type: boolean
+    description: |
+      Indicates if cost collection should be enabled/disabled
     required: false
     default: false
 

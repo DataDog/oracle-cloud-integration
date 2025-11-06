@@ -32,9 +32,3 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
-
-variable "auth_method" {
-  description = "Authentication method for OCI CLI commands. Set to '--auth api_key' if running from the command line, leave blank if running from OCI Resource Manager."
-  type        = string
-  default     = ""
-}

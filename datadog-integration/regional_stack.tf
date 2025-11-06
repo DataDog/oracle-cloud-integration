@@ -1,1007 +1,132 @@
-#
-# Regional Deployment Modules
-#
-# Deploys Datadog forwarding infrastructure to each subscribed region.
-# Uses static module blocks with provider aliases to enable multi-region deployment.
-# Only regions that are subscribed and have Docker images will actually be deployed (count = 1).
-#
 
-module "regional_deployment_af_johannesburg_1" {
-  count  = contains(local.final_regions_for_stacks, "af-johannesburg-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.af-johannesburg-1
+resource "terraform_data" "regional_stack_zip" {
+  depends_on = [null_resource.precheck_marker]
+  provisioner "local-exec" {
+    working_dir = "${path.module}/modules/regional-stacks"
+    command     = "rm -f dd_regional_stack.zip && zip -r dd_regional_stack.zip ./*.tf"
   }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "af-johannesburg-1"
-  region_key        = local.subscribed_regions_map["af-johannesburg-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "af-johannesburg-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
+  triggers_replace = {
+    "key" = timestamp()
+  }
 }
 
-module "regional_deployment_ap_batam_1" {
-  count  = contains(local.final_regions_for_stacks, "ap-batam-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.ap-batam-1
+# A dummy resource unique to the current stack. All the regional stacks are created with this id in their names.
+resource "terraform_data" "stack_digest" {
+  depends_on = [null_resource.precheck_marker]
+  provisioner "local-exec" {
+    working_dir = path.module
+    command     = "echo $JOB_ID"
   }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "ap-batam-1"
-  region_key        = local.subscribed_regions_map["ap-batam-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-batam-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
 }
 
-module "regional_deployment_ap_chuncheon_1" {
-  count  = contains(local.final_regions_for_stacks, "ap-chuncheon-1") ? 1 : 0
-  source = "./modules/regional-stacks"
 
-  providers = {
-    oci = oci.ap-chuncheon-1
+# Using a null resource because we want this to be applied on every execution.
+resource "null_resource" "regional_stacks_create_apply" {
+  depends_on = [null_resource.precheck_marker, null_resource.region_intersection_info, terraform_data.regional_stack_zip, terraform_data.stack_digest, module.compartment, module.auth, module.kms]
+  # Using intersection of subscribed regions, domain regions, and subnet regions
+  # keep this here since we need the list to be available at plan time
+  # this is why we cannot use the final_regions_for_stacks local variable
+  # and we have logic to exit early if the region is not supported
+  for_each = local.target_regions_for_stacks
+  provisioner "local-exec" {
+    working_dir = path.module
+    command     = <<EOT
+    # Suppress OCI CLI warnings
+    export OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING=True
+
+    echo "Checking if the region ${each.key} is supported or not"
+    VALUE="${local.supported_regions[each.key].result.failure}"
+    CURRENT_REGION="${each.key}"
+
+    
+    if [[ "$VALUE" != "" ]]; then
+      echo "The region ${each.key} is not supported.....exit"
+      exit 0
+    fi
+
+    # Do not wait for the stack to be applied except for home region
+    WAIT_COMMAND=""
+    if [[ "$CURRENT_REGION" == "${local.home_region_name}" ]]; then
+      WAIT_COMMAND="--wait-for-state SUCCEEDED --wait-for-state FAILED"
+    fi
+
+    echo "Checking any existing stacks in the compartment...."
+    
+    # The name of the stack to be created. Combined with the stack_digest to make it unique to this stack
+    STACK_NAME="datadog-regional-stack-${terraform_data.stack_digest.id}"
+
+    # Fetching the existing regional stacks associated with this parent stack
+    STACK_IDS=($(oci --region ${each.key} resource-manager stack list --display-name $STACK_NAME --compartment-id ${module.compartment.id} --raw-output | jq -r '.data[]."id"'))
+    STACK_ID=''
+    
+    if [[ -z "$STACK_IDS" ]]; then
+      echo "No stack found in the compartment by the name $STACK_NAME in region ${each.key}. Creating..."
+      STACK_ID=$(oci resource-manager stack create --compartment-id ${module.compartment.id} --display-name $STACK_NAME \
+      --config-source ${path.module}/modules/regional-stacks/dd_regional_stack.zip  --variables '{"tenancy_ocid": "${var.tenancy_ocid}", "region": "${each.key}", \
+      "compartment_ocid": "${module.compartment.id}", "datadog_site": "${var.datadog_site}", "api_key_secret_id": "${module.kms[0].api_key_secret_id}", \
+      "home_region": "${local.home_region_name}", "region_key": "${local.subscribed_regions_map[each.key].region_key}", \
+      "subnet_ocid": "${lookup(local.region_to_subnet_ocid_map, each.key, "")}"}' \
+      --wait-for-state ACTIVE \
+      --max-wait-seconds 120 \
+      --wait-interval-seconds 5 \
+      --query "data.id" --raw-output --region ${each.key})
+      echo "Created Stack ID: $STACK_ID in region ${each.key}"
+    else
+      echo "Found stacks..... $${STACK_IDS[@]}"
+      STACK_ID="$${STACK_IDS[@]:0:1}"
+    fi
+  
+
+    # Create and wait for apply job
+    
+    echo "Apply Job for stack: $STACK_ID in region ${each.key}"
+    
+    # Retry job creation up to 5 times with 6 second intervals
+    JOB_ID=""
+    for attempt in {1..5}; do
+      echo "Attempting to create job (attempt $attempt/5)..."
+      if JOB_ID=$(oci resource-manager job create-apply-job --stack-id $STACK_ID $WAIT_COMMAND --execution-plan-strategy AUTO_APPROVED --region ${each.key} --query "data.id"); then
+        echo "Job created successfully: $JOB_ID for region ${each.key}"
+        break
+      else
+        echo "Job creation failed on attempt $attempt"
+        if [ $attempt -lt 5 ]; then
+          echo "Waiting 6 seconds before retry..."
+          sleep 6
+        fi
+      fi
+    done
+    
+    if [ -z "$JOB_ID" ]; then
+      echo "WARNING: Failed to create job after 5 attempts for region ${each.key}. Continuing with next region..."
+    fi
+
+    EOT
   }
 
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "ap-chuncheon-1"
-  region_key        = local.subscribed_regions_map["ap-chuncheon-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-chuncheon-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
+  triggers = {
+    always_run = timestamp()
+  }
 }
 
-module "regional_deployment_ap_hyderabad_1" {
-  count  = contains(local.final_regions_for_stacks, "ap-hyderabad-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.ap-hyderabad-1
+# Using terraform_data only for destroy because other resource data or local variables cannot be referenced in destroy block. terraform_data allows that to refer from the self reference which is not 
+# present in null_resource. This is not used during create because terraform_data is destroyed on trigger.
+resource "terraform_data" "regional_stacks_destroy" {
+  depends_on = [null_resource.precheck_marker, terraform_data.regional_stack_zip, terraform_data.stack_digest]
+  for_each   = local.target_regions_for_stacks
+  input = {
+    compartment     = module.compartment.id
+    stack_digest_id = terraform_data.stack_digest.id
   }
 
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "ap-hyderabad-1"
-  region_key        = local.subscribed_regions_map["ap-hyderabad-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-hyderabad-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_ap_melbourne_1" {
-  count  = contains(local.final_regions_for_stacks, "ap-melbourne-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.ap-melbourne-1
+  provisioner "local-exec" {
+    working_dir = path.module
+    when        = destroy
+    command     = <<EOT
+    echo "Destroying........."
+    STACK_NAME="datadog-regional-stack-${self.input.stack_digest_id}"
+    chmod +x ${path.module}/delete_stack.sh && ${path.module}/delete_stack.sh ${self.input.compartment} ${each.key} $STACK_NAME
+    
+    EOT
   }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "ap-melbourne-1"
-  region_key        = local.subscribed_regions_map["ap-melbourne-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-melbourne-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_ap_mumbai_1" {
-  count  = contains(local.final_regions_for_stacks, "ap-mumbai-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.ap-mumbai-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "ap-mumbai-1"
-  region_key        = local.subscribed_regions_map["ap-mumbai-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-mumbai-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_ap_osaka_1" {
-  count  = contains(local.final_regions_for_stacks, "ap-osaka-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.ap-osaka-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "ap-osaka-1"
-  region_key        = local.subscribed_regions_map["ap-osaka-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-osaka-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_ap_seoul_1" {
-  count  = contains(local.final_regions_for_stacks, "ap-seoul-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.ap-seoul-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "ap-seoul-1"
-  region_key        = local.subscribed_regions_map["ap-seoul-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-seoul-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_ap_singapore_1" {
-  count  = contains(local.final_regions_for_stacks, "ap-singapore-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.ap-singapore-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "ap-singapore-1"
-  region_key        = local.subscribed_regions_map["ap-singapore-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-singapore-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_ap_singapore_2" {
-  count  = contains(local.final_regions_for_stacks, "ap-singapore-2") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.ap-singapore-2
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "ap-singapore-2"
-  region_key        = local.subscribed_regions_map["ap-singapore-2"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-singapore-2", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_ap_sydney_1" {
-  count  = contains(local.final_regions_for_stacks, "ap-sydney-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.ap-sydney-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "ap-sydney-1"
-  region_key        = local.subscribed_regions_map["ap-sydney-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-sydney-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_ap_tokyo_1" {
-  count  = contains(local.final_regions_for_stacks, "ap-tokyo-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.ap-tokyo-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "ap-tokyo-1"
-  region_key        = local.subscribed_regions_map["ap-tokyo-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-tokyo-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_ca_montreal_1" {
-  count  = contains(local.final_regions_for_stacks, "ca-montreal-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.ca-montreal-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "ca-montreal-1"
-  region_key        = local.subscribed_regions_map["ca-montreal-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ca-montreal-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_ca_toronto_1" {
-  count  = contains(local.final_regions_for_stacks, "ca-toronto-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.ca-toronto-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "ca-toronto-1"
-  region_key        = local.subscribed_regions_map["ca-toronto-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ca-toronto-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_eu_amsterdam_1" {
-  count  = contains(local.final_regions_for_stacks, "eu-amsterdam-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.eu-amsterdam-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "eu-amsterdam-1"
-  region_key        = local.subscribed_regions_map["eu-amsterdam-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-amsterdam-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_eu_frankfurt_1" {
-  count  = contains(local.final_regions_for_stacks, "eu-frankfurt-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.eu-frankfurt-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "eu-frankfurt-1"
-  region_key        = local.subscribed_regions_map["eu-frankfurt-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-frankfurt-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_eu_madrid_1" {
-  count  = contains(local.final_regions_for_stacks, "eu-madrid-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.eu-madrid-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "eu-madrid-1"
-  region_key        = local.subscribed_regions_map["eu-madrid-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-madrid-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_eu_marseille_1" {
-  count  = contains(local.final_regions_for_stacks, "eu-marseille-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.eu-marseille-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "eu-marseille-1"
-  region_key        = local.subscribed_regions_map["eu-marseille-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-marseille-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_eu_milan_1" {
-  count  = contains(local.final_regions_for_stacks, "eu-milan-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.eu-milan-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "eu-milan-1"
-  region_key        = local.subscribed_regions_map["eu-milan-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-milan-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_eu_paris_1" {
-  count  = contains(local.final_regions_for_stacks, "eu-paris-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.eu-paris-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "eu-paris-1"
-  region_key        = local.subscribed_regions_map["eu-paris-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-paris-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_eu_stockholm_1" {
-  count  = contains(local.final_regions_for_stacks, "eu-stockholm-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.eu-stockholm-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "eu-stockholm-1"
-  region_key        = local.subscribed_regions_map["eu-stockholm-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-stockholm-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_eu_zurich_1" {
-  count  = contains(local.final_regions_for_stacks, "eu-zurich-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.eu-zurich-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "eu-zurich-1"
-  region_key        = local.subscribed_regions_map["eu-zurich-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-zurich-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_il_jerusalem_1" {
-  count  = contains(local.final_regions_for_stacks, "il-jerusalem-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.il-jerusalem-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "il-jerusalem-1"
-  region_key        = local.subscribed_regions_map["il-jerusalem-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "il-jerusalem-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_me_abudhabi_1" {
-  count  = contains(local.final_regions_for_stacks, "me-abudhabi-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.me-abudhabi-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "me-abudhabi-1"
-  region_key        = local.subscribed_regions_map["me-abudhabi-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "me-abudhabi-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_me_dubai_1" {
-  count  = contains(local.final_regions_for_stacks, "me-dubai-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.me-dubai-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "me-dubai-1"
-  region_key        = local.subscribed_regions_map["me-dubai-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "me-dubai-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_me_jeddah_1" {
-  count  = contains(local.final_regions_for_stacks, "me-jeddah-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.me-jeddah-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "me-jeddah-1"
-  region_key        = local.subscribed_regions_map["me-jeddah-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "me-jeddah-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_me_riyadh_1" {
-  count  = contains(local.final_regions_for_stacks, "me-riyadh-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.me-riyadh-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "me-riyadh-1"
-  region_key        = local.subscribed_regions_map["me-riyadh-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "me-riyadh-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_mx_monterrey_1" {
-  count  = contains(local.final_regions_for_stacks, "mx-monterrey-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.mx-monterrey-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "mx-monterrey-1"
-  region_key        = local.subscribed_regions_map["mx-monterrey-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "mx-monterrey-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_mx_queretaro_1" {
-  count  = contains(local.final_regions_for_stacks, "mx-queretaro-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.mx-queretaro-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "mx-queretaro-1"
-  region_key        = local.subscribed_regions_map["mx-queretaro-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "mx-queretaro-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_sa_bogota_1" {
-  count  = contains(local.final_regions_for_stacks, "sa-bogota-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.sa-bogota-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "sa-bogota-1"
-  region_key        = local.subscribed_regions_map["sa-bogota-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "sa-bogota-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_sa_santiago_1" {
-  count  = contains(local.final_regions_for_stacks, "sa-santiago-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.sa-santiago-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "sa-santiago-1"
-  region_key        = local.subscribed_regions_map["sa-santiago-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "sa-santiago-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_sa_saopaulo_1" {
-  count  = contains(local.final_regions_for_stacks, "sa-saopaulo-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.sa-saopaulo-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "sa-saopaulo-1"
-  region_key        = local.subscribed_regions_map["sa-saopaulo-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "sa-saopaulo-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_sa_valparaiso_1" {
-  count  = contains(local.final_regions_for_stacks, "sa-valparaiso-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.sa-valparaiso-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "sa-valparaiso-1"
-  region_key        = local.subscribed_regions_map["sa-valparaiso-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "sa-valparaiso-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_sa_vinhedo_1" {
-  count  = contains(local.final_regions_for_stacks, "sa-vinhedo-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.sa-vinhedo-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "sa-vinhedo-1"
-  region_key        = local.subscribed_regions_map["sa-vinhedo-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "sa-vinhedo-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_uk_cardiff_1" {
-  count  = contains(local.final_regions_for_stacks, "uk-cardiff-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.uk-cardiff-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "uk-cardiff-1"
-  region_key        = local.subscribed_regions_map["uk-cardiff-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "uk-cardiff-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_uk_london_1" {
-  count  = contains(local.final_regions_for_stacks, "uk-london-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.uk-london-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "uk-london-1"
-  region_key        = local.subscribed_regions_map["uk-london-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "uk-london-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_us_ashburn_1" {
-  count  = contains(local.final_regions_for_stacks, "us-ashburn-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.us-ashburn-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "us-ashburn-1"
-  region_key        = local.subscribed_regions_map["us-ashburn-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "us-ashburn-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_us_chicago_1" {
-  count  = contains(local.final_regions_for_stacks, "us-chicago-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.us-chicago-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "us-chicago-1"
-  region_key        = local.subscribed_regions_map["us-chicago-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "us-chicago-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_us_phoenix_1" {
-  count  = contains(local.final_regions_for_stacks, "us-phoenix-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.us-phoenix-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "us-phoenix-1"
-  region_key        = local.subscribed_regions_map["us-phoenix-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "us-phoenix-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
-}
-
-module "regional_deployment_us_sanjose_1" {
-  count  = contains(local.final_regions_for_stacks, "us-sanjose-1") ? 1 : 0
-  source = "./modules/regional-stacks"
-
-  providers = {
-    oci = oci.us-sanjose-1
-  }
-
-  tenancy_ocid      = var.tenancy_ocid
-  region            = "us-sanjose-1"
-  region_key        = local.subscribed_regions_map["us-sanjose-1"].region_key
-  compartment_ocid  = module.compartment.id
-  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "us-sanjose-1", "")
-  datadog_site      = var.datadog_site
-  api_key_secret_id = local.api_key_secret_id
-  home_region       = local.home_region_name
-  tags              = local.tags
-
-  depends_on = [
-    terraform_data.prechecks_complete,
-    module.compartment,
-    module.auth
-  ]
 }

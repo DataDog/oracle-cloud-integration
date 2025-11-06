@@ -44,6 +44,31 @@ resource "terraform_data" "validate_home_region_support" {
   }
 }
 
+# Check 3: Validate user and group consistency
+resource "terraform_data" "validate_user_group_consistency" {
+  lifecycle {
+    precondition {
+      condition = (
+        (var.existing_user_id == null || var.existing_user_id == "") && (var.existing_group_id == null || var.existing_group_id == "") ||
+        (var.existing_user_id != null && var.existing_user_id != "") && (var.existing_group_id != null && var.existing_group_id != "")
+      )
+      error_message = <<-EOF
+        ╔════════════════════════════════════════════════════════════════════════════╗
+        ║                   USER/GROUP CONFIGURATION ERROR                           ║
+        ╠════════════════════════════════════════════════════════════════════════════╣
+        ║ Both existing_user_id and existing_group_id must be provided together,    ║
+        ║ or both must be null/empty.                                               ║
+        ║                                                                            ║
+        ║                                                                            ║
+        ║ Either:                                                                   ║
+        ║   1. Leave both empty to create new user and group, OR                    ║
+        ║   2. Provide both to use existing user and group                          ║
+        ╚════════════════════════════════════════════════════════════════════════════╝
+      EOF
+    }
+  }
+}
+
 # Resource existence checks removed - Terraform and OCI will handle duplicate resource conflicts
 # with clear error messages. For pure Terraform workflows, these checks are redundant.
 
@@ -136,6 +161,7 @@ resource "terraform_data" "validate_enabled_regions" {
   }
 }
 
+
 # Data source to check if integration already exists in state
 data "external" "check_integration_exists" {
   program = ["bash", "-c", <<-EOT
@@ -182,6 +208,7 @@ resource "terraform_data" "prechecks_complete" {
   depends_on = [
     terraform_data.validate_home_region,
     terraform_data.validate_home_region_support,
+    terraform_data.validate_user_group_consistency,
     terraform_data.validate_vault_quota,
     terraform_data.validate_connector_hub_quota,
     terraform_data.validate_enabled_regions,

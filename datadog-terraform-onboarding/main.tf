@@ -169,33 +169,11 @@ resource "null_resource" "region_intersection_info" {
   }
 }
 
-resource "null_resource" "precheck_marker" {
-  depends_on = [null_resource.region_intersection_info]
-  
-  provisioner "local-exec" {
-    when       = create
-    on_failure = fail
-    command    = <<-EOT
-      python ${path.module}/pre_check.py \
-        --tenancy-id '${var.tenancy_ocid}' \
-        --is-home-region '${local.is_current_region_home_region}' \
-        --home-region '${local.home_region_name}' \
-        --supported-regions '${jsonencode(local.supported_regions_list)}' \
-        --user-id '${var.current_user_ocid}' \
-        --user-name '${local.user_name}' \
-        --user-group-name '${local.user_group_name}' \
-        --user-group-policy-name '${local.user_group_policy_name}' \
-        --dg-sch-name '${local.dg_sch_name}' \
-        --dg-fn-name '${local.dg_fn_name}' \
-        --dg-policy-name '${local.dg_policy_name}' \
-        --domain-display-name '${local.domain_display_name}' \
-        --idcs-endpoint '${local.idcs_endpoint}'
-    EOT
-  }
-}
+# Prechecks are now defined in prechecks.tf using native Terraform data sources
+# This replaces the old pre_check.py script that required OCI CLI
 
 module "compartment" {
-  depends_on            = [null_resource.precheck_marker]
+  depends_on            = [terraform_data.prechecks_complete]
   source                = "./modules/compartment"
   compartment_id        = var.compartment_id
   new_compartment_name  = local.new_compartment_name
@@ -204,16 +182,16 @@ module "compartment" {
 }
 
 module "kms" {
-  depends_on      = [null_resource.precheck_marker]
+  depends_on      = [terraform_data.prechecks_complete]
   source          = "./modules/kms"
-  count           = local.is_current_region_home_region ? 1 : 0
+  count           = (local.is_current_region_home_region && var.enable_vault) ? 1 : 0
   compartment_id  = module.compartment.id
   datadog_api_key = var.datadog_api_key
   tags            = local.tags
 }
 
 module "auth" {
-  depends_on        = [null_resource.precheck_marker]
+  depends_on        = [terraform_data.prechecks_complete]
   source            = "./modules/auth"
   count             = local.is_current_region_home_region ? 1 : 0
   user_name         = local.actual_user_name
@@ -241,11 +219,11 @@ module "key" {
   region           = var.region
   idcs_endpoint    = local.idcs_endpoint
   tags             = local.tags
-  depends_on       = [null_resource.precheck_marker, module.auth]
+  depends_on       = [terraform_data.prechecks_complete, module.auth]
 }
 
 module "integration" {
-  depends_on = [null_resource.precheck_marker, module.auth, module.key, module.kms,null_resource.regional_stacks_create_apply]
+  depends_on = [terraform_data.prechecks_complete, module.auth, module.key, module.kms]
   source     = "./modules/integration"
   providers = {
     restapi = restapi
@@ -260,7 +238,15 @@ module "integration" {
   user_ocid                       = module.auth[0].user_id
   subscribed_regions              = tolist(local.final_regions_for_stacks)
   datadog_resource_compartment_id = module.compartment.id
-  logs_enabled                     = var.logs_enabled
+  logs_enabled                    = var.logs_enabled
+  metrics_enabled                 = var.metrics_enabled
+  resources_enabled               = var.resources_enabled
+  cost_collection_enabled         = var.cost_collection_enabled
+  enabled_regions                 = var.enabled_regions
+  logs_enabled_services           = var.logs_enabled_services
+  logs_compartment_tag_filters    = var.logs_compartment_tag_filters
+  metrics_enabled_services        = var.metrics_enabled_services
+  metrics_compartment_tag_filters = var.metrics_compartment_tag_filters
 }
 
 
