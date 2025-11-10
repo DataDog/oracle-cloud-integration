@@ -161,6 +161,34 @@ resource "terraform_data" "validate_enabled_regions" {
   }
 }
 
+# Check 11: Validate enabled regions have corresponding subnets when subnets are specified
+resource "terraform_data" "validate_enabled_regions_have_subnets" {
+  count = length(var.enabled_regions) > 0 && length(local.subnet_ocids_list) > 0 ? 1 : 0
+  
+  lifecycle {
+    precondition {
+      condition = alltrue([
+        for region in var.enabled_regions : contains(tolist(local.subnet_regions), region)
+      ])
+      error_message = <<-EOF
+        ╔════════════════════════════════════════════════════════════════════════════╗
+        ║              ENABLED REGIONS MISSING SUBNETS ERROR                         ║
+        ╠════════════════════════════════════════════════════════════════════════════╣
+        ║ When you specify both 'enabled_regions' and 'subnet_ocids', every enabled ║
+        ║ region must have a corresponding subnet for infrastructure deployment.     ║
+        ║                                                                            ║
+        ║ Enabled regions: ${jsonencode(var.enabled_regions)}
+        ║                                                                            ║
+        ║ Regions with subnets: ${jsonencode(sort(tolist(local.subnet_regions)))}
+        ║                                                                            ║
+        ║ SOLUTION: Either add subnets for the missing regions, or remove those     ║
+        ║ regions from 'enabled_regions', or omit 'subnet_ocids' to auto-create.    ║
+        ╚════════════════════════════════════════════════════════════════════════════╝
+      EOF
+    }
+  }
+}
+
 
 # Data source to check if integration already exists in state
 data "external" "check_integration_exists" {
@@ -657,6 +685,7 @@ resource "terraform_data" "prechecks_complete" {
     terraform_data.validate_vault_quota,
     terraform_data.validate_connector_hub_quota,
     terraform_data.validate_enabled_regions,
+    terraform_data.validate_enabled_regions_have_subnets,
     terraform_data.validate_parent_compartment_immutability,
     terraform_data.validate_infrastructure_regions_removal,
     terraform_data.validate_compartment_immutability,

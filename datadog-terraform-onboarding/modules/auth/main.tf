@@ -5,6 +5,10 @@ terraform {
       source  = "oracle/oci"
       version = ">=7.1.0"
     }
+    time = {
+      source  = "hashicorp/time"
+      version = ">= 0.9.0"
+    }
   }
 }
 
@@ -138,6 +142,13 @@ resource "oci_identity_domains_user" "dd_auth" {
       }
     }
   }
+}
+
+# Wait for user to appear in Identity Domains list API
+resource "time_sleep" "wait_for_user_propagation" {
+  count           = var.existing_user_id == null || var.existing_user_id == "" ? 1 : 0
+  depends_on      = [oci_identity_domains_user.dd_auth]
+  create_duration = "30s"
 }
 
 resource "oci_identity_domains_group" "dd_auth" {
