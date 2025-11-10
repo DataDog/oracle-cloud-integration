@@ -56,13 +56,13 @@ resource "terraform_data" "validate_user_group_consistency" {
         ╔════════════════════════════════════════════════════════════════════════════╗
         ║                   USER/GROUP CONFIGURATION ERROR                           ║
         ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Both existing_user_id and existing_group_id must be provided together,    ║
-        ║ or both must be null/empty.                                               ║
+        ║ Both existing_user_id and existing_group_id must be provided together,     ║
+        ║ or both must be null/empty.                                                ║
         ║                                                                            ║
         ║                                                                            ║
-        ║ Either:                                                                   ║
-        ║   1. Leave both empty to create new user and group, OR                    ║
-        ║   2. Provide both to use existing user and group                          ║
+        ║ Either:                                                                    ║
+        ║   1. Leave both empty to create new user and group, OR                     ║
+        ║   2. Provide both to use existing user and group                           ║
         ╚════════════════════════════════════════════════════════════════════════════╝
       EOF
     }
@@ -146,15 +146,12 @@ resource "terraform_data" "validate_enabled_regions" {
         ╔════════════════════════════════════════════════════════════════════════════╗
         ║                         ENABLED REGIONS ERROR                              ║
         ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ One or more enabled regions are not in your subscribed regions list.      ║
+        ║ One or more enabled regions are not in your subscribed regions list.       ║
         ║                                                                            ║
-        ║ Enabled regions must be from your tenancy's subscribed regions.           ║
+        ║ Enabled regions must be from your tenancy's subscribed regions.            ║
         ║                                                                            ║
-        ║ Enabled regions: ${jsonencode(var.enabled_regions)}
         ║                                                                            ║
-        ║ Available subscribed regions: ${jsonencode(local.subscribed_regions_list)}
-        ║                                                                            ║
-        ║ Please update 'enabled_regions' to only include subscribed regions.       ║
+        ║ Please update 'enabled_regions' to only include subscribed regions.        ║
         ╚════════════════════════════════════════════════════════════════════════════╝
       EOF
     }
@@ -174,15 +171,12 @@ resource "terraform_data" "validate_enabled_regions_have_subnets" {
         ╔════════════════════════════════════════════════════════════════════════════╗
         ║              ENABLED REGIONS MISSING SUBNETS ERROR                         ║
         ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ When you specify both 'enabled_regions' and 'subnet_ocids', every enabled ║
+        ║ When you specify both 'enabled_regions' and 'subnet_ocids', every enabled  ║
         ║ region must have a corresponding subnet for infrastructure deployment.     ║
         ║                                                                            ║
-        ║ Enabled regions: ${jsonencode(var.enabled_regions)}
         ║                                                                            ║
-        ║ Regions with subnets: ${jsonencode(sort(tolist(local.subnet_regions)))}
-        ║                                                                            ║
-        ║ SOLUTION: Either add subnets for the missing regions, or remove those     ║
-        ║ regions from 'enabled_regions', or omit 'subnet_ocids' to auto-create.    ║
+        ║ SOLUTION: Either add subnets for the missing regions, or remove those      ║
+        ║ regions from 'enabled_regions', or omit 'subnet_ocids' to auto-create.     ║
         ╚════════════════════════════════════════════════════════════════════════════╝
       EOF
     }
@@ -419,25 +413,19 @@ resource "terraform_data" "validate_parent_compartment_immutability" {
         ╔════════════════════════════════════════════════════════════════════════════╗
         ║                 PARENT COMPARTMENT CHANGE ERROR                            ║
         ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Cannot change compartment_ocid after creating a compartment.              ║
+        ║ Cannot change compartment_ocid after creating a compartment.               ║
         ║                                                                            ║
-        ║ Current parent compartment: ${data.external.check_parent_compartment_change.result.current_parent}
         ║                                                                            ║
-        ║ New parent compartment:     ${data.external.check_parent_compartment_change.result.desired_parent}
+        ║ Changing the parent would cause Terraform to:                              ║
+        ║   • Not find the existing compartment (wrong parent)                       ║
+        ║   • Try to create a NEW compartment under the new parent                   ║
+        ║   • Destroy and recreate ALL resources                                     ║
         ║                                                                            ║
-        ║ You created a "Datadog" compartment under the original compartment_ocid.  ║
-        ║ Changing the parent would cause Terraform to:                             ║
-        ║   • Not find the existing compartment (wrong parent)                      ║
-        ║   • Try to create a NEW compartment under the new parent                  ║
-        ║   • Destroy and recreate ALL resources                                    ║
+        ║ To change the parent compartment:                                          ║
+        ║   1. Run: terraform destroy                                                ║
+        ║   2. Update compartment_ocid in terraform.tfvars                           ║
+        ║   3. Run: terraform apply                                                  ║
         ║                                                                            ║
-        ║ To change the parent compartment:                                         ║
-        ║   1. Run: terraform destroy                                               ║
-        ║   2. Update compartment_ocid in terraform.tfvars                          ║
-        ║   3. Run: terraform apply                                                 ║
-        ║   4. Wait 7+ days for vault deletion                                      ║
-        ║                                                                            ║
-        ║ Set compartment_ocid correctly BEFORE your first terraform apply!         ║
         ╚════════════════════════════════════════════════════════════════════════════╝
       EOF
     }
@@ -447,24 +435,19 @@ resource "terraform_data" "validate_parent_compartment_immutability" {
         ╔════════════════════════════════════════════════════════════════════════════╗
         ║                 COMPARTMENT_OCID CHANGE ERROR                              ║
         ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Cannot change compartment_ocid after initial deployment.                  ║
+        ║ Cannot change compartment_ocid after initial deployment.                   ║
         ║                                                                            ║
-        ║ Current compartment_ocid: ${data.external.check_parent_compartment_change.result.current_compartment_ocid}
         ║                                                                            ║
-        ║ New compartment_ocid:     ${data.external.check_parent_compartment_change.result.desired_parent}
+        ║ Changing compartment_ocid would cause Terraform to:                        ║
+        ║   • Deploy resources to a different compartment hierarchy                  ║
+        ║   • Potentially orphan existing resources                                  ║
+        ║   • Destroy and recreate ALL resources                                     ║
         ║                                                                            ║
-        ║ Changing compartment_ocid would cause Terraform to:                       ║
-        ║   • Deploy resources to a different compartment hierarchy                 ║
-        ║   • Potentially orphan existing resources                                 ║
-        ║   • Destroy and recreate ALL resources                                    ║
+        ║ To change compartment_ocid:                                                ║
+        ║   1. Run: terraform destroy                                                ║
+        ║   2. Update compartment_ocid in terraform.tfvars                           ║
+        ║   3. Run: terraform apply                                                  ║
         ║                                                                            ║
-        ║ To change compartment_ocid:                                               ║
-        ║   1. Run: terraform destroy                                               ║
-        ║   2. Update compartment_ocid in terraform.tfvars                          ║
-        ║   3. Run: terraform apply                                                 ║
-        ║   4. Wait 7+ days for vault deletion                                      ║
-        ║                                                                            ║
-        ║ Set compartment_ocid correctly BEFORE your first terraform apply!         ║
         ╚════════════════════════════════════════════════════════════════════════════╝
       EOF
     }
@@ -480,23 +463,21 @@ resource "terraform_data" "validate_infrastructure_regions_removal" {
         ╔════════════════════════════════════════════════════════════════════════════╗
         ║                 INFRASTRUCTURE REGIONS REMOVAL ERROR                       ║
         ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Cannot modify available regions after deployment.               ║
-        ║                                                                            ║
-        ║ Regions with deployed infrastructure: ${data.external.check_infrastructure_regions_removal.result.deployed_regions}
+        ║ Cannot modify available regions after deployment.                          ║
         ║                                                                            ║
         ║                                                                            ║
-        ║ These regions have active infrastructure (functions, connector hubs, VCNs)║
-        ║ Changing subnet_ocids to exclude them would destroy this infrastructure.  ║
         ║                                                                            ║
-        ║ You CAN:                                                                  ║
-        ║   ✅ Add new regions (add more subnet OCIDs)                              ║
-        ║   ✅ Keep all existing regions in subnet_ocids                            ║
+        ║ These regions have active infrastructure (functions, connector hubs, VCNs) ║
+        ║ Changing subnet_ocids to exclude them would destroy this infrastructure.   ║
+        ║                                                                            ║
+        ║ You CAN:                                                                   ║
+        ║   ✅ Add new regions (add more subnet OCIDs)                               ║
+        ║   ✅ Keep all existing regions in subnet_ocids                             ║
         ║                                                                            ║
         ║ To remove regional infrastructure:                                        ║
         ║   1. Run: terraform destroy                                               ║
         ║   2. Update subnet_ocids in terraform.tfvars                              ║
         ║   3. Run: terraform apply                                                 ║
-        ║   4. Wait 7+ days for vault deletion                                      ║
         ╚════════════════════════════════════════════════════════════════════════════╝
       EOF
     }
@@ -512,24 +493,22 @@ resource "terraform_data" "validate_compartment_immutability" {
         ╔════════════════════════════════════════════════════════════════════════════╗
         ║                    COMPARTMENT MODE CHANGE ERROR                           ║
         ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Cannot change compartment_id after initial deployment.                    ║
+        ║ Cannot change compartment_id after initial deployment.                     ║
         ║                                                                            ║
-        ║ You are trying to switch between:                                         ║
-        ║   • Creating a new compartment (compartment_id = null)                    ║
-        ║   • Using an existing compartment (compartment_id = "ocid1...")           ║
+        ║ You are trying to switch between:                                          ║
+        ║   • Creating a new compartment (compartment_id = null)                     ║
+        ║   • Using an existing compartment (compartment_id = "ocid1...")            ║
         ║                                                                            ║
-        ║ This would destroy and recreate ALL resources, including:                 ║
-        ║   • Vault (7+ day deletion period)                                        ║
-        ║   • Functions, VCNs, subnets, service connectors                          ║
-        ║   • Authentication resources                                              ║
+        ║ This would destroy and recreate ALL resources, including:                  ║
+        ║   • Vault (7+ day deletion period)                                         ║
+        ║   • Functions, VCNs, subnets, service connectors                           ║
+        ║   • Authentication resources                                               ║
         ║                                                                            ║
-        ║ To change compartments:                                                   ║
-        ║   1. Run: terraform destroy                                               ║
-        ║   2. Update compartment_id in terraform.tfvars                            ║
-        ║   3. Run: terraform apply                                                 ║
-        ║   4. Wait 7+ days for vault deletion                                      ║
+        ║ To change compartments:                                                    ║
+        ║   1. Run: terraform destroy                                                ║
+        ║   2. Update compartment_id in terraform.tfvars                             ║
+        ║   3. Run: terraform apply                                                  ║
         ║                                                                            ║
-        ║ Set compartment_id correctly BEFORE your first terraform apply!           ║
         ╚════════════════════════════════════════════════════════════════════════════╝
       EOF
     }
@@ -539,25 +518,20 @@ resource "terraform_data" "validate_compartment_immutability" {
         ╔════════════════════════════════════════════════════════════════════════════╗
         ║                    COMPARTMENT OCID CHANGE ERROR                           ║
         ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Cannot change the compartment_id OCID after initial deployment.          ║
+        ║ Cannot change the compartment_id OCID after initial deployment.            ║
         ║                                                                            ║
-        ║ Current compartment: ${data.external.check_compartment_mode.result.current_ocid}
         ║                                                                            ║
-        ║ New compartment:     ${var.compartment_id != null ? var.compartment_id : "null"}
+        ║ You are trying to switch from one existing compartment to another.         ║
+        ║ This would destroy and recreate ALL resources, including:                  ║
+        ║   • Vault (7+ day deletion period)                                         ║
+        ║   • Functions, VCNs, subnets, service connectors                           ║
+        ║   • Authentication resources                                               ║
         ║                                                                            ║
-        ║ You are trying to switch from one existing compartment to another.       ║
-        ║ This would destroy and recreate ALL resources, including:                 ║
-        ║   • Vault (7+ day deletion period)                                        ║
-        ║   • Functions, VCNs, subnets, service connectors                          ║
-        ║   • Authentication resources                                              ║
+        ║ To change to a different compartment:                                      ║
+        ║   1. Run: terraform destroy                                                ║
+        ║   2. Update compartment_id in terraform.tfvars                             ║
+        ║   3. Run: terraform apply                                                  ║
         ║                                                                            ║
-        ║ To change to a different compartment:                                     ║
-        ║   1. Run: terraform destroy                                               ║
-        ║   2. Update compartment_id in terraform.tfvars                            ║
-        ║   3. Run: terraform apply                                                 ║
-        ║   4. Wait 7+ days for vault deletion                                      ║
-        ║                                                                            ║
-        ║ Set compartment_id correctly BEFORE your first terraform apply!           ║
         ╚════════════════════════════════════════════════════════════════════════════╝
       EOF
     }
@@ -573,23 +547,19 @@ resource "terraform_data" "validate_user_group_immutability" {
         ╔════════════════════════════════════════════════════════════════════════════╗
         ║                   USER/GROUP MODE CHANGE ERROR                             ║
         ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Cannot change existing_user_id/existing_group_id after deployment.        ║
+        ║ Cannot change existing_user_id/existing_group_id after deployment.         ║
         ║                                                                            ║
-        ║ You are trying to switch between:                                         ║
-        ║   • Creating new user/group (existing_user_id = null)                     ║
-        ║   • Using existing user/group (existing_user_id = "ocid1...")             ║
         ║                                                                            ║
-        ║ This would destroy and recreate authentication resources, including:      ║
-        ║   • API keys (integration would break)                                    ║
-        ║   • User and group resources                                              ║
-        ║   • Policies and permissions                                              ║
+        ║ This would destroy and recreate authentication resources, including:       ║
+        ║   • API keys (integration would break)                                     ║
+        ║   • User and group resources                                               ║
+        ║   • Policies and permissions                                               ║
         ║                                                                            ║
-        ║ To change user/group:                                                     ║
-        ║   1. Run: terraform destroy                                               ║
-        ║   2. Update existing_user_id/existing_group_id in terraform.tfvars        ║
-        ║   3. Run: terraform apply                                                 ║
+        ║ To change user/group:                                                      ║
+        ║   1. Run: terraform destroy                                                ║
+        ║   2. Update existing_user_id/existing_group_id in terraform.tfvars         ║
+        ║   3. Run: terraform apply                                                  ║
         ║                                                                            ║
-        ║ Set these correctly BEFORE your first terraform apply!                    ║
         ╚════════════════════════════════════════════════════════════════════════════╝
       EOF
     }
@@ -599,23 +569,19 @@ resource "terraform_data" "validate_user_group_immutability" {
         ╔════════════════════════════════════════════════════════════════════════════╗
         ║                   EXISTING USER OCID CHANGE ERROR                          ║
         ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Cannot change existing_user_id OCID after initial deployment.            ║
+        ║ Cannot change existing_user_id OCID after initial deployment.              ║
         ║                                                                            ║
-        ║ Current user: ${data.external.check_user_group_mode.result.current_user_ocid}
         ║                                                                            ║
-        ║ New user:     ${var.existing_user_id != null ? var.existing_user_id : "null"}
+        ║ Changing the user would destroy and recreate:                              ║
+        ║   • API keys (integration would break immediately)                         ║
+        ║   • User authentication credentials                                        ║
+        ║   • All policies attached to this user                                     ║
         ║                                                                            ║
-        ║ Changing the user would destroy and recreate:                             ║
-        ║   • API keys (integration would break immediately)                        ║
-        ║   • User authentication credentials                                       ║
-        ║   • All policies attached to this user                                    ║
+        ║ To change to a different user:                                             ║
+        ║   1. Run: terraform destroy                                                ║
+        ║   2. Update existing_user_id in terraform.tfvars                           ║
+        ║   3. Run: terraform apply                                                  ║
         ║                                                                            ║
-        ║ To change to a different user:                                            ║
-        ║   1. Run: terraform destroy                                               ║
-        ║   2. Update existing_user_id in terraform.tfvars                          ║
-        ║   3. Run: terraform apply                                                 ║
-        ║                                                                            ║
-        ║ Set existing_user_id correctly BEFORE your first terraform apply!         ║
         ╚════════════════════════════════════════════════════════════════════════════╝
       EOF
     }
@@ -625,23 +591,19 @@ resource "terraform_data" "validate_user_group_immutability" {
         ╔════════════════════════════════════════════════════════════════════════════╗
         ║                   EXISTING GROUP OCID CHANGE ERROR                         ║
         ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Cannot change existing_group_id OCID after initial deployment.           ║
+        ║ Cannot change existing_group_id OCID after initial deployment.             ║
         ║                                                                            ║
-        ║ Current group: ${data.external.check_user_group_mode.result.current_group_ocid}
         ║                                                                            ║
-        ║ New group:     ${var.existing_group_id != null ? var.existing_group_id : "null"}
+        ║ Changing the group would destroy and recreate:                             ║
+        ║   • All policies attached to this group                                    ║
+        ║   • Group permissions and access controls                                  ║
+        ║   • Integration authorization                                              ║
         ║                                                                            ║
-        ║ Changing the group would destroy and recreate:                            ║
-        ║   • All policies attached to this group                                   ║
-        ║   • Group permissions and access controls                                 ║
-        ║   • Integration authorization                                             ║
+        ║ To change to a different group:                                            ║
+        ║   1. Run: terraform destroy                                                ║
+        ║   2. Update existing_group_id in terraform.tfvars                          ║
+        ║   3. Run: terraform apply                                                  ║
         ║                                                                            ║
-        ║ To change to a different group:                                           ║
-        ║   1. Run: terraform destroy                                               ║
-        ║   2. Update existing_group_id in terraform.tfvars                         ║
-        ║   3. Run: terraform apply                                                 ║
-        ║                                                                            ║
-        ║ Set existing_group_id correctly BEFORE your first terraform apply!        ║
         ╚════════════════════════════════════════════════════════════════════════════╝
       EOF
     }
@@ -659,16 +621,16 @@ resource "terraform_data" "validate_cost_collection_timing" {
         ╔════════════════════════════════════════════════════════════════════════════╗
         ║                    COST COLLECTION TIMING ERROR                            ║
         ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Cost collection cannot be enabled during initial integration creation.    ║
+        ║ Cost collection cannot be enabled during initial integration creation.     ║
         ║                                                                            ║
-        ║ This is a known limitation - cost collection must be enabled after the    ║
-        ║ integration is created.                                                   ║
+        ║ This is a known limitation - cost collection must be enabled after the     ║
+        ║ integration is created. Only available for parent tenancies                ║
         ║                                                                            ║
-        ║ To proceed:                                                               ║
-        ║   1. Set cost_collection_enabled = false                                  ║
-        ║   2. Run terraform apply to create the integration                        ║
-        ║   3. Set cost_collection_enabled = true                                   ║
-        ║   4. Run terraform apply again to enable cost collection                  ║
+        ║ To proceed:                                                                ║
+        ║   1. Set cost_collection_enabled = false                                   ║
+        ║   2. Run terraform apply to create the integration                         ║
+        ║   3. Set cost_collection_enabled = true                                    ║
+        ║   4. Run terraform apply again to enable cost collection                   ║
         ╚════════════════════════════════════════════════════════════════════════════╝
       EOF
     }

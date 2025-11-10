@@ -2,7 +2,6 @@
 #         TF auth Requirements
 #*************************************
 
-# PARENT COMPARTMENT: Where Terraform executes and has permissions to create resources.
 # This is typically your tenancy root compartment.
 # Used as: The parent compartment for creating the Datadog child compartment.
 variable "compartment_ocid" {
@@ -13,7 +12,6 @@ variable "compartment_ocid" {
 # DEPLOYMENT COMPARTMENT: Where Datadog resources (vault, functions, VCNs) will be deployed.
 # If null, a new compartment named 'Datadog' will be created under compartment_ocid.
 # If set, uses that existing compartment for all Datadog resources.
-# ⚠️  WARNING: This value is IMMUTABLE after initial deployment! (See prechecks)
 variable "compartment_id" {
   type        = string
   description = "OCID of the compartment to create or use for Datadog resources. If null, a compartment named 'Datadog' will be created in the tenancy."

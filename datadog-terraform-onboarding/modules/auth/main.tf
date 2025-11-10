@@ -144,10 +144,6 @@ resource "oci_identity_domains_user" "dd_auth" {
   }
 }
 
-# Note: Previously had a 30s delay here for list API propagation
-# Now removed since key module uses direct lookup (oci_identity_domains_user)
-# which doesn't suffer from list endpoint eventual consistency issues
-
 resource "oci_identity_domains_group" "dd_auth" {
   depends_on    = [null_resource.user_group_variable_validation]
   count         = var.existing_group_id == null || var.existing_group_id == "" ? 1 : 0
