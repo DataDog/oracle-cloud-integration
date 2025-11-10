@@ -1,6 +1,5 @@
 output "user_id" {
   value = (var.existing_user_id != null && var.existing_user_id != "") ? var.existing_user_id : oci_identity_domains_user.dd_auth[0].ocid
-  depends_on = [time_sleep.wait_for_user_propagation]
 }
 
 output "group_id" {

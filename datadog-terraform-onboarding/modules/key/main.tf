@@ -9,10 +9,6 @@ terraform {
       source  = "hashicorp/tls"
       version = "~> 4.0"
     }
-    time = {
-      source  = "hashicorp/time"
-      version = "~> 0.9"
-    }
   }
 }
 
@@ -34,17 +30,16 @@ resource "terraform_data" "key_rotation_trigger" {
 }
 
 # Data source to get user's IDCS ID from their OCID
-# Note: Identity Domains data sources retrieve all users, we filter in Terraform
-data "oci_identity_domains_users" "user_lookup" {
+# Use the singular data source to look up user directly by OCID
+# This avoids eventual consistency issues with the list endpoint
+data "oci_identity_domains_user" "user_lookup" {
   idcs_endpoint = var.idcs_endpoint
+  user_id       = var.existing_user_id
 }
 
-# Local to find the specific user by OCID
+# Extract the IDCS ID from the user
 locals {
-  user_idcs_id = [
-    for user in data.oci_identity_domains_users.user_lookup.users :
-    user.id if try(user.ocid, "") == var.existing_user_id
-  ][0]
+  user_idcs_id = data.oci_identity_domains_user.user_lookup.id
 }
 
 # Create API key for the user using native Terraform resource
