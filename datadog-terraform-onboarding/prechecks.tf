@@ -69,9 +69,6 @@ resource "terraform_data" "validate_user_group_consistency" {
   }
 }
 
-# Resource existence checks removed - Terraform and OCI will handle duplicate resource conflicts
-# with clear error messages. For pure Terraform workflows, these checks are redundant.
-
 # Data source: Check vault quota availability
 data "oci_limits_resource_availability" "vault_quota" {
   count              = local.is_current_region_home_region ? 1 : 0
