@@ -10,7 +10,7 @@ terraform {
     }
     http = {
       source  = "hashicorp/http"
-      version = "3.5.0"
+      version = ">= 3.5.0"
     }
   }
 }
@@ -37,7 +37,7 @@ resource "oci_functions_function" "metrics_function" {
 module "vcn" {
   count                    = var.subnet_ocid == "" ? 1 : 0
   source                   = "oracle-terraform-modules/vcn/oci"
-  version                  = "3.6.0"
+  version                  = ">= 3.6.0"
   compartment_id           = var.compartment_ocid
   freeform_tags            = var.tags
   vcn_cidrs                = ["10.0.0.0/16"]
