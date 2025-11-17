@@ -3,28 +3,7 @@
 #  (Native Terraform replacement for pre_check.py)
 #*************************************
 
-# Check 1: Validate we're deploying in home region
-resource "terraform_data" "validate_home_region" {
-  lifecycle {
-    precondition {
-      condition     = local.is_current_region_home_region
-      error_message = <<-EOF
-        ╔════════════════════════════════════════════════════════════════════════════╗
-        ║                       HOME REGION MISMATCH ERROR                           ║
-        ╚════════════════════════════════════════════════════════════════════════════╝
-        
-        This stack must be deployed in the tenancy's home region.
-        
-        Current region: ${var.region}
-        Home region: ${local.home_region_name}
-        
-        Please update your region variable to match the home region.
-      EOF
-    }
-  }
-}
-
-# Check 2: Validate home region is supported by Datadog
+# Check 1: Validate home region is supported by Datadog
 resource "terraform_data" "validate_home_region_support" {
   lifecycle {
     precondition {
@@ -69,9 +48,58 @@ resource "terraform_data" "validate_user_group_consistency" {
   }
 }
 
+# Check 4: Validate domain_id and user_email consistency
+resource "terraform_data" "validate_domain_email_consistency" {
+  lifecycle {
+    precondition {
+      condition = (
+        (var.domain_id == null || var.domain_id == "") && (var.user_email == null || var.user_email == "") ||
+        (var.domain_id != null && var.domain_id != "") && (var.user_email != null && var.user_email != "")
+      )
+      error_message = <<-EOF
+        ╔════════════════════════════════════════════════════════════════════════════╗
+        ║                   DOMAIN/EMAIL CONFIGURATION ERROR                         ║
+        ╠════════════════════════════════════════════════════════════════════════════╣
+        ║ Both domain_id and user_email must be provided together,                  ║
+        ║ or both must be null/empty.                                                ║
+        ║                                                                            ║
+        ║ Either:                                                                    ║
+        ║   1. Leave both empty (default behavior), OR                               ║
+        ║   2. Provide both domain_id and user_email together                        ║
+        ╚════════════════════════════════════════════════════════════════════════════╝
+      EOF
+    }
+  }
+}
+
+# Check 5: Validate existing user/group cannot be used with domain_id/user_email
+resource "terraform_data" "validate_existing_vs_new_user" {
+  lifecycle {
+    precondition {
+      condition = !(
+        (var.existing_user_id != null && var.existing_user_id != "" || var.existing_group_id != null && var.existing_group_id != "") &&
+        (var.domain_id != null && var.domain_id != "" || var.user_email != null && var.user_email != "")
+      )
+      error_message = <<-EOF
+        ╔════════════════════════════════════════════════════════════════════════════╗
+        ║                   CONFLICTING USER CONFIGURATION ERROR                     ║
+        ╠════════════════════════════════════════════════════════════════════════════╣
+        ║ Cannot specify both existing user/group AND domain_id/user_email.         ║
+        ║                                                                            ║
+        ║ You are using existing_user_id or existing_group_id, which means you are  ║
+        ║ using pre-existing IAM resources.                                          ║
+        ║                                                                            ║
+        ║ The domain_id and user_email variables are only for creating NEW users.   ║
+        ║                                                                            ║
+        ║ Please remove domain_id and user_email from your configuration.           ║
+        ╚════════════════════════════════════════════════════════════════════════════╝
+      EOF
+    }
+  }
+}
+
 # Data source: Check vault quota availability
 data "oci_limits_resource_availability" "vault_quota" {
-  count              = local.is_current_region_home_region ? 1 : 0
   compartment_id     = var.tenancy_ocid
   limit_name         = "virtual-vault-count"
   service_name       = "kms"
@@ -80,11 +108,9 @@ data "oci_limits_resource_availability" "vault_quota" {
 
 # Check 9: Validate vault quota is available
 resource "terraform_data" "validate_vault_quota" {
-  count = local.is_current_region_home_region ? 1 : 0
-  
   lifecycle {
     precondition {
-      condition     = try(data.oci_limits_resource_availability.vault_quota[0].available, 0) >= 1
+      condition     = try(data.oci_limits_resource_availability.vault_quota.available, 0) >= 1
       error_message = <<-EOF
         ╔════════════════════════════════════════════════════════════════════════════╗
         ║                         VAULT QUOTA EXHAUSTED ERROR                        ║
@@ -92,7 +118,7 @@ resource "terraform_data" "validate_vault_quota" {
         
         No vaults can be created in ${local.home_region_name}: vault quota exhausted.
         
-        Available: ${try(data.oci_limits_resource_availability.vault_quota[0].available, 0)}
+        Available: ${try(data.oci_limits_resource_availability.vault_quota.available, 0)}
         Required: 1
         
         Please increase your vault quota or delete existing vaults.
@@ -119,7 +145,7 @@ resource "terraform_data" "validate_connector_hub_quota" {
         ║                   SERVICE CONNECTOR QUOTA EXHAUSTED ERROR                  ║
         ╚════════════════════════════════════════════════════════════════════════════╝
         
-        Insufficient connector hub quota in ${var.region}.
+        Insufficient connector hub quota in your tenancy.
         
         Available: ${try(data.oci_limits_resource_availability.connector_hub_quota.available, 0)}
         Required: 1
@@ -130,62 +156,10 @@ resource "terraform_data" "validate_connector_hub_quota" {
   }
 }
 
-# Check 10: Validate enabled regions are subscribed
-resource "terraform_data" "validate_enabled_regions" {
-  count = length(var.enabled_regions) > 0 ? 1 : 0
-  
-  lifecycle {
-    precondition {
-      condition = alltrue([
-        for region in var.enabled_regions : contains(local.subscribed_regions_list, region)
-      ])
-      error_message = <<-EOF
-        ╔════════════════════════════════════════════════════════════════════════════╗
-        ║                         ENABLED REGIONS ERROR                              ║
-        ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ One or more enabled regions are not in your subscribed regions list.       ║
-        ║                                                                            ║
-        ║ Enabled regions must be from your tenancy's subscribed regions.            ║
-        ║                                                                            ║
-        ║                                                                            ║
-        ║ Please update 'enabled_regions' to only include subscribed regions.        ║
-        ╚════════════════════════════════════════════════════════════════════════════╝
-      EOF
-    }
-  }
-}
-
-# Check 11: Validate enabled regions have corresponding subnets when subnets are specified
-resource "terraform_data" "validate_enabled_regions_have_subnets" {
-  count = length(var.enabled_regions) > 0 && length(local.subnet_ocids_list) > 0 ? 1 : 0
-  
-  lifecycle {
-    precondition {
-      condition = alltrue([
-        for region in var.enabled_regions : contains(tolist(local.subnet_regions), region)
-      ])
-      error_message = <<-EOF
-        ╔════════════════════════════════════════════════════════════════════════════╗
-        ║              ENABLED REGIONS MISSING SUBNETS ERROR                         ║
-        ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ When you specify both 'enabled_regions' and 'subnet_ocids', every enabled  ║
-        ║ region must have a corresponding subnet for infrastructure deployment.     ║
-        ║                                                                            ║
-        ║                                                                            ║
-        ║ SOLUTION: Either add subnets for the missing regions, or remove those      ║
-        ║ regions from 'enabled_regions', or omit 'subnet_ocids' to auto-create.     ║
-        ╚════════════════════════════════════════════════════════════════════════════╝
-      EOF
-    }
-  }
-}
-
-
-# Data source to check if integration already exists in state
 data "external" "check_integration_exists" {
   program = ["bash", "-c", <<-EOT
     # Check if integration resource exists in terraform state
-    if terraform state list 2>/dev/null | grep -q "module.integration\[0\].restapi_object.datadog_tenancy_integration"; then
+    if terraform state list 2>/dev/null | grep -q "module.integration.restapi_object.datadog_tenancy_integration"; then
       echo '{"exists": "true"}'
     else
       echo '{"exists": "false"}'
@@ -202,12 +176,12 @@ data "external" "check_compartment_mode" {
     USING_EXISTING_COMPARTMENT="false"
     CURRENT_COMPARTMENT_OCID=""
     
-    # Check if we previously CREATED a compartment (var.compartment_id was null)
+    # Check if we previously CREATED a compartment (var.resource_compartment_ocid was null)
     if terraform state list 2>/dev/null | grep -q "module.compartment.oci_identity_compartment.new\[0\]"; then
       CREATED_COMPARTMENT_EXISTS="true"
     fi
     
-    # Check if we previously USED an existing compartment (var.compartment_id was set)
+    # Check if we previously USED an existing compartment (var.resource_compartment_ocid was set)
     if terraform state list 2>/dev/null | grep -q "module.compartment.data.oci_identity_compartment.existing\[0\]"; then
       USING_EXISTING_COMPARTMENT="true"
       # Get the current compartment OCID from state
@@ -219,19 +193,19 @@ data "external" "check_compartment_mode" {
     MODE_CHANGING="false"
     OCID_CHANGING="false"
     
-    if [ "$CREATED_COMPARTMENT_EXISTS" = "true" ] && [ "${var.compartment_id != null ? "true" : "false"}" = "true" ]; then
+    if [ "$CREATED_COMPARTMENT_EXISTS" = "true" ] && [ "${var.resource_compartment_ocid != null ? "true" : "false"}" = "true" ]; then
       # Was creating, now wants to use existing
       MODE_CHANGING="true"
     fi
     
-    if [ "$USING_EXISTING_COMPARTMENT" = "true" ] && [ "${var.compartment_id != null ? "true" : "false"}" = "false" ]; then
+    if [ "$USING_EXISTING_COMPARTMENT" = "true" ] && [ "${var.resource_compartment_ocid != null ? "true" : "false"}" = "false" ]; then
       # Was using existing, now wants to create new
       MODE_CHANGING="true"
     fi
     
     # Check if the compartment OCID itself is changing (when using existing compartment)
     if [ "$USING_EXISTING_COMPARTMENT" = "true" ] && [ -n "$CURRENT_COMPARTMENT_OCID" ]; then
-      DESIRED_COMPARTMENT_OCID="${var.compartment_id != null ? var.compartment_id : ""}"
+      DESIRED_COMPARTMENT_OCID="${var.resource_compartment_ocid != null ? var.resource_compartment_ocid : ""}"
       if [ -n "$DESIRED_COMPARTMENT_OCID" ] && [ "$CURRENT_COMPARTMENT_OCID" != "$DESIRED_COMPARTMENT_OCID" ]; then
         OCID_CHANGING="true"
       fi
@@ -361,46 +335,6 @@ data "external" "check_parent_compartment_change" {
   ]
 }
 
-# Data source to check if infrastructure regions are being removed
-data "external" "check_infrastructure_regions_removal" {
-  program = ["bash", "-c", <<-EOT
-    # Get list of regions with deployed infrastructure
-    DEPLOYED_REGIONS=$(terraform state list 2>/dev/null | grep "module.regional_deployment_" | sed 's/module.regional_deployment_//' | sed 's/\[0\].*//' | tr '_' '-' | sort -u | tr '\n' ',' | sed 's/,$//')
-    
-    # Check if subnet_ocids is being used to control regions
-    SUBNET_OCIDS_USED="${var.subnet_ocids != "" ? "true" : "false"}"
-    
-    # Get regions from current subnet OCIDs
-    CURRENT_SUBNET_REGIONS="${join(",", [for s in split("\n", var.subnet_ocids) : length(split(".", trimspace(s))) >= 4 ? replace(split(".", trimspace(s))[3], "_", "-") : "" if trimspace(s) != ""])}"
-    
-    # Check if any deployed region would lose its infrastructure
-    REGIONS_REMOVED="false"
-    REMOVED_REGIONS=""
-    
-    if [ "$SUBNET_OCIDS_USED" = "true" ] && [ -n "$DEPLOYED_REGIONS" ]; then
-      # Convert to arrays
-      IFS=',' read -ra DEPLOYED <<< "$DEPLOYED_REGIONS"
-      
-      for region in "$${DEPLOYED[@]}"; do
-        [ -z "$region" ] && continue
-        
-        # Check if this deployed region is still in current subnet regions
-        if ! echo ",$CURRENT_SUBNET_REGIONS," | grep -q ",$region,"; then
-          REGIONS_REMOVED="true"
-          if [ -z "$REMOVED_REGIONS" ]; then
-            REMOVED_REGIONS="$region"
-          else
-            REMOVED_REGIONS="$REMOVED_REGIONS,$region"
-          fi
-        fi
-      done
-    fi
-    
-    echo "{\"deployed_regions\": \"$DEPLOYED_REGIONS\", \"subnet_regions\": \"$CURRENT_SUBNET_REGIONS\", \"regions_removed\": \"$REGIONS_REMOVED\", \"removed_regions\": \"$REMOVED_REGIONS\"}"
-  EOT
-  ]
-}
-
 # Check 11: Prevent parent compartment changes
 resource "terraform_data" "validate_parent_compartment_immutability" {
   lifecycle {
@@ -451,37 +385,7 @@ resource "terraform_data" "validate_parent_compartment_immutability" {
   }
 }
 
-# Check 12: Prevent removing infrastructure from deployed regions
-resource "terraform_data" "validate_infrastructure_regions_removal" {
-  lifecycle {
-    precondition {
-      condition     = data.external.check_infrastructure_regions_removal.result.regions_removed != "true"
-      error_message = <<-EOF
-        ╔════════════════════════════════════════════════════════════════════════════╗
-        ║                 INFRASTRUCTURE REGIONS REMOVAL ERROR                       ║
-        ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Cannot modify available regions after deployment.                          ║
-        ║                                                                            ║
-        ║                                                                            ║
-        ║                                                                            ║
-        ║ These regions have active infrastructure (functions, connector hubs, VCNs) ║
-        ║ Changing subnet_ocids to exclude them would destroy this infrastructure.   ║
-        ║                                                                            ║
-        ║ You CAN:                                                                   ║
-        ║   ✅ Add new regions (add more subnet OCIDs)                               ║
-        ║   ✅ Keep all existing regions in subnet_ocids                             ║
-        ║                                                                            ║
-        ║ To remove regional infrastructure:                                        ║
-        ║   1. Run: terraform destroy                                               ║
-        ║   2. Update subnet_ocids in terraform.tfvars                              ║
-        ║   3. Run: terraform apply                                                 ║
-        ╚════════════════════════════════════════════════════════════════════════════╝
-      EOF
-    }
-  }
-}
-
-# Check 13: Prevent compartment mode changes
+# Check 12: Prevent compartment mode changes
 resource "terraform_data" "validate_compartment_immutability" {
   lifecycle {
     precondition {
@@ -490,11 +394,11 @@ resource "terraform_data" "validate_compartment_immutability" {
         ╔════════════════════════════════════════════════════════════════════════════╗
         ║                    COMPARTMENT MODE CHANGE ERROR                           ║
         ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Cannot change compartment_id after initial deployment.                     ║
+        ║ Cannot change resource_compartment_ocid after initial deployment.          ║
         ║                                                                            ║
         ║ You are trying to switch between:                                          ║
-        ║   • Creating a new compartment (compartment_id = null)                     ║
-        ║   • Using an existing compartment (compartment_id = "ocid1...")            ║
+        ║   • Creating a new compartment (resource_compartment_ocid = null)          ║
+        ║   • Using an existing compartment (resource_compartment_ocid = "ocid1...")  ║
         ║                                                                            ║
         ║ This would destroy and recreate ALL resources, including:                  ║
         ║   • Vault (7+ day deletion period)                                         ║
@@ -503,7 +407,7 @@ resource "terraform_data" "validate_compartment_immutability" {
         ║                                                                            ║
         ║ To change compartments:                                                    ║
         ║   1. Run: terraform destroy                                                ║
-        ║   2. Update compartment_id in terraform.tfvars                             ║
+        ║   2. Update resource_compartment_ocid in terraform.tfvars                  ║
         ║   3. Run: terraform apply                                                  ║
         ║                                                                            ║
         ╚════════════════════════════════════════════════════════════════════════════╝
@@ -515,7 +419,7 @@ resource "terraform_data" "validate_compartment_immutability" {
         ╔════════════════════════════════════════════════════════════════════════════╗
         ║                    COMPARTMENT OCID CHANGE ERROR                           ║
         ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Cannot change the compartment_id OCID after initial deployment.            ║
+        ║ Cannot change the resource_compartment_ocid OCID after initial deployment. ║
         ║                                                                            ║
         ║                                                                            ║
         ║ You are trying to switch from one existing compartment to another.         ║
@@ -526,7 +430,7 @@ resource "terraform_data" "validate_compartment_immutability" {
         ║                                                                            ║
         ║ To change to a different compartment:                                      ║
         ║   1. Run: terraform destroy                                                ║
-        ║   2. Update compartment_id in terraform.tfvars                             ║
+        ║   2. Update resource_compartment_ocid in terraform.tfvars                  ║
         ║   3. Run: terraform apply                                                  ║
         ║                                                                            ║
         ╚════════════════════════════════════════════════════════════════════════════╝
@@ -535,7 +439,7 @@ resource "terraform_data" "validate_compartment_immutability" {
   }
 }
 
-# Check 14: Prevent user/group mode changes
+# Check 13: Prevent user/group mode changes
 resource "terraform_data" "validate_user_group_immutability" {
   lifecycle {
     precondition {
@@ -607,49 +511,19 @@ resource "terraform_data" "validate_user_group_immutability" {
   }
 }
 
-# Check 13: Prevent cost collection at initial creation
-resource "terraform_data" "validate_cost_collection_timing" {
-  count = var.cost_collection_enabled ? 1 : 0
-  
-  lifecycle {
-    precondition {
-      condition     = data.external.check_integration_exists.result.exists == "true"
-      error_message = <<-EOF
-        ╔════════════════════════════════════════════════════════════════════════════╗
-        ║                    COST COLLECTION TIMING ERROR                            ║
-        ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Cost collection cannot be enabled during initial integration creation.     ║
-        ║                                                                            ║
-        ║ This is a known limitation - cost collection must be enabled after the     ║
-        ║ integration is created. Only available for parent tenancies                ║
-        ║                                                                            ║
-        ║ To proceed:                                                                ║
-        ║   1. Set cost_collection_enabled = false                                   ║
-        ║   2. Run terraform apply to create the integration                         ║
-        ║   3. Set cost_collection_enabled = true                                    ║
-        ║   4. Run terraform apply again to enable cost collection                   ║
-        ╚════════════════════════════════════════════════════════════════════════════╝
-      EOF
-    }
-  }
-}
-
 # Marker resource to indicate all prechecks have passed
 # Other resources can depend on this instead of null_resource.precheck_marker
 resource "terraform_data" "prechecks_complete" {
   depends_on = [
-    terraform_data.validate_home_region,
     terraform_data.validate_home_region_support,
     terraform_data.validate_user_group_consistency,
+    terraform_data.validate_domain_email_consistency,
+    terraform_data.validate_existing_vs_new_user,
     terraform_data.validate_vault_quota,
     terraform_data.validate_connector_hub_quota,
-    terraform_data.validate_enabled_regions,
-    terraform_data.validate_enabled_regions_have_subnets,
     terraform_data.validate_parent_compartment_immutability,
-    terraform_data.validate_infrastructure_regions_removal,
     terraform_data.validate_compartment_immutability,
     terraform_data.validate_user_group_immutability,
-    terraform_data.validate_cost_collection_timing,
   ]
 }
 

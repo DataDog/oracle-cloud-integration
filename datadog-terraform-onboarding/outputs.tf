@@ -50,16 +50,16 @@ output "compartment_id" {
 }
 
 output "api_key_secret_id" {
-  description = "OCID of the API key secret in KMS (only in home region)"
-  value       = local.is_current_region_home_region && length(module.kms) > 0 ? module.kms[0].api_key_secret_id : null
+  description = "OCID of the API key secret in KMS"
+  value       = length(module.kms) > 0 ? module.kms[0].api_key_secret_id : null
 }
 
 output "datadog_user_ocid" {
-  description = "OCID of the Datadog IAM user (only in home region)"
-  value       = local.is_current_region_home_region && length(module.auth) > 0 ? module.auth[0].user_id : null
+  description = "OCID of the Datadog IAM user"
+  value       = module.auth.user_id
 }
 
 output "datadog_integration_status" {
-  description = "Status of Datadog integration registration (only in home region)"
-  value       = local.is_current_region_home_region && length(module.integration) > 0 ? module.integration[0].api_output : null
+  description = "Status of Datadog integration registration"
+  value       = module.integration.api_output
 }

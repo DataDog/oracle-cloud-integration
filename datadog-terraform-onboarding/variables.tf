@@ -12,15 +12,10 @@ variable "compartment_ocid" {
 # DEPLOYMENT COMPARTMENT: Where Datadog resources (vault, functions, VCNs) will be deployed.
 # If null, a new compartment named 'Datadog' will be created under compartment_ocid.
 # If set, uses that existing compartment for all Datadog resources.
-variable "compartment_id" {
+variable "resource_compartment_ocid" {
   type        = string
   description = "OCID of the compartment to create or use for Datadog resources. If null, a compartment named 'Datadog' will be created in the tenancy."
   default     = null
-}
-
-variable "region" {
-  type        = string
-  description = "OCI Region as documented at https://docs.cloud.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm"
 }
 
 variable "tenancy_ocid" {
@@ -86,109 +81,6 @@ variable "logs_enabled" {
   type        = bool
   description = "Indicates if logs should be enabled/disabled"
   default     = true
-}
-
-variable "metrics_enabled" {
-  type        = bool
-  description = "Indicates if metrics collection should be enabled/disabled"
-  default     = true
-}
-
-variable "resources_enabled" {
-  type        = bool
-  description = "Indicates if resource collection should be enabled/disabled"
-  default     = true
-}
-
-variable "cost_collection_enabled" {
-  type        = bool
-  description = "Indicates if cost collection should be enabled/disabled"
-  default     = false
-}
-
-variable "enabled_regions" {
-  type        = list(string)
-  description = "List of OCI regions to enable for monitoring. If empty, all subscribed regions will be enabled by default. Example: [\"us-ashburn-1\", \"eu-frankfurt-1\"]"
-  default     = []
-}
-
-variable "logs_enabled_services" {
-  type        = list(string)
-  description = "List of OCI log services to enable. If empty, Datadog's defaults will be used."
-  default     = []
-  
-  validation {
-    condition = alltrue([
-      for service in var.logs_enabled_services : contains([
-        "audit", "adm", "adbd", "dataintegration", "functions", "integration",
-        "ocinetworkfirewall", "objectstorage", "operatoraccessprod", "postgresql",
-        "cloud_guard_raw_logs_prod", "contentdeliverynetwork", "mediaflow", "goldengate",
-        "oacnativeproduction", "oke-k8s-cp-prod", "dataflow", "cloudevents", "filestorage",
-        "oci-cache", "oci_c3_vpn", "adi", "och", "emaildelivery", "flowlogs", "workengine",
-        "cloud_guard_query_results_prod", "loadbalancer", "devops", "keymanagementservice",
-        "waa", "apigateway", "apm", "datascience", "delegateaccessprod", "waf"
-      ], service)
-    ])
-    error_message = "Invalid log service specified. Please use only services from the allowed list."
-  }
-}
-
-variable "logs_compartment_tag_filters" {
-  type        = list(string)
-  description = "List of compartment tag filters for log collection in Datadog tag format (key:value). Only logs from compartments with these tags will be collected. Maximum 100 tags. Example: [\"env:prod\", \"team:platform\"]"
-  default     = []
-  
-  validation {
-    condition = alltrue([
-      for tag in var.logs_compartment_tag_filters : can(regex("^!?[^:,]+(:[^:,]+)?(,!?[^:,]+(:[^:,]+)?)*$", tag))
-    ])
-    error_message = "Tags must be in Datadog format: 'key' or 'key:value', comma-separated, with optional '!' negation (e.g., 'env:prod', '!env:staging,!testing')."
-  }
-  
-  validation {
-    condition     = length(var.logs_compartment_tag_filters) <= 100
-    error_message = "Maximum of 100 compartment tag filters allowed."
-  }
-}
-
-variable "metrics_enabled_services" {
-  type        = list(string)
-  description = "List of OCI metric namespaces to enable. If empty, Datadog's defaults will be used."
-  default     = []
-  
-  validation {
-    condition = alltrue([
-      for service in var.metrics_enabled_services : contains([
-        "oci_compute", "oci_block_storage", "oci_file_storage", "oci_object_storage",
-        "oci_autonomous_database", "oci_database", "oci_mysql_database", "oci_postgresql",
-        "oci_load_balancer", "oci_network_firewall", "oci_nat_gateway", "oci_internet_gateway",
-        "oci_service_gateway", "oci_dynamic_routing_gateway", "oci_vcn", "oci_vpn", "oci_fastconnect",
-        "oci_functions", "oci_api_gateway", "oci_service_connector_hub", "oci_integration",
-        "oci_oke", "oci_container_instances", "oci_instancepools", "oci_cloudevents",
-        "oci_servicemesh", "oci_visual_builder", "oci_goldengate", "oci_mediastreams",
-        "oci_waf", "oci_queue", "oci_ebs", "oracle_appmgmt"
-      ], service)
-    ])
-    error_message = "Invalid metric namespace specified. Please use only namespaces from the allowed list."
-  }
-}
-
-variable "metrics_compartment_tag_filters" {
-  type        = list(string)
-  description = "List of compartment tag filters for metric collection in Datadog tag format (key:value). Only metrics from compartments with these tags will be collected. Maximum 100 tags. Example: [\"env:prod\", \"team:platform\"]"
-  default     = []
-  
-  validation {
-    condition = alltrue([
-      for tag in var.metrics_compartment_tag_filters : can(regex("^!?[^:,]+(:[^:,]+)?(,!?[^:,]+(:[^:,]+)?)*$", tag))
-    ])
-    error_message = "Tags must be in Datadog format: 'key' or 'key:value', comma-separated, with optional '!' negation (e.g., 'env:prod', '!env:staging,!testing')."
-  }
-  
-  validation {
-    condition     = length(var.metrics_compartment_tag_filters) <= 100
-    error_message = "Maximum of 100 compartment tag filters allowed."
-  }
 }
 
 variable "domain_id" {

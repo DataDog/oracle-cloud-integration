@@ -33,7 +33,18 @@ provider "restapi" {
 }
 
 #*************************************
-#   OCI Provider Aliases (Multi-Region)
+#   OCI Provider Aliases
+#*************************************
+# Home region provider: Used for resources that must be in home region (KMS vault)
+# The region is auto-discovered from OCI API to ensure correctness regardless of
+# user's ~/.oci/config settings.
+provider "oci" {
+  alias  = "home_region"
+  region = local.home_region_name
+}
+
+#*************************************
+#   Multi-Region Provider Aliases
 #*************************************
 # These provider aliases enable multi-region deployment in a single Terraform stack.
 # Only regions that are subscribed will actually be deployed (count = 0 for others).

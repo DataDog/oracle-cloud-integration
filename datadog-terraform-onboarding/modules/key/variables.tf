@@ -7,11 +7,6 @@ variable "compartment_ocid" {
   type        = string
 }
 
-variable "region" {
-  description = "The region to deploy to"
-  type        = string
-}
-
 variable "tenancy_ocid" {
   description = "The OCID of the tenancy"
   type        = string

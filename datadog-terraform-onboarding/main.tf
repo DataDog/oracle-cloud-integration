@@ -175,7 +175,7 @@ resource "null_resource" "region_intersection_info" {
 module "compartment" {
   depends_on            = [terraform_data.prechecks_complete]
   source                = "./modules/compartment"
-  compartment_id        = var.compartment_id
+  compartment_id        = var.resource_compartment_ocid
   new_compartment_name  = local.new_compartment_name
   parent_compartment_id = var.tenancy_ocid
   tags                  = local.tags
@@ -184,7 +184,12 @@ module "compartment" {
 module "kms" {
   depends_on      = [terraform_data.prechecks_complete]
   source          = "./modules/kms"
-  count           = (local.is_current_region_home_region && var.enable_vault) ? 1 : 0
+  count           = var.enable_vault ? 1 : 0
+  
+  providers = {
+    oci = oci.home_region
+  }
+  
   compartment_id  = module.compartment.id
   datadog_api_key = var.datadog_api_key
   tags            = local.tags
@@ -193,7 +198,6 @@ module "kms" {
 module "auth" {
   depends_on        = [terraform_data.prechecks_complete]
   source            = "./modules/auth"
-  count             = local.is_current_region_home_region ? 1 : 0
   user_name         = local.actual_user_name
   user_email        = local.user_email
   tenancy_id        = var.tenancy_ocid
@@ -212,11 +216,9 @@ module "auth" {
 
 module "key" {
   source           = "./modules/key"
-  count            = local.is_current_region_home_region ? 1 : 0
-  existing_user_id = module.auth[0].user_id
+  existing_user_id = module.auth.user_id
   tenancy_ocid     = var.tenancy_ocid
   compartment_ocid = module.compartment.id
-  region           = var.region
   idcs_endpoint    = local.idcs_endpoint
   tags             = local.tags
   depends_on       = [terraform_data.prechecks_complete, module.auth]
@@ -228,25 +230,16 @@ module "integration" {
   providers = {
     restapi = restapi
   }
-  count                           = local.is_current_region_home_region ? 1 : 0
   datadog_api_key                 = var.datadog_api_key
   datadog_app_key                 = var.datadog_app_key
   datadog_site                    = var.datadog_site
   home_region                     = local.home_region_name
   tenancy_ocid                    = var.tenancy_ocid
-  private_key                     = module.key[0].private_key
-  user_ocid                       = module.auth[0].user_id
+  private_key                     = module.key.private_key
+  user_ocid                       = module.auth.user_id
   subscribed_regions              = tolist(local.final_regions_for_stacks)
   datadog_resource_compartment_id = module.compartment.id
   logs_enabled                    = var.logs_enabled
-  metrics_enabled                 = var.metrics_enabled
-  resources_enabled               = var.resources_enabled
-  cost_collection_enabled         = var.cost_collection_enabled
-  enabled_regions                 = var.enabled_regions
-  logs_enabled_services           = var.logs_enabled_services
-  logs_compartment_tag_filters    = var.logs_compartment_tag_filters
-  metrics_enabled_services        = var.metrics_enabled_services
-  metrics_compartment_tag_filters = var.metrics_compartment_tag_filters
 }
 
 

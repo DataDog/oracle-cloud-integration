@@ -8,8 +8,6 @@ locals {
     if region.is_home_region
   ][0]
 
-  is_current_region_home_region = (var.region == local.home_region_name)
-
   new_compartment_name = "Datadog"
 }
 
