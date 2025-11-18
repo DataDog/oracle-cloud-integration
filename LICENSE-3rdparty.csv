@@ -1,7 +1,13 @@
 Component,Origin,License,Copyright
-fdk, https://github.com/fnproject/fdk-python, Apache-2.0,
-datetime, https://pypi.org/project/DateTime/, Zope Public License (ZPL 2.1),
-requests, https://pypi.org/project/requests/, Apache-2.0,
-oci, https://github.com/oracle/oci-python-sdk, Apache-2.0,
-terraform-oci-vcn, https://github.com/oracle-terraform-modules/terraform-oci-vcn, Universal Public License v1.0,
+fdk,https://github.com/fnproject/fdk-python,Apache-2.0,Copyright (c) Oracle and/or its affiliates
+datetime,https://pypi.org/project/DateTime/,ZPL-2.1,Copyright (c) Zope Foundation and Contributors
+requests,https://pypi.org/project/requests/,Apache-2.0,Copyright Kenneth Reitz
+oci,https://github.com/oracle/oci-python-sdk,Apache-2.0,Copyright (c) Oracle and/or its affiliates
+terraform-oci-vcn,https://github.com/oracle-terraform-modules/terraform-oci-vcn,UPL-1.0,Copyright (c) Oracle and/or its affiliates
+terraform-provider-oci,https://github.com/oracle/terraform-provider-oci,MPL-2.0,Copyright (c) Oracle and/or its affiliates
+terraform-provider-restapi,https://github.com/Mastercard/terraform-provider-restapi,MIT,Copyright (c) Mastercard
+terraform-provider-external,https://github.com/hashicorp/terraform-provider-external,MPL-2.0,Copyright (c) HashiCorp Inc.
+terraform-provider-null,https://github.com/hashicorp/terraform-provider-null,MPL-2.0,Copyright (c) HashiCorp Inc.
+terraform-provider-tls,https://github.com/hashicorp/terraform-provider-tls,MPL-2.0,Copyright (c) HashiCorp Inc.
+terraform-provider-http,https://github.com/hashicorp/terraform-provider-http,MPL-2.0,Copyright (c) HashiCorp Inc.
 

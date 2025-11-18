@@ -9,7 +9,6 @@ variableGroups:
   - title: "Tenancy"
     variables:
       - ${tenancy_ocid}
-      - ${compartment_ocid}
       - ${current_user_ocid}
     visible: false
   - title: "Datadog Environment"

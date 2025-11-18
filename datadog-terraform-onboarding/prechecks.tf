@@ -287,104 +287,6 @@ data "external" "check_user_group_mode" {
   ]
 }
 
-# Data source to check if parent compartment is being changed
-data "external" "check_parent_compartment_change" {
-  program = ["bash", "-c", <<-EOT
-    # Check if we created a compartment (not using existing)
-    CREATED_COMPARTMENT="false"
-    USING_EXISTING_COMPARTMENT="false"
-    
-    if terraform state list 2>/dev/null | grep -q "module.compartment.oci_identity_compartment.new\[0\]"; then
-      CREATED_COMPARTMENT="true"
-    fi
-    
-    if terraform state list 2>/dev/null | grep -q "module.compartment.data.oci_identity_compartment.existing\[0\]"; then
-      USING_EXISTING_COMPARTMENT="true"
-    fi
-    
-    # Get the parent compartment from state (when created)
-    CURRENT_PARENT=""
-    if [ "$CREATED_COMPARTMENT" = "true" ]; then
-      CURRENT_PARENT=$(terraform state show 'module.compartment.oci_identity_compartment.new[0]' 2>/dev/null | grep "compartment_id" | head -1 | sed 's/.*= "//' | sed 's/"//')
-    fi
-    
-    # Get current compartment_ocid from state for any deployment mode
-    CURRENT_COMPARTMENT_OCID=""
-    if [ "$CREATED_COMPARTMENT" = "true" ] || [ "$USING_EXISTING_COMPARTMENT" = "true" ]; then
-      # Try to get from terraform.tfstate directly as a fallback
-      CURRENT_COMPARTMENT_OCID=$(grep -o '"compartment_ocid"[[:space:]]*:[[:space:]]*"[^"]*"' terraform.tfstate 2>/dev/null | head -1 | sed 's/.*:.*"\([^"]*\)".*/\1/')
-    fi
-    
-    # Get the desired parent from variable
-    DESIRED_PARENT="${var.compartment_ocid}"
-    
-    # Check if parent is changing (when created compartment)
-    PARENT_CHANGING="false"
-    if [ "$CREATED_COMPARTMENT" = "true" ] && [ -n "$CURRENT_PARENT" ] && [ "$CURRENT_PARENT" != "$DESIRED_PARENT" ]; then
-      PARENT_CHANGING="true"
-    fi
-    
-    # Check if compartment_ocid itself is changing (for any mode)
-    COMPARTMENT_OCID_CHANGING="false"
-    if [ -n "$CURRENT_COMPARTMENT_OCID" ] && [ "$CURRENT_COMPARTMENT_OCID" != "$DESIRED_PARENT" ]; then
-      COMPARTMENT_OCID_CHANGING="true"
-    fi
-    
-    echo "{\"created_compartment\": \"$CREATED_COMPARTMENT\", \"current_parent\": \"$CURRENT_PARENT\", \"desired_parent\": \"$DESIRED_PARENT\", \"parent_changing\": \"$PARENT_CHANGING\", \"current_compartment_ocid\": \"$CURRENT_COMPARTMENT_OCID\", \"compartment_ocid_changing\": \"$COMPARTMENT_OCID_CHANGING\"}"
-  EOT
-  ]
-}
-
-# Check 11: Prevent parent compartment changes
-resource "terraform_data" "validate_parent_compartment_immutability" {
-  lifecycle {
-    precondition {
-      condition     = data.external.check_parent_compartment_change.result.parent_changing != "true"
-      error_message = <<-EOF
-        ╔════════════════════════════════════════════════════════════════════════════╗
-        ║                 PARENT COMPARTMENT CHANGE ERROR                            ║
-        ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Cannot change compartment_ocid after creating a compartment.               ║
-        ║                                                                            ║
-        ║                                                                            ║
-        ║ Changing the parent would cause Terraform to:                              ║
-        ║   • Not find the existing compartment (wrong parent)                       ║
-        ║   • Try to create a NEW compartment under the new parent                   ║
-        ║   • Destroy and recreate ALL resources                                     ║
-        ║                                                                            ║
-        ║ To change the parent compartment:                                          ║
-        ║   1. Run: terraform destroy                                                ║
-        ║   2. Update compartment_ocid in terraform.tfvars                           ║
-        ║   3. Run: terraform apply                                                  ║
-        ║                                                                            ║
-        ╚════════════════════════════════════════════════════════════════════════════╝
-      EOF
-    }
-    precondition {
-      condition     = data.external.check_parent_compartment_change.result.compartment_ocid_changing != "true"
-      error_message = <<-EOF
-        ╔════════════════════════════════════════════════════════════════════════════╗
-        ║                 COMPARTMENT_OCID CHANGE ERROR                              ║
-        ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Cannot change compartment_ocid after initial deployment.                   ║
-        ║                                                                            ║
-        ║                                                                            ║
-        ║ Changing compartment_ocid would cause Terraform to:                        ║
-        ║   • Deploy resources to a different compartment hierarchy                  ║
-        ║   • Potentially orphan existing resources                                  ║
-        ║   • Destroy and recreate ALL resources                                     ║
-        ║                                                                            ║
-        ║ To change compartment_ocid:                                                ║
-        ║   1. Run: terraform destroy                                                ║
-        ║   2. Update compartment_ocid in terraform.tfvars                           ║
-        ║   3. Run: terraform apply                                                  ║
-        ║                                                                            ║
-        ╚════════════════════════════════════════════════════════════════════════════╝
-      EOF
-    }
-  }
-}
-
 # Check 12: Prevent compartment mode changes
 resource "terraform_data" "validate_compartment_immutability" {
   lifecycle {
@@ -521,7 +423,6 @@ resource "terraform_data" "prechecks_complete" {
     terraform_data.validate_existing_vs_new_user,
     terraform_data.validate_vault_quota,
     terraform_data.validate_connector_hub_quota,
-    terraform_data.validate_parent_compartment_immutability,
     terraform_data.validate_compartment_immutability,
     terraform_data.validate_user_group_immutability,
   ]
