@@ -11,13 +11,13 @@ resource "terraform_data" "validate_home_region_support" {
       error_message = <<-EOF
         ╔════════════════════════════════════════════════════════════════════════════╗
         ║                    HOME REGION NOT SUPPORTED ERROR                         ║
+        ╠════════════════════════════════════════════════════════════════════════════╣
+        ║ Home region ${local.home_region_name} is not supported by Datadog.         ║
+        ║                                                                            ║
+        ║ Supported regions: ${join(", ", local.supported_regions_list)}             ║
+        ║                                                                            ║
+        ║ Please contact Datadog support if you need this region enabled.            ║
         ╚════════════════════════════════════════════════════════════════════════════╝
-        
-        Home region ${local.home_region_name} is not supported by Datadog.
-        
-        Supported regions: ${join(", ", local.supported_regions_list)}
-        
-        Please contact Datadog support if you need this region enabled.
       EOF
     }
   }
@@ -60,7 +60,7 @@ resource "terraform_data" "validate_domain_email_consistency" {
         ╔════════════════════════════════════════════════════════════════════════════╗
         ║                   DOMAIN/EMAIL CONFIGURATION ERROR                         ║
         ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Both domain_id and user_email must be provided together,                  ║
+        ║ Both domain_id and user_email must be provided together,                   ║
         ║ or both must be null/empty.                                                ║
         ║                                                                            ║
         ║ Either:                                                                    ║
@@ -84,14 +84,14 @@ resource "terraform_data" "validate_existing_vs_new_user" {
         ╔════════════════════════════════════════════════════════════════════════════╗
         ║                   CONFLICTING USER CONFIGURATION ERROR                     ║
         ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Cannot specify both existing user/group AND domain_id/user_email.         ║
+        ║ Cannot specify both existing user/group AND domain_id/user_email.          ║
         ║                                                                            ║
-        ║ You are using existing_user_id or existing_group_id, which means you are  ║
+        ║ You are using existing_user_id or existing_group_id, which means you are   ║
         ║ using pre-existing IAM resources.                                          ║
         ║                                                                            ║
-        ║ The domain_id and user_email variables are only for creating NEW users.   ║
+        ║ The domain_id and user_email variables are only for creating NEW users.    ║
         ║                                                                            ║
-        ║ Please remove domain_id and user_email from your configuration.           ║
+        ║ Please remove domain_id and user_email from your configuration.            ║
         ╚════════════════════════════════════════════════════════════════════════════╝
       EOF
     }
@@ -112,16 +112,16 @@ resource "terraform_data" "validate_vault_quota" {
     precondition {
       condition     = try(data.oci_limits_resource_availability.vault_quota.available, 0) >= 1
       error_message = <<-EOF
-        ╔════════════════════════════════════════════════════════════════════════════╗
-        ║                         VAULT QUOTA EXHAUSTED ERROR                        ║
-        ╚════════════════════════════════════════════════════════════════════════════╝
-        
-        No vaults can be created in ${local.home_region_name}: vault quota exhausted.
-        
-        Available: ${try(data.oci_limits_resource_availability.vault_quota.available, 0)}
-        Required: 1
-        
-        Please increase your vault quota or delete existing vaults.
+        ╔═══════════════════════════════════════════════════════════════════════════════════╗
+        ║                         VAULT QUOTA EXHAUSTED ERROR                               ║
+        ╠═══════════════════════════════════════════════════════════════════════════════════╣
+        ║ No vaults can be created in ${local.home_region_name}: vault quota exhausted.     ║
+        ║                                                                                   ║
+        ║ Available: ${try(data.oci_limits_resource_availability.vault_quota.available, 0)} ║
+        ║ Required: 1                                                                       ║
+        ║                                                                                   ║
+        ║ Please increase your vault quota or delete existing vaults.                       ║ 
+        ╚═══════════════════════════════════════════════════════════════════════════════════╝
       EOF
     }
   }
@@ -143,14 +143,14 @@ resource "terraform_data" "validate_connector_hub_quota" {
       error_message = <<-EOF
         ╔════════════════════════════════════════════════════════════════════════════╗
         ║                   SERVICE CONNECTOR QUOTA EXHAUSTED ERROR                  ║
+        ╠════════════════════════════════════════════════════════════════════════════╣
+        ║ Insufficient connector hub quota in your tenancy.                          ║
+        ║                                                                            ║
+        ║ Available: ${try(data.oci_limits_resource_availability.connector_hub_quota.available, 0)} ║
+        ║ Required: 1                                                                ║
+        ║                                                                            ║
+        ║ Please increase your service connector quota.                              ║
         ╚════════════════════════════════════════════════════════════════════════════╝
-        
-        Insufficient connector hub quota in your tenancy.
-        
-        Available: ${try(data.oci_limits_resource_availability.connector_hub_quota.available, 0)}
-        Required: 1
-        
-        Please increase your service connector quota.
       EOF
     }
   }
@@ -300,7 +300,7 @@ resource "terraform_data" "validate_compartment_immutability" {
         ║                                                                            ║
         ║ You are trying to switch between:                                          ║
         ║   • Creating a new compartment (resource_compartment_ocid = null)          ║
-        ║   • Using an existing compartment (resource_compartment_ocid = "ocid1...")  ║
+        ║   • Using an existing compartment (resource_compartment_ocid = "ocid1...") ║
         ║                                                                            ║
         ║ This would destroy and recreate ALL resources, including:                  ║
         ║   • Vault (7+ day deletion period)                                         ║
