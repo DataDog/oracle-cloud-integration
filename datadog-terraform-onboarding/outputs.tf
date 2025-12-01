@@ -51,7 +51,7 @@ output "compartment_id" {
 
 output "api_key_secret_id" {
   description = "OCID of the API key secret in KMS"
-  value       = length(module.kms) > 0 ? module.kms[0].api_key_secret_id : null
+  value       = module.kms.api_key_secret_id
 }
 
 output "datadog_user_ocid" {

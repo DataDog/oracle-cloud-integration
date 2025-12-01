@@ -25,12 +25,6 @@ variable "current_user_ocid" {
 #         Datadog Variables
 #*************************************
 
-variable "enable_vault" {
-  type        = bool
-  default     = false
-  description = "Enable KMS Vault creation for storing API keys. Set to false for testing to avoid OCI vault limits (10 vaults, 7+ day deletion period). When false, functions will deploy but won't work until a vault is configured."
-}
-
 variable "datadog_api_key" {
   type        = string
   description = "The API key for sending message to datadog endpoints"

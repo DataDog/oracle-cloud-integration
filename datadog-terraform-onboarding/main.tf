@@ -184,7 +184,6 @@ module "compartment" {
 module "kms" {
   depends_on      = [terraform_data.prechecks_complete]
   source          = "./modules/kms"
-  count           = var.enable_vault ? 1 : 0
   
   providers = {
     oci = oci.home_region
