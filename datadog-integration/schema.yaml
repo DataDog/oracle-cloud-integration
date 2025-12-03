@@ -32,6 +32,7 @@ variableGroups:
     variables:
       - ${show_advanced_options}
       - ${compartment_id}
+      - ${lockdown_vcn_default_seclist}
       - ${domain_id}
       - ${user_email}
 
@@ -123,6 +124,16 @@ variables:
     type: oci:identity:compartment:id
     required: false
     default: null
+    visible: ${show_advanced_options}
+
+  lockdown_vcn_default_seclist:
+    title: Lock down VCN default security list
+    type: boolean
+    description: |
+      Removes the default OCI ingress rules (including SSH on port 22) from Datadog-managed VCNs when enabled.
+      Disable only if you require Oracle's default security list behavior.
+    required: false
+    default: true
     visible: ${show_advanced_options}
 
   existing_user_id:
