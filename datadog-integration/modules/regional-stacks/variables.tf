@@ -51,3 +51,10 @@ variable "subnet_ocid" {
     error_message = "If provided, subnet_ocid must be a valid subnet OCID starting with: ocid1.subnet.oc[0-9]."
   }
 }
+
+variable "lockdown_default_seclist" {
+  type        = bool
+  description = "If true, removes the default OCI security list rules (SSH/ICMP) from Datadog-created VCNs."
+  default     = true
+}
+
