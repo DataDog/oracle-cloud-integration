@@ -250,3 +250,13 @@ provider "oci" {
   alias  = "us-sanjose-1"
   region = "us-sanjose-1"
 }
+
+provider "oci" {
+  alias  = "eu-turin-1"
+  region = "eu-turin-1"
+}
+
+provider "oci" {
+  alias  = "eu-madrid-3"
+  region = "eu-madrid-3"
+}
