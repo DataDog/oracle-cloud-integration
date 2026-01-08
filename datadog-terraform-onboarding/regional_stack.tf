@@ -1005,3 +1005,53 @@ module "regional_deployment_us_sanjose_1" {
     module.auth
   ]
 }
+
+module "regional_deployment_eu_madrid_3" {
+  count  = contains(local.final_regions_for_stacks, "eu-madrid-3") ? 1 : 0
+  source = "./modules/regional-stacks"
+
+  providers = {
+    oci = oci.eu-madrid-3
+  }
+
+  tenancy_ocid      = var.tenancy_ocid
+  region            = "eu-madrid-3"
+  region_key        = local.subscribed_regions_map["eu-madrid-3"].region_key
+  compartment_ocid  = module.compartment.id
+  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-madrid-3", "")
+  datadog_site      = var.datadog_site
+  api_key_secret_id = local.api_key_secret_id
+  home_region       = local.home_region_name
+  tags              = local.tags
+
+  depends_on = [
+    terraform_data.prechecks_complete,
+    module.compartment,
+    module.auth
+  ]
+}
+
+module "regional_deployment_eu_turin_1" {
+  count  = contains(local.final_regions_for_stacks, "eu-turin-1") ? 1 : 0
+  source = "./modules/regional-stacks"
+
+  providers = {
+    oci = oci.eu-turin-1
+  }
+
+  tenancy_ocid      = var.tenancy_ocid
+  region            = "eu-turin-1"
+  region_key        = local.subscribed_regions_map["eu-turin-1"].region_key
+  compartment_ocid  = module.compartment.id
+  subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-turin-1", "")
+  datadog_site      = var.datadog_site
+  api_key_secret_id = local.api_key_secret_id
+  home_region       = local.home_region_name
+  tags              = local.tags
+
+  depends_on = [
+    terraform_data.prechecks_complete,
+    module.compartment,
+    module.auth
+  ]
+}
