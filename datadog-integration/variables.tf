@@ -77,6 +77,12 @@ variable "logs_enabled" {
   default     = false
 }
 
+variable "lockdown_vcn_default_seclist" {
+  type        = bool
+  description = "When true, removes the default OCI security list ingress rules (including SSH) from Datadog-managed VCNs."
+  default     = true
+}
+
 variable "domain_id" {
   type        = string
   description = "The OCID of the Identity Domain to use for the Datadog QuickStart stack"
