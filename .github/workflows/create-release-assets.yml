@@ -1,0 +1,77 @@
+name: Create Release Assets
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  create-assets:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+    - name: Create release zip files
+      run: |
+        echo "Creating release zip files..."
+        echo "================================"
+        
+        cd datadog-oci-orm/
+        
+        zip -r datadog-oci-orm-metrics-setup.zip ./metrics-setup/*
+        
+        zip -r datadog-oci-orm-policy-setup.zip ./policy-setup/*
+        
+        zip -r datadog-oci-orm.zip ./*
+        
+        mv *.zip ../
+        cd ../
+        
+        cd datadog-integration/
+        zip -r datadog-integration.zip ./*
+        mv datadog-integration.zip ../
+        cd ../
+        
+        cd datadog-functions/
+        zip -r datadog-functions.zip ./*
+        mv datadog-functions.zip ../
+        cd ../
+        
+    - name: Display created files
+      run: |
+        ls -la *.zip
+        echo ""
+        echo "File sizes:"
+        echo "=============="
+        du -h *.zip
+    
+    - name: Upload release assets as artifacts
+      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
+      with:
+        name: release-assets
+        path: |
+          datadog-oci-orm-metrics-setup.zip
+          datadog-oci-orm-policy-setup.zip
+          datadog-oci-orm.zip
+          datadog-integration.zip
+          datadog-functions.zip
+        retention-days: 90
+        
+    - name: Summary
+      run: |
+        echo "Release assets have been created and uploaded as artifacts."
+        echo ""
+        echo "To use these for a release:"
+        echo "1. Go to the Actions tab in GitHub"
+        echo "2. Click on this workflow run"  
+        echo "3. Download the 'release-assets' artifact"
+        echo "4. Extract the zip files"
+        echo "5. Upload them manually to your GitHub release"
+        echo ""
+        echo "These will be available at URLs like:"
+        echo "https://github.com/Datadog/oracle-cloud-integration/releases/latest/download/datadog-oci-orm.zip" 
