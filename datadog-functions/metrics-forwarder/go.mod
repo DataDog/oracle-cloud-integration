@@ -4,8 +4,8 @@ go 1.25.7
 
 require (
 	datadog-functions/lib v0.0.0
-	github.com/fnproject/fdk-go v0.0.55
-	github.com/stretchr/testify v1.10.0
+	github.com/fnproject/fdk-go v0.0.66
+	github.com/stretchr/testify v1.11.1
 )
 
 replace datadog-functions/lib => ../lib
