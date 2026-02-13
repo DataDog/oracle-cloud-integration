@@ -1,6 +1,6 @@
 module datadog-functions/lib
 
-go 1.24.0
+go 1.25.7
 
 require (
 	github.com/DataDog/datadog-api-client-go/v2 v2.36.1
