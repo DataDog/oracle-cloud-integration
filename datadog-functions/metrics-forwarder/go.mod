@@ -1,6 +1,6 @@
 module datadog-functions/metrics-forwarder
 
-go 1.24.0
+go 1.25.7
 
 require (
 	datadog-functions/lib v0.0.0
