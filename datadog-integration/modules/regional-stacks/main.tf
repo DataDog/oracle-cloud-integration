@@ -40,7 +40,7 @@ module "vcn" {
   vcn_cidrs                = ["10.0.0.0/16"]
   vcn_dns_label            = "ddvcnmodule"
   vcn_name                 = local.vcn_name
-  lockdown_default_seclist = false
+  lockdown_default_seclist = var.lockdown_default_seclist
 
   subnets = {
     private = {
