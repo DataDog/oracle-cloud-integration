@@ -201,6 +201,7 @@ module "compartment" {
   new_compartment_name  = local.new_compartment_name
   parent_compartment_id = var.tenancy_ocid
   tags                  = local.tags
+  defined_tags          = local.defined_tags
 }
 
 module "kms" {
@@ -210,6 +211,7 @@ module "kms" {
   compartment_id  = module.compartment.id
   datadog_api_key = var.datadog_api_key
   tags            = local.tags
+  defined_tags    = local.defined_tags
 }
 
 module "auth" {
@@ -230,6 +232,7 @@ module "auth" {
   dg_sch_name       = local.dg_sch_name
   dg_fn_name        = local.dg_fn_name
   dg_policy_name    = local.dg_policy_name
+  defined_tags      = local.defined_tags
 }
 
 module "key" {

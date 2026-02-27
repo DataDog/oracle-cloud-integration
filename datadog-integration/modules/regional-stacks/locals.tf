@@ -1,4 +1,5 @@
 locals {
+  defined_tags_map   = jsondecode(var.defined_tags)
   registry_host      = lower("${var.region_key}.ocir.io/iddfxd5j9l2o")
   metrics_image_path = "${local.registry_host}/oci-datadog-forwarder/metrics:latest"
   logs_image_path    = "${local.registry_host}/oci-datadog-forwarder/logs:latest"
@@ -39,5 +40,5 @@ locals {
   )
   
   # Simple subnet selection logic: use provided OCID or create new
-  subnet_id = var.subnet_ocid != "" ? var.subnet_ocid : module.vcn[0].subnet_id[local.subnet]
+  subnet_id = var.subnet_ocid != "" ? var.subnet_ocid : module.subnet[0].subnet_id[local.subnet]
 }

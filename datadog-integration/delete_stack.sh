@@ -6,6 +6,7 @@ export OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING=True
 COMPARTMENT=$1
 REGION=$2
 DISPLAY_NAME=$3
+DEFINED_TAGS_JSON="${4:-}"
 
 STACK_IDS=($(oci --region "$REGION" resource-manager stack list --compartment-id $COMPARTMENT --display-name $DISPLAY_NAME --raw-output | jq -r '.data[]."id"'))
 
@@ -14,12 +15,17 @@ if [[ -z "$STACK_IDS" ]]; then
   exit 0
 fi
 
+DEFINED_TAGS_ARG=()
+if [[ -n "$DEFINED_TAGS_JSON" ]]; then
+  DEFINED_TAGS_ARG=(--defined-tags "$DEFINED_TAGS_JSON")
+fi
+
 echo "Found... stack... Ids: ${STACK_IDS[@]}"
 for STACK_ID in "${STACK_IDS[@]}"; do
   echo "Running...destroy...job...for...stack...: $STACK_ID"
 
   JOB_ID=$(oci --region "$REGION" resource-manager job create-destroy-job \
-    --stack-id "$STACK_ID" --wait-for-state SUCCEEDED --wait-for-state FAILED \
+    --stack-id "$STACK_ID" "${DEFINED_TAGS_ARG[@]}" --wait-for-state SUCCEEDED --wait-for-state FAILED \
     --execution-plan-strategy AUTO_APPROVED \
     --query "data.id" --raw-output)
   
