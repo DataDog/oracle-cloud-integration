@@ -20,9 +20,9 @@ resource "oci_functions_function" "logs_function" {
   display_name   = "dd-logs-forwarder"
   memory_in_mbs  = "1024"
   freeform_tags  = var.tags
+  defined_tags   = var.defined_tags
   image          = local.logs_image_path
   image_digest   = length(local.image_sha_logs) > 0 ? local.image_sha_logs : null
-
 }
 
 resource "oci_functions_function" "metrics_function" {
@@ -30,6 +30,7 @@ resource "oci_functions_function" "metrics_function" {
   display_name   = "dd-metrics-forwarder"
   memory_in_mbs  = "512"
   freeform_tags  = var.tags
+  defined_tags   = var.defined_tags
   image          = local.metrics_image_path
   image_digest   = length(local.image_sha_metrics) > 0 ? local.image_sha_metrics : null
 }
@@ -40,18 +41,12 @@ module "vcn" {
   version                  = ">= 3.6.0"
   compartment_id           = var.compartment_ocid
   freeform_tags            = var.tags
+  defined_tags             = var.defined_tags
   vcn_cidrs                = ["10.0.0.0/16"]
   vcn_dns_label            = "ddvcnmodule"
   vcn_name                 = local.vcn_name
-  lockdown_default_seclist = false
-
-  subnets = {
-    private = {
-      cidr_block = "10.0.0.0/16"
-      type       = "private"
-      name       = local.subnet
-    }
-  }
+  lockdown_default_seclist  = false
+  subnets                  = {}
 
   create_nat_gateway           = true
   nat_gateway_display_name     = local.nat_gateway
@@ -59,10 +54,31 @@ module "vcn" {
   service_gateway_display_name = local.service_gateway
 }
 
+# Subnet submodule so we can pass defined_tags (upstream VCN module does not pass them to subnets).
+module "subnet" {
+  count           = var.subnet_ocid == "" ? 1 : 0
+  source          = "oracle-terraform-modules/vcn/oci//modules/subnet"
+  version         = ">= 3.6.0"
+  compartment_id  = var.compartment_ocid
+  vcn_id          = module.vcn[0].vcn_id
+  nat_route_id    = module.vcn[0].nat_route_id
+  ig_route_id     = module.vcn[0].ig_route_id
+  subnets = {
+    private = {
+      cidr_block = "10.0.0.0/16"
+      type       = "private"
+      name       = local.subnet
+    }
+  }
+  freeform_tags = var.tags
+  defined_tags  = var.defined_tags
+}
+
 resource "oci_functions_application" "dd_function_app" {
   compartment_id = var.compartment_ocid
   display_name   = "dd-function-app"
   freeform_tags  = var.tags
+  defined_tags   = var.defined_tags
   shape          = "GENERIC_X86_ARM"
   subnet_ids = [
     local.subnet_id

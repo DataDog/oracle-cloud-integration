@@ -16,6 +16,12 @@ variable "tags" {
   default     = {}
 }
 
+variable "defined_tags" {
+  description = "Defined tags (flat map: Namespace.TagKey = value) for policies and Identity Domain resources"
+  type        = map(string)
+  default     = {}
+}
+
 variable "tenancy_id" {
   type        = string
   description = "OCI tenant OCID, more details can be found at https://docs.cloud.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm#five"

@@ -14,6 +14,7 @@ resource "oci_kms_vault" "datadog_vault" {
   display_name   = "datadog-vault"
   vault_type     = "DEFAULT"
   freeform_tags  = var.tags
+  defined_tags   = var.defined_tags
 
   timeouts {
     create = "60m"
@@ -31,6 +32,7 @@ resource "oci_kms_key" "datadog_key" {
   }
   management_endpoint = oci_kms_vault.datadog_vault.management_endpoint
   freeform_tags       = var.tags
+  defined_tags        = var.defined_tags
 
   timeouts {
     create = "60m"
@@ -49,6 +51,7 @@ resource "oci_vault_secret" "api_key" {
     content      = base64encode(var.datadog_api_key)
   }
   freeform_tags = var.tags
+  defined_tags  = var.defined_tags
 
   timeouts {
     create = "60m"
