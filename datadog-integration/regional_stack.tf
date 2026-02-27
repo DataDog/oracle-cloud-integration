@@ -127,7 +127,7 @@ resource "terraform_data" "regional_stacks_destroy" {
     command     = <<EOT
     echo "Destroying........."
     STACK_NAME="datadog-regional-stack-${self.input.stack_digest_id}"
-    DEFINED_TAGS_JSON="${replace(try(self.input.defined_tags_json, ""), "\"", "\\\"")}"
+    DEFINED_TAGS_JSON="${replace(replace(try(self.input.defined_tags_json, ""), "$", "\\$"), "\"", "\\\"")}"
     chmod +x ${path.module}/delete_stack.sh && ${path.module}/delete_stack.sh ${self.input.compartment} ${each.key} "$STACK_NAME" "$DEFINED_TAGS_JSON"
     EOT
   }
