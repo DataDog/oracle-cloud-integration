@@ -88,3 +88,9 @@ variable "user_email" {
   description = "Email address where you want OCI to send you notifications about the created user."
   default     = null
 }
+
+variable "defined_tags" {
+  type        = string
+  description = "Defined tags to apply to all created resources. One entry per line in the format namespace.key:value (e.g. CostCenter.Environment:prod). Leave blank unless your tenancy has mandatory tag defaults."
+  default     = ""
+}

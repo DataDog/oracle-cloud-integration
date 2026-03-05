@@ -34,6 +34,7 @@ variableGroups:
       - ${compartment_id}
       - ${domain_id}
       - ${user_email}
+      - ${defined_tags}
 
 variables:
   choose_subnet:
@@ -170,3 +171,14 @@ variables:
         - ${show_advanced_options}
         - not:
             - ${choose_user}
+
+  defined_tags:
+    title: Defined tags
+    type: text
+    multiline: true
+    description: |
+      Defined tags to apply to all created resources. One entry per line in the format <strong>namespace.key:value</strong> (e.g. CostCenter.Environment:prod).
+      <strong>Datadog recommends leaving this blank unless your tenancy has mandatory tag defaults that apply to the compartment where Datadog resources will be created.</strong>
+    required: false
+    default: ""
+    visible: ${show_advanced_options}

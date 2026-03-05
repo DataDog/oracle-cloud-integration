@@ -39,13 +39,3 @@ data "oci_identity_domain" "domain" {
   domain_id = local.matching_domain_id
 }
 
-# Defined tags: auto-discovered from compartment tag defaults (not user-configurable)
-data "oci_identity_tag_defaults" "compartment" {
-  compartment_id = coalesce(var.compartment_id, var.tenancy_ocid)
-}
-
-data "oci_identity_tag_namespaces" "tenancy" {
-  compartment_id          = var.tenancy_ocid
-  include_subcompartments = true
-  state                   = "ACTIVE"
-}
