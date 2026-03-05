@@ -242,6 +242,7 @@ module "integration" {
   subscribed_regions              = tolist(local.final_regions_for_stacks)
   datadog_resource_compartment_id = module.compartment.id
   logs_enabled                    = var.logs_enabled
+  defined_tags                    = local.defined_tags
 }
 
 
