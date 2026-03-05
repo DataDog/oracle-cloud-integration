@@ -1,24 +1,24 @@
 locals {
   config_version = 3
   json_object = {
-    data = {
-      type = "oci_tenancy"
-      id   = var.tenancy_ocid
-      attributes = {
-        home_region   = var.home_region
-        user_ocid     = var.user_ocid
-        config_version = local.config_version
-        auth_credentials = {
-          private_key = var.private_key
+    data : {
+      type : "oci_tenancy",
+      id : var.tenancy_ocid,
+      attributes : {
+        home_region : var.home_region
+        user_ocid : var.user_ocid
+        config_version : local.config_version
+        auth_credentials : {
+          private_key : var.private_key
+        },
+        regions_config : {
+          available : var.subscribed_regions
         }
-        regions_config = {
-          available = var.subscribed_regions
-        }
-        dd_compartment_id = var.datadog_resource_compartment_id
-        logs_config = {
+        dd_compartment_id : var.datadog_resource_compartment_id
+        logs_config : {
           Enabled = var.logs_enabled
         }
-        defined_tags = [for k, v in var.defined_tags : "${k}:${v}"]
+        defined_tags : [for k, v in var.defined_tags : "${k}:${v}"]
       }
     }
   }
