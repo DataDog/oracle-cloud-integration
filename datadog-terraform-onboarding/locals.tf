@@ -5,7 +5,7 @@ locals {
 
   # Defined tags: parsed from user input (multiline namespace.key:value per line)
   defined_tags_raw = [
-    for line in split("\n", coalesce(var.defined_tags, "")) :
+    for line in split("\n", var.defined_tags != null ? var.defined_tags : "") :
     trimspace(line) if trimspace(line) != ""
   ]
   defined_tags = {
