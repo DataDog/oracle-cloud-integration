@@ -3,12 +3,17 @@ locals {
     ownedby = "datadog"
   }
 
-  # Resolve tag_namespace_id -> name from list (no CLI)
-  tag_defaults_namespace_names = { for ns in data.oci_identity_tag_namespaces.tenancy.tag_namespaces : ns.id => ns.name }
-  # Defined tags: auto-collected from compartment tag defaults only (not a user input)
+  # Defined tags: parsed from user input (multiline namespace.key:value per line)
+  defined_tags_raw = [
+    for line in split("\n", coalesce(var.defined_tags, "")) :
+    trimspace(line) if trimspace(line) != ""
+  ]
   defined_tags = {
-    for td in data.oci_identity_tag_defaults.compartment.tag_defaults :
-    "${local.tag_defaults_namespace_names[td.tag_namespace_id]}.${td.tag_definition_name}" => td.value
+    for line in local.defined_tags_raw :
+    # Format: namespace.key:value (split on first : so value can contain colons)
+    (split(":", line)[0]) => (
+      length(split(":", line)) > 1 ? join(":", slice(split(":", line), 1, length(split(":", line)))) : ""
+    )
   }
 
   home_region_name = [
