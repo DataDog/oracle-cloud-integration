@@ -263,7 +263,8 @@ module "integration" {
   user_ocid                       = module.auth[0].user_id
   subscribed_regions              = tolist(local.final_regions_for_stacks)
   datadog_resource_compartment_id = module.compartment.id
-  logs_enabled                     = var.logs_enabled
+  logs_enabled                    = var.logs_enabled
+  defined_tags                    = local.defined_tags
 }
 
 
