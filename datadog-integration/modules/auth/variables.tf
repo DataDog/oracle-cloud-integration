@@ -17,7 +17,7 @@ variable "tags" {
 }
 
 variable "defined_tags" {
-  description = "A map od defined tags to assign to the resource"
+  description = "A map of defined tags to assign to the resource"
   type        = map(string)
   default     = {}
 }
