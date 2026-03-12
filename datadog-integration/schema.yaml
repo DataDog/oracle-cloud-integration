@@ -173,12 +173,14 @@ variables:
             - ${choose_user}
 
   defined_tags:
-    title: Defined tags
+    title: Resource tags
     type: text
     multiline: true
     description: |
-      Defined tags to apply to all created resources. One entry per line in the format <strong>namespace.key:value</strong> (e.g. CostCenter.Environment:prod).
-      <strong>Datadog recommends leaving this blank unless your tenancy has mandatory tag defaults that apply to the compartment where Datadog resources will be created.</strong>
+      Provide a list of defined tag(s) to be added to all OCI resources deployed by the Datadog QuickStart stack.
+       Enter one tag per line. Do not add commas. Each defined tag should be in the format: namespace.key:value. 
+       Example: CostCenter.Environment:prod 
+       <strong>If left blank, no defined tags will be added to the OCI resources deployed by the Datadog QuickStart stack.</strong>
     required: false
     default: ""
     visible: ${show_advanced_options}
