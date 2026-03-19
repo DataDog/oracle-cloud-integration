@@ -1,5 +1,4 @@
 locals {
-
   config_version = 3
   json_object = {
     data : {
@@ -19,6 +18,7 @@ locals {
         logs_config : {
           Enabled = var.logs_enabled
         }
+        defined_tags : [for k, v in var.defined_tags : "${k}:${v}"]
       }
     }
   }

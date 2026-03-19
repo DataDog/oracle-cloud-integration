@@ -38,6 +38,6 @@ locals {
     upper(local.subnet_region_from_ocid) == var.region_key
   )
   
-  # Simple subnet selection logic: use provided OCID or create new
-  subnet_id = var.subnet_ocid != "" ? var.subnet_ocid : module.vcn[0].subnet_id[local.subnet]
+  # Simple subnet selection logic: use provided OCID or create new (subnet from our subnet submodule when we create VCN)
+  subnet_id = var.subnet_ocid != "" ? var.subnet_ocid : module.subnet[0].subnet_id[local.subnet]
 }

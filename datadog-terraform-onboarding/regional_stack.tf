@@ -23,6 +23,7 @@ module "regional_deployment_af_johannesburg_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -48,6 +49,7 @@ module "regional_deployment_ap_batam_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -73,6 +75,7 @@ module "regional_deployment_ap_chuncheon_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -98,6 +101,7 @@ module "regional_deployment_ap_hyderabad_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -123,6 +127,7 @@ module "regional_deployment_ap_melbourne_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -148,6 +153,7 @@ module "regional_deployment_ap_mumbai_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -173,6 +179,7 @@ module "regional_deployment_ap_osaka_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -198,6 +205,7 @@ module "regional_deployment_ap_seoul_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -223,6 +231,7 @@ module "regional_deployment_ap_singapore_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -248,6 +257,7 @@ module "regional_deployment_ap_singapore_2" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -273,6 +283,7 @@ module "regional_deployment_ap_sydney_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -298,6 +309,7 @@ module "regional_deployment_ap_tokyo_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -323,6 +335,7 @@ module "regional_deployment_ca_montreal_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -348,6 +361,7 @@ module "regional_deployment_ca_toronto_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -373,6 +387,7 @@ module "regional_deployment_eu_amsterdam_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -398,6 +413,7 @@ module "regional_deployment_eu_frankfurt_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -423,6 +439,7 @@ module "regional_deployment_eu_madrid_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -448,6 +465,7 @@ module "regional_deployment_eu_marseille_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -473,6 +491,7 @@ module "regional_deployment_eu_milan_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -498,6 +517,7 @@ module "regional_deployment_eu_paris_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -523,6 +543,7 @@ module "regional_deployment_eu_stockholm_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -548,6 +569,7 @@ module "regional_deployment_eu_zurich_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -573,6 +595,7 @@ module "regional_deployment_il_jerusalem_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -598,6 +621,7 @@ module "regional_deployment_me_abudhabi_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -623,6 +647,7 @@ module "regional_deployment_me_dubai_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -648,6 +673,7 @@ module "regional_deployment_me_jeddah_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -673,6 +699,7 @@ module "regional_deployment_me_riyadh_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -698,6 +725,7 @@ module "regional_deployment_mx_monterrey_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -723,6 +751,7 @@ module "regional_deployment_mx_queretaro_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -748,6 +777,7 @@ module "regional_deployment_sa_bogota_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -773,6 +803,7 @@ module "regional_deployment_sa_santiago_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -798,6 +829,7 @@ module "regional_deployment_sa_saopaulo_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -823,6 +855,7 @@ module "regional_deployment_sa_valparaiso_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -848,6 +881,7 @@ module "regional_deployment_sa_vinhedo_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -873,6 +907,7 @@ module "regional_deployment_uk_cardiff_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -898,6 +933,7 @@ module "regional_deployment_uk_london_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -923,6 +959,7 @@ module "regional_deployment_us_ashburn_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -948,6 +985,7 @@ module "regional_deployment_us_chicago_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -973,6 +1011,7 @@ module "regional_deployment_us_phoenix_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -998,6 +1037,7 @@ module "regional_deployment_us_sanjose_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -1023,6 +1063,7 @@ module "regional_deployment_eu_madrid_3" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,
@@ -1048,6 +1089,7 @@ module "regional_deployment_eu_turin_1" {
   api_key_secret_id = local.api_key_secret_id
   home_region       = local.home_region_name
   tags              = local.tags
+  defined_tags      = local.defined_tags
 
   depends_on = [
     terraform_data.prechecks_complete,

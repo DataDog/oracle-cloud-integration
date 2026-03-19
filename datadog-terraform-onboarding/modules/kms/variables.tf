@@ -14,3 +14,9 @@ variable "datadog_api_key" {
   description = "The API key for sending message to datadog endpoints"
   sensitive   = true
 }
+
+variable "defined_tags" {
+  type        = map(string)
+  description = "Defined tags to assign to resources"
+  default     = {}
+}

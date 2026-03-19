@@ -51,3 +51,9 @@ variable "subnet_ocid" {
     error_message = "If provided, subnet_ocid must be a valid subnet OCID starting with: ocid1.subnet.oc[0-9]."
   }
 }
+
+variable "defined_tags" {
+  type        = map(string)
+  description = "Defined tags to assign to VCN, subnet, function app and functions."
+  default     = {}
+}

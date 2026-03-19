@@ -20,3 +20,9 @@ variable "new_compartment_name" {
   type        = string
   default     = "Datadog"
 }
+
+variable "defined_tags" {
+  description = "Defined tags to assign to the compartment"
+  type        = map(string)
+  default     = {}
+}

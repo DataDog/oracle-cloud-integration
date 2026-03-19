@@ -179,6 +179,7 @@ module "compartment" {
   new_compartment_name  = local.new_compartment_name
   parent_compartment_id = var.tenancy_ocid
   tags                  = local.tags
+  defined_tags          = local.defined_tags
 }
 
 module "kms" {
@@ -192,6 +193,7 @@ module "kms" {
   compartment_id  = module.compartment.id
   datadog_api_key = var.datadog_api_key
   tags            = local.tags
+  defined_tags    = local.defined_tags
 }
 
 module "auth" {
@@ -201,6 +203,7 @@ module "auth" {
   user_email        = local.user_email
   tenancy_id        = var.tenancy_ocid
   tags              = local.tags
+  defined_tags      = local.defined_tags
   current_user_id   = var.current_user_ocid
   compartment_id    = module.compartment.id
   idcs_endpoint     = local.idcs_endpoint
@@ -239,6 +242,7 @@ module "integration" {
   subscribed_regions              = tolist(local.final_regions_for_stacks)
   datadog_resource_compartment_id = module.compartment.id
   logs_enabled                    = var.logs_enabled
+  defined_tags                    = local.defined_tags
 }
 
 
