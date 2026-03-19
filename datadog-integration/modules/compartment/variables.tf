@@ -10,7 +10,13 @@ variable "parent_compartment_id" {
 }
 
 variable "tags" {
-  description = "A map of tags to assign to the compartment"
+  description = "A map of freeform tags to assign to the compartment"
+  type        = map(string)
+  default     = {}
+}
+
+variable "defined_tags" {
+  description = "A map of defined tags to assign to the compartment"
   type        = map(string)
   default     = {}
 }

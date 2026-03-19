@@ -11,7 +11,13 @@ variable "user_email" {
 }
 
 variable "tags" {
-  description = "A map of tags to assign to the resource"
+  description = "A map of freeform tags to assign to the resource"
+  type        = map(string)
+  default     = {}
+}
+
+variable "defined_tags" {
+  description = "A map of defined tags to assign to the resource"
   type        = map(string)
   default     = {}
 }

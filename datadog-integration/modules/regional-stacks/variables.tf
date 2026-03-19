@@ -20,10 +20,16 @@ variable "datadog_site" {
 
 variable "tags" {
   type        = map(string)
-  description = "A map of tags to assign to the resource"
+  description = "A map of freeform tags to assign to the resource"
   default = {
     ownedby = "datadog"
   }
+}
+
+variable "defined_tags" {
+  type        = string
+  description = "JSON-encoded map of defined tags (namespace.key = value), e.g. \"{\\\"Namespace.Key\\\":\\\"value\\\"}\". Passed from parent stack."
+  default     = "{}"
 }
 
 variable "home_region" {

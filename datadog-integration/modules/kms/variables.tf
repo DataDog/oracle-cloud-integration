@@ -5,7 +5,13 @@ variable "compartment_id" {
 
 variable "tags" {
   type        = map(string)
-  description = "A map of tags to assign to resources"
+  description = "A map of freeform tags to assign to resources"
+  default     = {}
+}
+
+variable "defined_tags" {
+  type        = map(string)
+  description = "A map of defined tags to assign to resources"
   default     = {}
 }
 

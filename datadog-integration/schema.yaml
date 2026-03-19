@@ -34,6 +34,7 @@ variableGroups:
       - ${compartment_id}
       - ${domain_id}
       - ${user_email}
+      - ${defined_tags}
 
 variables:
   choose_subnet:
@@ -170,3 +171,16 @@ variables:
         - ${show_advanced_options}
         - not:
             - ${choose_user}
+
+  defined_tags:
+    title: Resource tags
+    type: text
+    multiline: true
+    description: |
+      Provide a list of defined tag(s) to be added to all OCI resources deployed by the Datadog QuickStart stack.
+       Enter one tag per line. Do not add commas. Each defined tag should be in the format: namespace.key:value. 
+       Example: CostCenter.Environment:prod 
+       <strong>If left blank, no defined tags will be added to the OCI resources deployed by the Datadog QuickStart stack.</strong>
+    required: false
+    default: ""
+    visible: ${show_advanced_options}

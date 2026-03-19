@@ -65,7 +65,8 @@ resource "null_resource" "regional_stacks_create_apply" {
       --config-source ${path.module}/modules/regional-stacks/dd_regional_stack.zip  --variables '{"tenancy_ocid": "${var.tenancy_ocid}", "region": "${each.key}", \
       "compartment_ocid": "${module.compartment.id}", "datadog_site": "${var.datadog_site}", "api_key_secret_id": "${module.kms[0].api_key_secret_id}", \
       "home_region": "${local.home_region_name}", "region_key": "${local.subscribed_regions_map[each.key].region_key}", \
-      "subnet_ocid": "${lookup(local.region_to_subnet_ocid_map, each.key, "")}"}' \
+      "subnet_ocid": "${lookup(local.region_to_subnet_ocid_map, each.key, "")}", "defined_tags": ${jsonencode(jsonencode(local.defined_tags))}}' \
+      ${local.stack_create_defined_tags_flag} \
       --wait-for-state ACTIVE \
       --max-wait-seconds 120 \
       --wait-interval-seconds 5 \
@@ -85,7 +86,7 @@ resource "null_resource" "regional_stacks_create_apply" {
     JOB_ID=""
     for attempt in {1..5}; do
       echo "Attempting to create job (attempt $attempt/5)..."
-      if JOB_ID=$(oci resource-manager job create-apply-job --stack-id $STACK_ID $WAIT_COMMAND --execution-plan-strategy AUTO_APPROVED --region ${each.key} --query "data.id"); then
+      if JOB_ID=$(oci resource-manager job create-apply-job --stack-id $STACK_ID ${local.stack_create_defined_tags_flag} $WAIT_COMMAND --execution-plan-strategy AUTO_APPROVED --region ${each.key} --query "data.id"); then
         echo "Job created successfully: $JOB_ID for region ${each.key}"
         break
       else
@@ -115,8 +116,9 @@ resource "terraform_data" "regional_stacks_destroy" {
   depends_on = [null_resource.precheck_marker, terraform_data.regional_stack_zip, terraform_data.stack_digest]
   for_each   = local.target_regions_for_stacks
   input = {
-    compartment     = module.compartment.id
-    stack_digest_id = terraform_data.stack_digest.id
+    compartment       = module.compartment.id
+    stack_digest_id   = terraform_data.stack_digest.id
+    defined_tags_json = length(keys(local.compartment_defined_tags)) > 0 ? jsonencode(local.compartment_defined_tags) : ""
   }
 
   provisioner "local-exec" {
@@ -125,8 +127,8 @@ resource "terraform_data" "regional_stacks_destroy" {
     command     = <<EOT
     echo "Destroying........."
     STACK_NAME="datadog-regional-stack-${self.input.stack_digest_id}"
-    chmod +x ${path.module}/delete_stack.sh && ${path.module}/delete_stack.sh ${self.input.compartment} ${each.key} $STACK_NAME
-    
+    DEFINED_TAGS_JSON="${replace(replace(try(self.input.defined_tags_json, ""), "$", "\\$"), "\"", "\\\"")}"
+    chmod +x ${path.module}/delete_stack.sh && ${path.module}/delete_stack.sh ${self.input.compartment} ${each.key} "$STACK_NAME" "$DEFINED_TAGS_JSON"
     EOT
   }
 }

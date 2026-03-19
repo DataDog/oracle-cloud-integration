@@ -3,6 +3,28 @@ locals {
     ownedby = "datadog"
   }
 
+  # Defined tags: parsed from user input (multiline namespace.key:value per line)
+  defined_tags_raw = [
+    for line in split("\n", var.defined_tags != null ? var.defined_tags : "") :
+    trimspace(line) if trimspace(line) != ""
+  ]
+  defined_tags = {
+    for line in local.defined_tags_raw :
+    # Format: namespace.key:value (split on first : so value can contain colons)
+    (split(":", line)[0]) => (
+      length(split(":", line)) > 1 ? join(":", slice(split(":", line), 1, length(split(":", line)))) : ""
+    )
+  }
+
+  # Nested format for stack create --defined-tags (tags the Stack resource in the compartment)
+  compartment_defined_tags = length(local.defined_tags) > 0 ? {
+    for ns in distinct([for k in keys(local.defined_tags) : split(".", k)[0]]) :
+    ns => { for k, v in local.defined_tags : join(".", slice(split(".", k), 1, length(split(".", k)))) => v if split(".", k)[0] == ns }
+  } : {}
+
+  # Prebuilt --defined-tags flag for oci resource-manager stack create (avoids heredoc quoting issues)
+  stack_create_defined_tags_flag = length(keys(local.compartment_defined_tags)) > 0 ? join("", ["--defined-tags '", jsonencode(local.compartment_defined_tags), "'"]) : ""
+
   home_region_name = [
     for region in data.oci_identity_region_subscriptions.subscribed_regions.region_subscriptions : region.region_name
     if region.is_home_region

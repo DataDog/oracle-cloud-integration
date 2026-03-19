@@ -137,6 +137,14 @@ resource "oci_identity_domains_user" "dd_auth" {
         value = freeform_tags.value
       }
     }
+    dynamic "defined_tags" {
+      for_each = var.defined_tags
+      content {
+        namespace = split(".", defined_tags.key)[0]
+        key       = join(".", slice(split(".", defined_tags.key), 1, length(split(".", defined_tags.key))))
+        value     = defined_tags.value
+      }
+    }
   }
 }
 
@@ -161,6 +169,14 @@ resource "oci_identity_domains_group" "dd_auth" {
         value = freeform_tags.value
       }
     }
+    dynamic "defined_tags" {
+      for_each = var.defined_tags
+      content {
+        namespace = split(".", defined_tags.key)[0]
+        key       = join(".", slice(split(".", defined_tags.key), 1, length(split(".", defined_tags.key))))
+        value     = defined_tags.value
+      }
+    }
   }
 }
 
@@ -172,11 +188,13 @@ resource "oci_identity_policy" "dd_auth" {
   statements = [
     "Define tenancy usage-report as ocid1.tenancy.oc1..aaaaaaaaned4fkpkisbwjlr56u7cj63lf3wffbilvqknstgtvzub7vhqkggq",
     "Allow group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to read all-resources in tenancy",
+    "Allow group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to use tag-namespaces in tenancy",
     "Allow group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to manage serviceconnectors in compartment id ${var.compartment_id}",
     "Allow group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to manage functions-family in compartment id ${var.compartment_id} where ANY {request.permission = 'FN_FUNCTION_UPDATE', request.permission = 'FN_FUNCTION_LIST', request.permission = 'FN_APP_LIST'}",
     "Endorse group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to read objects in tenancy usage-report"
   ]
   freeform_tags = var.tags
+  defined_tags  = var.defined_tags
 }
 
 resource "oci_identity_domains_dynamic_resource_group" "service_connector" {
@@ -210,4 +228,5 @@ resource "oci_identity_policy" "dynamic_group" {
     "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.forwarding_function.ocid} to read secret-bundles in compartment id ${var.compartment_id}"
   ]
   freeform_tags = var.tags
+  defined_tags  = var.defined_tags
 }

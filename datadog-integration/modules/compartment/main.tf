@@ -20,5 +20,6 @@ resource "oci_identity_compartment" "new" {
   name           = var.new_compartment_name
   description    = "Compartment for Datadog generated resources"
   compartment_id = var.parent_compartment_id
-  freeform_tags  = var.tags
+  freeform_tags = var.tags
+  defined_tags  = var.defined_tags
 }

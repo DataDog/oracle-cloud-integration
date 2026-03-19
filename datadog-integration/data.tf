@@ -38,3 +38,4 @@ data "oci_identity_domains_groups" "existing_group_in_domain" {
 data "oci_identity_domain" "domain" {
   domain_id = local.matching_domain_id
 }
+
