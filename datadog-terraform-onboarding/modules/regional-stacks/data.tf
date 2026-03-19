@@ -35,3 +35,8 @@ data "oci_core_subnet" "provided_subnet" {
   count     = var.subnet_ocid != "" ? 1 : 0
   subnet_id = var.subnet_ocid
 }
+
+data "oci_core_vcn" "dd_vcn" {
+  count  = var.subnet_ocid == "" ? 1 : 0
+  vcn_id = module.vcn[0].vcn_id
+}
