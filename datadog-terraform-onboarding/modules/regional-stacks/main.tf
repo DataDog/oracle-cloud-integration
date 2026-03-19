@@ -45,7 +45,7 @@ module "vcn" {
   vcn_cidrs                = ["10.0.0.0/16"]
   vcn_dns_label            = "ddvcnmodule"
   vcn_name                 = local.vcn_name
-  lockdown_default_seclist  = false
+  lockdown_default_seclist  = true
   subnets                  = {}
 
   create_nat_gateway           = true
@@ -72,6 +72,39 @@ module "subnet" {
   }
   freeform_tags = var.tags
   defined_tags  = var.defined_tags
+}
+
+resource "oci_core_default_security_list" "dd_default" {
+  count                      = var.subnet_ocid == "" ? 1 : 0
+  manage_default_resource_id = data.oci_core_vcn.dd_vcn[0].default_security_list_id
+  freeform_tags              = var.tags
+
+  egress_security_rules {
+    destination      = "0.0.0.0/0"
+    protocol         = "all"
+    destination_type = "CIDR_BLOCK"
+  }
+
+  # ICMP type 3 code 4: path MTU discovery (from anywhere)
+  ingress_security_rules {
+    protocol    = "1"
+    source      = "0.0.0.0/0"
+    source_type = "CIDR_BLOCK"
+    icmp_options {
+      type = 3
+      code = 4
+    }
+  }
+
+  # ICMP type 3: destination unreachable (from within VCN)
+  ingress_security_rules {
+    protocol    = "1"
+    source      = "10.0.0.0/16"
+    source_type = "CIDR_BLOCK"
+    icmp_options {
+      type = 3
+    }
+  }
 }
 
 resource "oci_functions_application" "dd_function_app" {
