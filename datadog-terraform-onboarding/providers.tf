@@ -7,7 +7,7 @@ terraform {
     }
     restapi = {
       source  = "Mastercard/restapi"
-      version = ">= 1.20.0"
+      version = "~> 1.20"
     }
     external = {
       source  = "hashicorp/external"
