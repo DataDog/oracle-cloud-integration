@@ -3,8 +3,8 @@ module datadog-functions/lib
 go 1.25.7
 
 require (
-	github.com/DataDog/datadog-api-client-go/v2 v2.36.1
-	github.com/oracle/oci-go-sdk/v65 v65.108.0
+	github.com/DataDog/datadog-api-client-go/v2 v2.55.0
+	github.com/oracle/oci-go-sdk/v65 v65.108.3
 	github.com/stretchr/testify v1.11.1
 )
 
@@ -13,6 +13,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
+	github.com/google/uuid v1.5.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sony/gobreaker v1.0.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
