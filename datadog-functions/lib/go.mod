@@ -3,8 +3,8 @@ module datadog-functions/lib
 go 1.25.7
 
 require (
-	github.com/DataDog/datadog-api-client-go/v2 v2.56.0
-	github.com/oracle/oci-go-sdk/v65 v65.109.3
+	github.com/DataDog/datadog-api-client-go/v2 v2.57.0
+	github.com/oracle/oci-go-sdk/v65 v65.110.0
 	github.com/stretchr/testify v1.11.1
 )
 
