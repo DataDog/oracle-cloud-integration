@@ -42,8 +42,8 @@ func TestChunk_FitsInOnePayload(t *testing.T) {
 		json.RawMessage(sampleEvent),
 		json.RawMessage(sampleEvent),
 	}
-	payloads, err := Chunk(events)
-	assert.NoError(t, err)
+	payloads, dropped := Chunk(events)
+	assert.Equal(t, 0, dropped)
 	assert.Len(t, payloads, 1)
 
 	var decoded []map[string]any
@@ -52,21 +52,19 @@ func TestChunk_FitsInOnePayload(t *testing.T) {
 }
 
 func TestChunk_Empty(t *testing.T) {
-	payloads, err := Chunk(nil)
-	assert.NoError(t, err)
+	payloads, dropped := Chunk(nil)
+	assert.Equal(t, 0, dropped)
 	assert.Nil(t, payloads)
 }
 
 func TestChunk_SplitsOnByteLimit(t *testing.T) {
-	// Build events that each occupy roughly half of MaxBodyBytes so two events
-	// must split across payloads.
 	big := strings.Repeat("a", MaxBodyBytes/2-100)
 	ev := json.RawMessage(`{"eventID":"` + big + `"}`)
 	events := []json.RawMessage{ev, ev, ev}
 
-	payloads, err := Chunk(events)
-	assert.NoError(t, err)
-	assert.GreaterOrEqual(t, len(payloads), 2)
+	payloads, dropped := Chunk(events)
+	assert.Equal(t, 0, dropped)
+	assert.Len(t, payloads, 2)
 
 	for _, p := range payloads {
 		assert.LessOrEqual(t, len(p), MaxBodyBytes)
@@ -78,10 +76,8 @@ func TestChunk_DropsOversizeEvent(t *testing.T) {
 	oversize := json.RawMessage(`{"eventID":"` + huge + `"}`)
 	normal := json.RawMessage(sampleEvent)
 
-	payloads, err := Chunk([]json.RawMessage{normal, oversize, normal})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "exceeded")
-	// Normal events still ship.
+	payloads, dropped := Chunk([]json.RawMessage{normal, oversize, normal})
+	assert.Equal(t, 1, dropped)
 	assert.Len(t, payloads, 1)
 	var decoded []map[string]any
 	assert.NoError(t, json.Unmarshal(payloads[0], &decoded))
@@ -89,15 +85,14 @@ func TestChunk_DropsOversizeEvent(t *testing.T) {
 }
 
 func TestChunk_SplitsOnCountLimit(t *testing.T) {
-	// Synthesize events just past MaxBatchCount to verify a count-based split.
 	count := MaxBatchCount + 5
 	events := make([]json.RawMessage, count)
 	for i := range events {
 		events[i] = json.RawMessage(`{}`)
 	}
 
-	payloads, err := Chunk(events)
-	assert.NoError(t, err)
+	payloads, dropped := Chunk(events)
+	assert.Equal(t, 0, dropped)
 	assert.Len(t, payloads, 2)
 
 	var first []map[string]any

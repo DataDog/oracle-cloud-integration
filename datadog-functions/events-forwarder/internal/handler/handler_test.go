@@ -78,7 +78,7 @@ func TestMyHandler_InvalidJSON(t *testing.T) {
 }
 
 func TestMyHandler_MissingEnv(t *testing.T) {
-	// No withTestClient — exercise the real client path so the env-var check fires.
+	// Skip withTestClient so the real client constructor runs and the env-var check fires.
 	original := datadogClientFunc
 	t.Cleanup(func() { datadogClientFunc = original })
 	datadogClientFunc = client.NewDatadogClientWithSite

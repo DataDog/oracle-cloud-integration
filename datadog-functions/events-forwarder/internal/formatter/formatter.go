@@ -1,9 +1,6 @@
-// Package formatter decodes and chunks the OCI cloud-events batch delivered by
-// the Service Connector Hub into payloads sized for the cloudchanges intake.
-//
-// Input from OCH is a JSON array of OCI CloudEvents envelopes (or a single
-// envelope). The events are forwarded unchanged — mapping to the unified
-// cloudchange schema happens server-side in cloudchange-worker.
+// Package formatter decodes and chunks an OCI cloud-events batch into
+// payloads sized for the cloudchanges intake. Events are forwarded
+// unchanged — schema mapping happens server-side in cloudchange-worker.
 package formatter
 
 import (
@@ -14,13 +11,13 @@ import (
 
 // Intake limits enforced by cloudplatform-intake/api/v2/cloudchanges.
 const (
-	MaxBodyBytes  = 5 * 1024 * 1024 // 5 MB uncompressed
+	MaxBodyBytes  = 5 * 1024 * 1024
 	MaxBatchCount = 65536
 )
 
-// Decode reads a JSON payload that is either a single OCI CloudEvents
-// envelope or an array of envelopes, and returns them as RawMessage so that
-// downstream chunking can operate on encoded sizes without re-encoding.
+// Decode accepts either a single OCI CloudEvents envelope or an array of
+// envelopes. Events are returned as RawMessage so downstream chunking can
+// operate on encoded sizes without re-encoding each element.
 func Decode(in io.Reader) ([]json.RawMessage, error) {
 	var body json.RawMessage
 	if err := json.NewDecoder(in).Decode(&body); err != nil {
@@ -32,7 +29,6 @@ func Decode(in io.Reader) ([]json.RawMessage, error) {
 		return arr, nil
 	}
 
-	// Fall back to a single object.
 	var obj map[string]any
 	if err := json.Unmarshal(body, &obj); err != nil {
 		return nil, fmt.Errorf("invalid JSON format: expected object or array of objects: %w", err)
@@ -41,22 +37,18 @@ func Decode(in io.Reader) ([]json.RawMessage, error) {
 }
 
 // Chunk splits events into JSON-array payloads that respect the intake's
-// per-request size and count limits. Each returned payload is a complete
-// JSON array ready to be sent.
-//
-// A single event larger than MaxBodyBytes is dropped with an error returned
-// for the caller to log; the remaining events still chunk normally.
-func Chunk(events []json.RawMessage) ([][]byte, error) {
+// per-request size and count limits. Events larger than MaxBodyBytes
+// individually cannot fit in any payload and are dropped; the count of
+// dropped events is returned alongside the payloads so the caller can log
+// it.
+func Chunk(events []json.RawMessage) (payloads [][]byte, dropped int) {
 	if len(events) == 0 {
-		return nil, nil
+		return nil, 0
 	}
 
 	var (
-		payloads [][]byte
-		current  []json.RawMessage
-		// Account for "[", "]" and the commas between elements.
-		currentSize = 2
-		oversize    int
+		current     []json.RawMessage
+		currentSize = 2 // "[" + "]"
 	)
 
 	flush := func() {
@@ -72,14 +64,13 @@ func Chunk(events []json.RawMessage) ([][]byte, error) {
 	for _, ev := range events {
 		evSize := len(ev)
 		if evSize+2 > MaxBodyBytes {
-			oversize++
+			dropped++
 			continue
 		}
 
-		// +1 for the comma separator if this isn't the first element.
 		addSize := evSize
 		if len(current) > 0 {
-			addSize++
+			addSize++ // comma separator
 		}
 
 		if currentSize+addSize > MaxBodyBytes || len(current)+1 > MaxBatchCount {
@@ -92,8 +83,5 @@ func Chunk(events []json.RawMessage) ([][]byte, error) {
 	}
 	flush()
 
-	if oversize > 0 {
-		return payloads, fmt.Errorf("%d event(s) exceeded the %d byte intake limit and were dropped", oversize, MaxBodyBytes)
-	}
-	return payloads, nil
+	return payloads, dropped
 }
