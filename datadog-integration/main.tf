@@ -232,6 +232,7 @@ module "auth" {
   dg_sch_name       = local.dg_sch_name
   dg_fn_name        = local.dg_fn_name
   dg_policy_name    = local.dg_policy_name
+  events_enabled    = var.events_enabled
   defined_tags      = local.defined_tags
 }
 
@@ -264,6 +265,7 @@ module "integration" {
   subscribed_regions              = tolist(local.final_regions_for_stacks)
   datadog_resource_compartment_id = module.compartment.id
   logs_enabled                    = var.logs_enabled
+  events_enabled                  = var.events_enabled
   defined_tags                    = local.defined_tags
 }
 

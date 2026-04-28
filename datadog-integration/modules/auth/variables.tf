@@ -80,3 +80,9 @@ variable "dg_policy_name" {
   type        = string
 }
 
+variable "events_enabled" {
+  type        = bool
+  description = "When true, provisions the cloudEvents IAM policy that lets the OCI Events service write to streams in the Datadog compartment."
+  default     = false
+}
+

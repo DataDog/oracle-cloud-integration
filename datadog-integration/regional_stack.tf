@@ -65,7 +65,7 @@ resource "null_resource" "regional_stacks_create_apply" {
       --config-source ${path.module}/modules/regional-stacks/dd_regional_stack.zip  --variables '{"tenancy_ocid": "${var.tenancy_ocid}", "region": "${each.key}", \
       "compartment_ocid": "${module.compartment.id}", "datadog_site": "${var.datadog_site}", "api_key_secret_id": "${module.kms[0].api_key_secret_id}", \
       "home_region": "${local.home_region_name}", "region_key": "${local.subscribed_regions_map[each.key].region_key}", \
-      "subnet_ocid": "${lookup(local.region_to_subnet_ocid_map, each.key, "")}", "defined_tags": ${jsonencode(jsonencode(local.defined_tags))}}' \
+      "subnet_ocid": "${lookup(local.region_to_subnet_ocid_map, each.key, "")}", "events_enabled": "${var.events_enabled}", "defined_tags": ${jsonencode(jsonencode(local.defined_tags))}}' \
       ${local.stack_create_defined_tags_flag} \
       --wait-for-state ACTIVE \
       --max-wait-seconds 120 \

@@ -51,9 +51,15 @@ variable "subnet_ocid" {
   type        = string
   description = "Optional OCID of an existing subnet to use. If not provided, a new subnet will be created."
   default     = ""
-  
+
   validation {
     condition = var.subnet_ocid == "" || can(regex("^ocid1\\.subnet\\.oc[0-9]\\.", var.subnet_ocid))
     error_message = "If provided, subnet_ocid must be a valid subnet OCID starting with: ocid1.subnet.oc[0-9]."
   }
+}
+
+variable "events_enabled" {
+  type        = bool
+  description = "Indicates if the events-forwarder function should be deployed in this region."
+  default     = false
 }

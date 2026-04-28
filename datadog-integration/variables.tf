@@ -77,6 +77,12 @@ variable "logs_enabled" {
   default     = false
 }
 
+variable "events_enabled" {
+  type        = bool
+  description = "Indicates if OCI cloud-event forwarding should be enabled. When true, the events-forwarder function and the cloudEvents IAM policy are provisioned and the integration is opted in to event management."
+  default     = false
+}
+
 variable "domain_id" {
   type        = string
   description = "The OCID of the Identity Domain to use for the Datadog QuickStart stack"

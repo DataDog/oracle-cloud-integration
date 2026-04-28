@@ -20,6 +20,9 @@ locals {
         logs_config : {
           Enabled : var.logs_enabled
         }
+        events_config : {
+          Enabled : var.events_enabled
+        }
         defined_tags : [for k, v in var.defined_tags : "${k}:${v}"]
       }
     }

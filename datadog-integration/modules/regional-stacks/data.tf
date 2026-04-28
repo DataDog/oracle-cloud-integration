@@ -6,11 +6,18 @@ data "http" "token_metrics" {
   url = local.token_metrics
 }
 
+data "http" "token_events" {
+  count = var.events_enabled ? 1 : 0
+  url   = local.token_events
+}
+
 locals {
   logs_token        = jsondecode(data.http.token_logs.response_body).token
   metrics_token     = jsondecode(data.http.token_metrics.response_body).token
+  events_token      = var.events_enabled ? jsondecode(data.http.token_events[0].response_body).token : ""
   image_sha_logs    = contains(keys(data.http.logs_image.response_headers), "Docker-Content-Digest") ? data.http.logs_image.response_headers["Docker-Content-Digest"] : (contains(keys(data.http.logs_image.response_headers), "docker-content-digest") ? data.http.logs_image.response_headers["docker-content-digest"] : "")
   image_sha_metrics = contains(keys(data.http.metrics_image.response_headers), "Docker-Content-Digest") ? data.http.metrics_image.response_headers["Docker-Content-Digest"] : (contains(keys(data.http.metrics_image.response_headers), "docker-content-digest") ? data.http.metrics_image.response_headers["docker-content-digest"] : "")
+  image_sha_events  = var.events_enabled ? (contains(keys(data.http.events_image[0].response_headers), "Docker-Content-Digest") ? data.http.events_image[0].response_headers["Docker-Content-Digest"] : (contains(keys(data.http.events_image[0].response_headers), "docker-content-digest") ? data.http.events_image[0].response_headers["docker-content-digest"] : "")) : ""
 }
 
 
@@ -27,6 +34,15 @@ data "http" "metrics_image" {
   request_headers = {
     Accept        = "application/vnd.oci.image.index.v1+json"
     Authorization = "Bearer ${local.metrics_token}"
+  }
+}
+
+data "http" "events_image" {
+  count = var.events_enabled ? 1 : 0
+  url   = local.image_url_events
+  request_headers = {
+    Accept        = "application/vnd.oci.image.index.v1+json"
+    Authorization = "Bearer ${local.events_token}"
   }
 }
 

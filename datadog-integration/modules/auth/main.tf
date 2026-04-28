@@ -230,3 +230,19 @@ resource "oci_identity_policy" "dynamic_group" {
   freeform_tags = var.tags
   defined_tags  = var.defined_tags
 }
+
+resource "oci_identity_policy" "events" {
+  count          = var.events_enabled ? 1 : 0
+  depends_on     = [null_resource.user_group_variable_validation, oci_identity_domains_group.dd_auth]
+  compartment_id = var.tenancy_id
+  description    = "[DO NOT REMOVE] Policy granting the OCI Events service permission to publish to the Datadog events stream and Datadog to manage event rules"
+  name           = "dd-events-cloudevents-policy"
+  statements = [
+    "Allow service cloudEvents to use streams in compartment id ${var.compartment_id}",
+    "Allow group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to manage cloudevents-rules in tenancy",
+    "Allow group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to manage stream-family in compartment id ${var.compartment_id}",
+    "Allow group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to manage serviceconnectors in compartment id ${var.compartment_id}"
+  ]
+  freeform_tags = var.tags
+  defined_tags  = var.defined_tags
+}

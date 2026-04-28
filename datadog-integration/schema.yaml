@@ -19,6 +19,7 @@ variableGroups:
       - ${datadog_api_key}
       - ${datadog_site}
       - ${logs_enabled}
+      - ${events_enabled}
   - title: "(Optional) Choose specific subnet(s)"
     variables:
       - ${choose_subnet}
@@ -113,6 +114,14 @@ variables:
     type: string
     description: |
       Indicates if logs should be enabled/disabled
+    required: false
+    default: false
+
+  events_enabled:
+    title: Events Enabled
+    type: string
+    description: |
+      Indicates if OCI cloud-event forwarding should be enabled. When true, an additional events-forwarder function and the cloudEvents IAM policy are deployed in each region.
     required: false
     default: false
 

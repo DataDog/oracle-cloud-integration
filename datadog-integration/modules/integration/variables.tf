@@ -55,6 +55,12 @@ variable "logs_enabled" {
   default     = false
 }
 
+variable "events_enabled" {
+  type        = bool
+  description = "Indicates if OCI events should be enabled/disabled"
+  default     = false
+}
+
 variable "defined_tags" {
   type        = map(string)
   description = "OCI defined tags applied to resources (namespace.key -> value). Sent to Datadog for integration config."

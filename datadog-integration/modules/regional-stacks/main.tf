@@ -33,6 +33,17 @@ resource "oci_functions_function" "metrics_function" {
   image_digest   = length(local.image_sha_metrics) > 0 ? local.image_sha_metrics : null
 }
 
+resource "oci_functions_function" "events_function" {
+  count          = var.events_enabled ? 1 : 0
+  application_id = oci_functions_application.dd_function_app.id
+  display_name   = "dd-events-forwarder"
+  memory_in_mbs  = "256"
+  freeform_tags  = var.tags
+  defined_tags   = local.defined_tags_map
+  image          = local.events_image_path
+  image_digest   = length(local.image_sha_events) > 0 ? local.image_sha_events : null
+}
+
 module "vcn" {
   count                    = var.subnet_ocid == "" ? 1 : 0
   source                   = "oracle-terraform-modules/vcn/oci"
