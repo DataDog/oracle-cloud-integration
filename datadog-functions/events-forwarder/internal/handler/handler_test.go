@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 
 	"datadog-functions/lib/client"
 
 	fdk "github.com/fnproject/fdk-go"
-	"github.com/stretchr/testify/assert"
 )
 
 func getContext() context.Context {
@@ -39,42 +39,50 @@ func withTestClient(t *testing.T) {
 	datadogClientFunc = client.NewTestDatadogClientWithSite
 }
 
-func TestMyHandler_ArrayPayload(t *testing.T) {
-	withTestClient(t)
-
-	in := bytes.NewBufferString("[" + eventEnvelope + "," + eventEnvelope + "]")
+func runHandler(t *testing.T, body string) fnResponse {
+	t.Helper()
+	in := bytes.NewBufferString(body)
 	out := &bytes.Buffer{}
 	MyHandler(getContext(), in, out)
 
 	var resp fnResponse
-	assert.NoError(t, json.Unmarshal(out.Bytes(), &resp))
-	assert.Equal(t, "success", resp.Status)
-	assert.Equal(t, "Events sent to Datadog", resp.Message)
+	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v (raw=%q)", err, out.String())
+	}
+	return resp
+}
+
+func TestMyHandler_ArrayPayload(t *testing.T) {
+	withTestClient(t)
+
+	resp := runHandler(t, "["+eventEnvelope+","+eventEnvelope+"]")
+	if resp.Status != "success" {
+		t.Fatalf("status = %q, want success (resp=%+v)", resp.Status, resp)
+	}
+	if resp.Message != "Events sent to Datadog" {
+		t.Fatalf("message = %q, want %q", resp.Message, "Events sent to Datadog")
+	}
 }
 
 func TestMyHandler_SingleEnvelope(t *testing.T) {
 	withTestClient(t)
 
-	in := bytes.NewBufferString(eventEnvelope)
-	out := &bytes.Buffer{}
-	MyHandler(getContext(), in, out)
-
-	var resp fnResponse
-	assert.NoError(t, json.Unmarshal(out.Bytes(), &resp))
-	assert.Equal(t, "success", resp.Status)
+	resp := runHandler(t, eventEnvelope)
+	if resp.Status != "success" {
+		t.Fatalf("status = %q, want success (resp=%+v)", resp.Status, resp)
+	}
 }
 
 func TestMyHandler_InvalidJSON(t *testing.T) {
 	withTestClient(t)
 
-	in := bytes.NewBufferString("not json")
-	out := &bytes.Buffer{}
-	MyHandler(getContext(), in, out)
-
-	var resp fnResponse
-	assert.NoError(t, json.Unmarshal(out.Bytes(), &resp))
-	assert.Equal(t, "error", resp.Status)
-	assert.Contains(t, resp.Error, "decode JSON")
+	resp := runHandler(t, "not json")
+	if resp.Status != "error" {
+		t.Fatalf("status = %q, want error", resp.Status)
+	}
+	if !strings.Contains(resp.Error, "decode JSON") {
+		t.Fatalf("error = %q, want substring %q", resp.Error, "decode JSON")
+	}
 }
 
 func TestMyHandler_MissingEnv(t *testing.T) {
@@ -85,12 +93,11 @@ func TestMyHandler_MissingEnv(t *testing.T) {
 
 	os.Unsetenv("DD_SITE")
 
-	in := bytes.NewBufferString(eventEnvelope)
-	out := &bytes.Buffer{}
-	MyHandler(getContext(), in, out)
-
-	var resp fnResponse
-	assert.NoError(t, json.Unmarshal(out.Bytes(), &resp))
-	assert.Equal(t, "error", resp.Status)
-	assert.Contains(t, resp.Error, "DD_SITE")
+	resp := runHandler(t, eventEnvelope)
+	if resp.Status != "error" {
+		t.Fatalf("status = %q, want error", resp.Status)
+	}
+	if !strings.Contains(resp.Error, "DD_SITE") {
+		t.Fatalf("error = %q, want substring %q", resp.Error, "DD_SITE")
+	}
 }

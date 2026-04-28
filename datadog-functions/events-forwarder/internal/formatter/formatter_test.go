@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 const sampleEvent = `{"eventType":"com.oraclecloud.objectstorage.deletebucket","eventID":"abc","data":{"resourceId":"ocid1.bucket.oc1..xyz"}}`
@@ -14,47 +12,63 @@ const sampleEvent = `{"eventType":"com.oraclecloud.objectstorage.deletebucket","
 func TestDecode_Array(t *testing.T) {
 	in := bytes.NewBufferString("[" + sampleEvent + "," + sampleEvent + "]")
 	events, err := Decode(in)
-	assert.NoError(t, err)
-	assert.Len(t, events, 2)
+	if err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("got %d events, want 2", len(events))
+	}
 }
 
 func TestDecode_SingleObject(t *testing.T) {
 	in := bytes.NewBufferString(sampleEvent)
 	events, err := Decode(in)
-	assert.NoError(t, err)
-	assert.Len(t, events, 1)
+	if err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("got %d events, want 1", len(events))
+	}
 }
 
 func TestDecode_InvalidJSON(t *testing.T) {
-	in := bytes.NewBufferString("not json")
-	_, err := Decode(in)
-	assert.Error(t, err)
+	if _, err := Decode(bytes.NewBufferString("not json")); err == nil {
+		t.Fatal("expected error for invalid JSON, got nil")
+	}
 }
 
 func TestDecode_NotObjectOrArray(t *testing.T) {
-	in := bytes.NewBufferString("123")
-	_, err := Decode(in)
-	assert.Error(t, err)
+	if _, err := Decode(bytes.NewBufferString("123")); err == nil {
+		t.Fatal("expected error for non-object/array JSON, got nil")
+	}
 }
 
 func TestChunk_FitsInOnePayload(t *testing.T) {
-	events := []json.RawMessage{
-		json.RawMessage(sampleEvent),
-		json.RawMessage(sampleEvent),
-	}
+	events := []json.RawMessage{json.RawMessage(sampleEvent), json.RawMessage(sampleEvent)}
 	payloads, dropped := Chunk(events)
-	assert.Equal(t, 0, dropped)
-	assert.Len(t, payloads, 1)
-
+	if dropped != 0 {
+		t.Fatalf("dropped = %d, want 0", dropped)
+	}
+	if len(payloads) != 1 {
+		t.Fatalf("got %d payloads, want 1", len(payloads))
+	}
 	var decoded []map[string]any
-	assert.NoError(t, json.Unmarshal(payloads[0], &decoded))
-	assert.Len(t, decoded, 2)
+	if err := json.Unmarshal(payloads[0], &decoded); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	if len(decoded) != 2 {
+		t.Fatalf("payload contains %d events, want 2", len(decoded))
+	}
 }
 
 func TestChunk_Empty(t *testing.T) {
 	payloads, dropped := Chunk(nil)
-	assert.Equal(t, 0, dropped)
-	assert.Nil(t, payloads)
+	if dropped != 0 {
+		t.Fatalf("dropped = %d, want 0", dropped)
+	}
+	if payloads != nil {
+		t.Fatalf("got %v payloads, want nil", payloads)
+	}
 }
 
 func TestChunk_SplitsOnByteLimit(t *testing.T) {
@@ -63,11 +77,16 @@ func TestChunk_SplitsOnByteLimit(t *testing.T) {
 	events := []json.RawMessage{ev, ev, ev}
 
 	payloads, dropped := Chunk(events)
-	assert.Equal(t, 0, dropped)
-	assert.Len(t, payloads, 2)
-
-	for _, p := range payloads {
-		assert.LessOrEqual(t, len(p), MaxBodyBytes)
+	if dropped != 0 {
+		t.Fatalf("dropped = %d, want 0", dropped)
+	}
+	if len(payloads) != 2 {
+		t.Fatalf("got %d payloads, want 2", len(payloads))
+	}
+	for i, p := range payloads {
+		if len(p) > MaxBodyBytes {
+			t.Fatalf("payload %d has size %d, exceeds MaxBodyBytes %d", i, len(p), MaxBodyBytes)
+		}
 	}
 }
 
@@ -77,11 +96,19 @@ func TestChunk_DropsOversizeEvent(t *testing.T) {
 	normal := json.RawMessage(sampleEvent)
 
 	payloads, dropped := Chunk([]json.RawMessage{normal, oversize, normal})
-	assert.Equal(t, 1, dropped)
-	assert.Len(t, payloads, 1)
+	if dropped != 1 {
+		t.Fatalf("dropped = %d, want 1", dropped)
+	}
+	if len(payloads) != 1 {
+		t.Fatalf("got %d payloads, want 1", len(payloads))
+	}
 	var decoded []map[string]any
-	assert.NoError(t, json.Unmarshal(payloads[0], &decoded))
-	assert.Len(t, decoded, 2)
+	if err := json.Unmarshal(payloads[0], &decoded); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	if len(decoded) != 2 {
+		t.Fatalf("payload contains %d events, want 2", len(decoded))
+	}
 }
 
 func TestChunk_SplitsOnCountLimit(t *testing.T) {
@@ -92,14 +119,26 @@ func TestChunk_SplitsOnCountLimit(t *testing.T) {
 	}
 
 	payloads, dropped := Chunk(events)
-	assert.Equal(t, 0, dropped)
-	assert.Len(t, payloads, 2)
+	if dropped != 0 {
+		t.Fatalf("dropped = %d, want 0", dropped)
+	}
+	if len(payloads) != 2 {
+		t.Fatalf("got %d payloads, want 2", len(payloads))
+	}
 
 	var first []map[string]any
-	assert.NoError(t, json.Unmarshal(payloads[0], &first))
-	assert.Equal(t, MaxBatchCount, len(first))
+	if err := json.Unmarshal(payloads[0], &first); err != nil {
+		t.Fatalf("unmarshal first payload: %v", err)
+	}
+	if len(first) != MaxBatchCount {
+		t.Fatalf("first payload has %d events, want %d", len(first), MaxBatchCount)
+	}
 
 	var second []map[string]any
-	assert.NoError(t, json.Unmarshal(payloads[1], &second))
-	assert.Equal(t, 5, len(second))
+	if err := json.Unmarshal(payloads[1], &second); err != nil {
+		t.Fatalf("unmarshal second payload: %v", err)
+	}
+	if len(second) != 5 {
+		t.Fatalf("second payload has %d events, want 5", len(second))
+	}
 }
