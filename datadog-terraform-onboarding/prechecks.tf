@@ -127,34 +127,6 @@ resource "terraform_data" "validate_vault_quota" {
   }
 }
 
-# Data source: Check service connector hub quota availability
-data "oci_limits_resource_availability" "connector_hub_quota" {
-  compartment_id      = var.tenancy_ocid
-  limit_name          = "service-connector-count"
-  service_name        = "service-connector-hub"
-  availability_domain = null
-}
-
-# Check 10: Validate service connector hub quota is available
-resource "terraform_data" "validate_connector_hub_quota" {
-  lifecycle {
-    precondition {
-      condition     = try(data.oci_limits_resource_availability.connector_hub_quota.available, 0) >= 1
-      error_message = <<-EOF
-        ╔════════════════════════════════════════════════════════════════════════════╗
-        ║                   SERVICE CONNECTOR QUOTA EXHAUSTED ERROR                  ║
-        ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Insufficient connector hub quota in your tenancy.                          ║
-        ║                                                                            ║
-        ║ Available: ${try(data.oci_limits_resource_availability.connector_hub_quota.available, 0)} ║
-        ║ Required: 1                                                                ║
-        ║                                                                            ║
-        ║ Please increase your service connector quota.                              ║
-        ╚════════════════════════════════════════════════════════════════════════════╝
-      EOF
-    }
-  }
-}
 
 data "external" "check_integration_exists" {
   program = ["bash", "-c", <<-EOT
@@ -422,7 +394,6 @@ resource "terraform_data" "prechecks_complete" {
     terraform_data.validate_domain_email_consistency,
     terraform_data.validate_existing_vs_new_user,
     terraform_data.validate_vault_quota,
-    terraform_data.validate_connector_hub_quota,
     terraform_data.validate_compartment_immutability,
     terraform_data.validate_user_group_immutability,
   ]
