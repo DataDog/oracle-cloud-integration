@@ -98,6 +98,16 @@ resource "terraform_data" "validate_existing_vs_new_user" {
   }
 }
 
+data "external" "check_resources_in_state" {
+  program = ["bash", "-c", <<-EOT
+    STATE=$(terraform state list 2>/dev/null)
+    VAULT_EXISTS="false"
+    echo "$STATE" | grep -q "oci_kms_vault\." && VAULT_EXISTS="true"
+    echo "{\"vault_exists\": \"$VAULT_EXISTS\"}"
+  EOT
+  ]
+}
+
 # Data source: Check vault quota availability
 data "oci_limits_resource_availability" "vault_quota" {
   compartment_id     = var.tenancy_ocid
@@ -120,24 +130,11 @@ resource "terraform_data" "validate_vault_quota" {
         ║ Available: ${try(data.oci_limits_resource_availability.vault_quota.available, 0)} ║
         ║ Required: 1                                                                       ║
         ║                                                                                   ║
-        ║ Please increase your vault quota or delete existing vaults.                       ║ 
+        ║ Please increase your vault quota or delete existing vaults.                       ║
         ╚═══════════════════════════════════════════════════════════════════════════════════╝
       EOF
     }
   }
-}
-
-
-data "external" "check_resources_in_state" {
-  program = ["bash", "-c", <<-EOT
-    STATE=$(terraform state list 2>/dev/null)
-    INTEGRATION_EXISTS="false"
-    VAULT_EXISTS="false"
-    echo "$STATE" | grep -q "restapi_object\.datadog_tenancy_integration" && INTEGRATION_EXISTS="true"
-    echo "$STATE" | grep -q "oci_kms_vault\."                             && VAULT_EXISTS="true"
-    echo "{\"integration_exists\": \"$INTEGRATION_EXISTS\", \"vault_exists\": \"$VAULT_EXISTS\"}"
-  EOT
-  ]
 }
 
 # Data source to check compartment mode changes
