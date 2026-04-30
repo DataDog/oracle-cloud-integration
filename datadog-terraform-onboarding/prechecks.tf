@@ -110,7 +110,7 @@ data "oci_limits_resource_availability" "vault_quota" {
 resource "terraform_data" "validate_vault_quota" {
   lifecycle {
     precondition {
-      condition     = try(data.oci_limits_resource_availability.vault_quota.available, 0) >= 1
+      condition     = try(data.oci_limits_resource_availability.vault_quota.available, 0) >= 1 || data.external.check_integration_exists.result.vault_exists == "true"
       error_message = <<-EOF
         ╔═══════════════════════════════════════════════════════════════════════════════════╗
         ║                         VAULT QUOTA EXHAUSTED ERROR                               ║
@@ -158,12 +158,12 @@ resource "terraform_data" "validate_connector_hub_quota" {
 
 data "external" "check_integration_exists" {
   program = ["bash", "-c", <<-EOT
-    # Check if integration resource exists in terraform state
-    if terraform state list 2>/dev/null | grep -q "module.integration.restapi_object.datadog_tenancy_integration"; then
-      echo '{"exists": "true"}'
-    else
-      echo '{"exists": "false"}'
-    fi
+    STATE=$(terraform state list 2>/dev/null)
+    INTEGRATION_EXISTS="false"
+    VAULT_EXISTS="false"
+    echo "$STATE" | grep -q "module.integration.restapi_object.datadog_tenancy_integration" && INTEGRATION_EXISTS="true"
+    echo "$STATE" | grep -q "module.kms.oci_kms_vault.datadog_vault" && VAULT_EXISTS="true"
+    echo "{\"exists\": \"$INTEGRATION_EXISTS\", \"vault_exists\": \"$VAULT_EXISTS\"}"
   EOT
   ]
 }
