@@ -98,6 +98,16 @@ resource "terraform_data" "validate_existing_vs_new_user" {
   }
 }
 
+data "external" "check_resources_in_state" {
+  program = ["bash", "-c", <<-EOT
+    STATE=$(terraform state list 2>/dev/null)
+    VAULT_EXISTS="false"
+    echo "$STATE" | grep -q "oci_kms_vault\." && VAULT_EXISTS="true"
+    echo "{\"vault_exists\": \"$VAULT_EXISTS\"}"
+  EOT
+  ]
+}
+
 # Data source: Check vault quota availability
 data "oci_limits_resource_availability" "vault_quota" {
   compartment_id     = var.tenancy_ocid
@@ -110,7 +120,7 @@ data "oci_limits_resource_availability" "vault_quota" {
 resource "terraform_data" "validate_vault_quota" {
   lifecycle {
     precondition {
-      condition     = try(data.oci_limits_resource_availability.vault_quota.available, 0) >= 1
+      condition     = try(data.oci_limits_resource_availability.vault_quota.available, 0) >= 1 || data.external.check_resources_in_state.result.vault_exists == "true"
       error_message = <<-EOF
         ╔═══════════════════════════════════════════════════════════════════════════════════╗
         ║                         VAULT QUOTA EXHAUSTED ERROR                               ║
@@ -120,52 +130,11 @@ resource "terraform_data" "validate_vault_quota" {
         ║ Available: ${try(data.oci_limits_resource_availability.vault_quota.available, 0)} ║
         ║ Required: 1                                                                       ║
         ║                                                                                   ║
-        ║ Please increase your vault quota or delete existing vaults.                       ║ 
+        ║ Please increase your vault quota or delete existing vaults.                       ║
         ╚═══════════════════════════════════════════════════════════════════════════════════╝
       EOF
     }
   }
-}
-
-# Data source: Check service connector hub quota availability
-data "oci_limits_resource_availability" "connector_hub_quota" {
-  compartment_id      = var.tenancy_ocid
-  limit_name          = "service-connector-count"
-  service_name        = "service-connector-hub"
-  availability_domain = null
-}
-
-# Check 10: Validate service connector hub quota is available
-resource "terraform_data" "validate_connector_hub_quota" {
-  lifecycle {
-    precondition {
-      condition     = try(data.oci_limits_resource_availability.connector_hub_quota.available, 0) >= 1
-      error_message = <<-EOF
-        ╔════════════════════════════════════════════════════════════════════════════╗
-        ║                   SERVICE CONNECTOR QUOTA EXHAUSTED ERROR                  ║
-        ╠════════════════════════════════════════════════════════════════════════════╣
-        ║ Insufficient connector hub quota in your tenancy.                          ║
-        ║                                                                            ║
-        ║ Available: ${try(data.oci_limits_resource_availability.connector_hub_quota.available, 0)} ║
-        ║ Required: 1                                                                ║
-        ║                                                                            ║
-        ║ Please increase your service connector quota.                              ║
-        ╚════════════════════════════════════════════════════════════════════════════╝
-      EOF
-    }
-  }
-}
-
-data "external" "check_integration_exists" {
-  program = ["bash", "-c", <<-EOT
-    # Check if integration resource exists in terraform state
-    if terraform state list 2>/dev/null | grep -q "module.integration.restapi_object.datadog_tenancy_integration"; then
-      echo '{"exists": "true"}'
-    else
-      echo '{"exists": "false"}'
-    fi
-  EOT
-  ]
 }
 
 # Data source to check compartment mode changes
@@ -422,7 +391,6 @@ resource "terraform_data" "prechecks_complete" {
     terraform_data.validate_domain_email_consistency,
     terraform_data.validate_existing_vs_new_user,
     terraform_data.validate_vault_quota,
-    terraform_data.validate_connector_hub_quota,
     terraform_data.validate_compartment_immutability,
     terraform_data.validate_user_group_immutability,
   ]
