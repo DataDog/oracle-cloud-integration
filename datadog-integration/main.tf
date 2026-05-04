@@ -189,7 +189,8 @@ resource "null_resource" "precheck_marker" {
         --dg-fn-name '${local.dg_fn_name}' \
         --dg-policy-name '${local.dg_policy_name}' \
         --domain-display-name '${local.domain_display_name}' \
-        --idcs-endpoint '${local.idcs_endpoint}'
+        --idcs-endpoint '${local.idcs_endpoint}' \
+        --compartment-id '${var.compartment_id != null ? var.compartment_id : ""}'
     EOT
   }
 }
