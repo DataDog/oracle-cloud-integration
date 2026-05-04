@@ -72,13 +72,15 @@ def validate_pre_existing_resources(params, domain_endpoint):
         existing.append(f"User {params['user_name']}")
     if _resource_exists(ResourceType.GROUP, params["user_group_name"], domain_endpoint=domain_endpoint):
         existing.append(f"User Group {params['user_group_name']}")
-    if _resource_exists(ResourceType.POLICY, params["user_group_policy_name"], compartment_id=params["tenancy_id"]):
+    if _resource_exists(ResourceType.POLICY, params["user_group_policy_name"], compartment_id=params["tenancy_id"]) \
+            and not _policy_owned_by_datadog(params["user_group_policy_name"], params["tenancy_id"]):
         existing.append(f"User Group Policy {params['user_group_policy_name']}")
     if _resource_exists(ResourceType.DYNAMIC_GROUP, params["dg_sch_name"], domain_endpoint=domain_endpoint):
         existing.append(f"Dynamic Group {params['dg_sch_name']}")
     if _resource_exists(ResourceType.DYNAMIC_GROUP, params["dg_fn_name"], domain_endpoint=domain_endpoint):
         existing.append(f"Dynamic Group {params['dg_fn_name']}")
-    if _resource_exists(ResourceType.POLICY, params["dg_policy_name"], compartment_id=params["tenancy_id"]):
+    if _resource_exists(ResourceType.POLICY, params["dg_policy_name"], compartment_id=params["tenancy_id"]) \
+            and not _policy_owned_by_datadog(params["dg_policy_name"], params["tenancy_id"]):
         existing.append(f"Dynamic Group Policy {params['dg_policy_name']}")
     if existing:
         return f"{', '.join(existing)} already exists."
@@ -111,6 +113,24 @@ def _vault_exists(tenancy_ocid, home_region, compartment_id):
         ]
         result = subprocess.check_output(cmd).decode().strip()
         return bool(result and result != "null")
+    except Exception:
+        return False
+
+def _policy_owned_by_datadog(name, compartment_id):
+    """Return True if the named IAM policy exists and carries the ownedby=datadog tag."""
+    cmd = [
+        "oci", "iam", "policy", "list",
+        "--compartment-id", compartment_id,
+        "--all",
+        "--query", f"data[?name=='{name}'] | [0]",
+        "--raw-output",
+    ]
+    try:
+        result = subprocess.check_output(cmd).decode().strip()
+        if not result or result == "null":
+            return False
+        policy = json.loads(result)
+        return policy.get("freeform-tags", {}).get("ownedby") == "datadog"
     except Exception:
         return False
 
