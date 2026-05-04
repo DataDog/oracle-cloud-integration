@@ -8,7 +8,8 @@ OK_STATUS = "ok"
 ERROR_STATUS = "error"
 DEFAULT_DOMAIN_NAME = "Default"
 MIN_AVAILABLE_VAULT = 1
-MIN_AVAILABLE_CONNECTOR_HUB = 1
+DATADOG_VAULT_NAME = "datadog-vault"
+DATADOG_COMPARTMENT_NAME = "Datadog"
 
 class ResourceType(Enum):
     USER = "user"
@@ -83,7 +84,39 @@ def validate_pre_existing_resources(params, domain_endpoint):
         return f"{', '.join(existing)} already exists."
     return OK_STATUS
 
-def validate_vault_quota(tenancy_ocid, home_region):
+def _vault_exists(tenancy_ocid, home_region, compartment_id):
+    """Return True if the datadog-vault already exists, so re-apply does not trip the quota check."""
+    if not compartment_id:
+        # Look up the auto-created Datadog compartment under the tenancy.
+        try:
+            cmd = [
+                "oci", "iam", "compartment", "list",
+                "--compartment-id", tenancy_ocid,
+                "--name", DATADOG_COMPARTMENT_NAME,
+                "--query", "data[?\"lifecycle-state\"=='ACTIVE'].id | [0]",
+                "--raw-output",
+            ]
+            compartment_id = subprocess.check_output(cmd).decode().strip()
+        except Exception:
+            return False
+    if not compartment_id or compartment_id == "null":
+        return False
+    try:
+        cmd = [
+            "oci", "kms", "management", "vault", "list",
+            "--compartment-id", compartment_id,
+            "--region", home_region,
+            "--query", f"data[?\"display-name\"=='{DATADOG_VAULT_NAME}' && \"lifecycle-state\"=='ACTIVE'] | [0]",
+            "--raw-output",
+        ]
+        result = subprocess.check_output(cmd).decode().strip()
+        return bool(result and result != "null")
+    except Exception:
+        return False
+
+def validate_vault_quota(tenancy_ocid, home_region, compartment_id):
+    if _vault_exists(tenancy_ocid, home_region, compartment_id):
+        return OK_STATUS
     cmd = [
         "oci", "limits", "resource-availability", "get",
         "--service-name", "kms",
@@ -101,24 +134,6 @@ def validate_vault_quota(tenancy_ocid, home_region):
     except Exception as e:
         return f"Failed to check vault quota: {str(e)}"
 
-def validate_connector_hub_quota(tenancy_ocid, home_region):
-    cmd = [
-        "oci", "limits", "resource-availability", "get",
-        "--service-name", "service-connector-hub",
-        "--limit-name", "service-connector-count",
-        "--compartment-id", tenancy_ocid,
-        "--region", home_region
-    ]
-    try:
-        result = subprocess.check_output(cmd).decode()
-        data = json.loads(result)
-        available = data["data"].get("available", 0)
-        if available < MIN_AVAILABLE_CONNECTOR_HUB:
-            return f"Insufficient connector hub quota in region {home_region}: {available} available, {MIN_AVAILABLE_CONNECTOR_HUB} required."
-    except Exception as e:
-        return f"Failed to check connector hub quota in region {home_region}: {str(e)}"
-    return OK_STATUS
-
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--tenancy-id", required=True)
@@ -134,6 +149,7 @@ def parse_args():
     parser.add_argument("--dg-policy-name", required=True)
     parser.add_argument("--domain-display-name", required=True)
     parser.add_argument("--idcs-endpoint", required=True)
+    parser.add_argument("--compartment-id", required=False, default="")
     return parser.parse_args()
 
 def main():
@@ -152,6 +168,7 @@ def main():
         "dg_policy_name": args.dg_policy_name,
         "domain_display_name": args.domain_display_name,
         "idcs_endpoint": args.idcs_endpoint,
+        "compartment_id": args.compartment_id,
     }
 
     errors = []
@@ -180,13 +197,8 @@ def main():
     else:
         errors.append("User not found in any domain")
 
-    # Validation 5: Vault quota check
-    result = validate_vault_quota(params["tenancy_id"], params["home_region"])
-    if result != OK_STATUS:
-        errors.append(result)
-
-    # Validation 6: Connector hub quota check
-    result = validate_connector_hub_quota(params["tenancy_id"], params["home_region"])
+    # Validation 5: Vault quota check (skipped when vault already exists — idempotent re-apply)
+    result = validate_vault_quota(params["tenancy_id"], params["home_region"], params["compartment_id"])
     if result != OK_STATUS:
         errors.append(result)
 
