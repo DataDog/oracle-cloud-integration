@@ -75,6 +75,7 @@ module "subnet" {
 resource "oci_core_default_security_list" "dd_default" {
   count                      = var.subnet_ocid == "" ? 1 : 0
   manage_default_resource_id = data.oci_core_vcn.dd_vcn[0].default_security_list_id
+  depends_on                 = [module.vcn]
   freeform_tags              = var.tags
 
   egress_security_rules {
