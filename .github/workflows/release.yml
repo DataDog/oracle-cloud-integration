@@ -12,7 +12,7 @@ on:
           - minor
           - major
       dry_run:
-        description: "Dry run: build and upload assets to a draft release, then delete it. An ephemeral tag is created and deleted."
+        description: "Dry run: build and upload assets to a draft release, then delete it."
         type: boolean
         default: false
 
@@ -129,14 +129,14 @@ jobs:
         run: |
           gh release edit "${VERSION}" --latest --repo "${GH_REPO}"
 
-      - name: Delete draft release and tag
+      - name: Delete draft release
         if: always() && inputs.dry_run == true && steps.create-release.conclusion == 'success'
         env:
           VERSION: ${{ steps.version.outputs.version }}
           GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release delete "${VERSION}" --repo "${GH_REPO}" --yes --cleanup-tag
+          gh release delete "${VERSION}" --repo "${GH_REPO}" --yes
 
       - name: Delete release and tag on failure
         if: steps.create-tag.conclusion == 'success' && failure()
