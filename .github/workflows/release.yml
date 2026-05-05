@@ -145,5 +145,5 @@ jobs:
           GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release delete "${VERSION}" --repo "${GH_REPO}" --yes || true
-          gh api "repos/${GH_REPO}/git/refs/tags/${VERSION}" --method DELETE
+          gh release delete "${VERSION}" --repo "${GH_REPO}" --yes --cleanup-tag 2>/dev/null || \
+            gh api "repos/${GH_REPO}/git/refs/tags/${VERSION}" --method DELETE
