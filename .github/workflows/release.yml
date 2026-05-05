@@ -83,6 +83,7 @@ jobs:
             --raw-field "sha=${GITHUB_SHA}"
 
       - name: Create release
+        id: create-release
         env:
           VERSION: ${{ steps.version.outputs.version }}
           GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
@@ -92,13 +93,39 @@ jobs:
             --repo "${GH_REPO}" \
             --title "${VERSION}" \
             --generate-notes \
-            --verify-tag
+            --verify-tag \
+            --latest=false
 
-      - name: Delete orphan tag on failure
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Build artifacts
+        run: |
+          cd datadog-integration && zip -r ../datadog-integration.zip ./* && cd ..
+
+      - name: Upload assets
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release upload "${VERSION}" datadog-integration.zip \
+            --repo "${GH_REPO}"
+
+      - name: Mark as latest
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release edit "${VERSION}" --latest --repo "${GH_REPO}"
+
+      - name: Delete release and tag on failure
         if: steps.create-tag.conclusion == 'success' && failure()
         env:
           VERSION: ${{ steps.version.outputs.version }}
           GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
           GH_REPO: ${{ github.repository }}
         run: |
+          gh release delete "${VERSION}" --repo "${GH_REPO}" --yes || true
           gh api "repos/${GH_REPO}/git/refs/tags/${VERSION}" --method DELETE
