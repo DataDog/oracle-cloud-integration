@@ -36,6 +36,28 @@ func Decode(in io.Reader) ([]json.RawMessage, error) {
 	return []json.RawMessage{body}, nil
 }
 
+// Stamp injects "source":"oci" into each event envelope before forwarding.
+// Events routed through the Datadog-provisioned dd-event-forwarder carry this
+// stamp so cloudchanges-worker can route by source field without structural
+// inspection. Customer events forwarded directly to the v2 API (no stamp) fall
+// back to cloudEventsVersion detection on the worker side.
+func Stamp(events []json.RawMessage) ([]json.RawMessage, error) {
+	stamped := make([]json.RawMessage, 0, len(events))
+	for _, ev := range events {
+		var m map[string]json.RawMessage
+		if err := json.Unmarshal(ev, &m); err != nil {
+			return nil, fmt.Errorf("failed to parse event for stamping: %w", err)
+		}
+		m["source"] = json.RawMessage(`"oci"`)
+		b, err := json.Marshal(m)
+		if err != nil {
+			return nil, fmt.Errorf("failed to re-encode event after stamping: %w", err)
+		}
+		stamped = append(stamped, b)
+	}
+	return stamped, nil
+}
+
 // Chunk splits events into JSON-array payloads that respect the intake's
 // per-request size and count limits. Events larger than MaxBodyBytes
 // individually cannot fit in any payload and are dropped; the count of

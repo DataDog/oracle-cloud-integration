@@ -27,6 +27,13 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 		return
 	}
 
+	events, err = formatter.Stamp(events)
+	if err != nil {
+		log.Printf("Error stamping events: %v", err)
+		writeResponse(out, "error", "", err)
+		return
+	}
+
 	payloads, dropped := formatter.Chunk(events)
 	if dropped > 0 {
 		log.Printf("Dropped %d event(s) exceeding the %d byte intake limit", dropped, formatter.MaxBodyBytes)
