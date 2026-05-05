@@ -46,6 +46,16 @@ jobs:
             exit 1
           fi
 
+          tag_obj=$(gh api "repos/${GH_REPO}/git/ref/tags/${latest}")
+          tag_sha=$(echo "$tag_obj" | jq -r '.object.sha')
+          if [[ "$(echo "$tag_obj" | jq -r '.object.type')" == "tag" ]]; then
+            tag_sha=$(gh api "repos/${GH_REPO}/git/tags/${tag_sha}" --jq '.object.sha')
+          fi
+          if [[ "$tag_sha" == "$GITHUB_SHA" ]]; then
+            echo "Nothing to release: HEAD is already tagged as ${latest}"
+            exit 0
+          fi
+
           ver="${latest#datadog-oci-orm-v}"
           major="${ver%%.*}"; rest="${ver#*.}"
           minor="${rest%%.*}"; patch="${rest#*.}"
