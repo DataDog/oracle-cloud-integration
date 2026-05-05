@@ -11,6 +11,10 @@ on:
           - patch
           - minor
           - major
+      dry_run:
+        description: "Dry run: build and upload assets to a draft release, then delete it. An ephemeral tag is created and deleted."
+        type: boolean
+        default: false
 
 jobs:
   release:
@@ -46,16 +50,6 @@ jobs:
             exit 1
           fi
 
-          tag_obj=$(gh api "repos/${GH_REPO}/git/ref/tags/${latest}")
-          tag_sha=$(echo "$tag_obj" | jq -r '.object.sha')
-          if [[ "$(echo "$tag_obj" | jq -r '.object.type')" == "tag" ]]; then
-            tag_sha=$(gh api "repos/${GH_REPO}/git/tags/${tag_sha}" --jq '.object.sha')
-          fi
-          if [[ "$tag_sha" == "$GITHUB_SHA" ]]; then
-            echo "Nothing to release: HEAD is already tagged as ${latest}"
-            exit 0
-          fi
-
           ver="${latest#datadog-oci-orm-v}"
           major="${ver%%.*}"; rest="${ver#*.}"
           minor="${rest%%.*}"; patch="${rest#*.}"
@@ -72,6 +66,7 @@ jobs:
 
       - name: Create tag
         id: create-tag
+        if: inputs.dry_run == false
         env:
           VERSION: ${{ steps.version.outputs.version }}
           GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
@@ -88,13 +83,26 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
           GH_REPO: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          gh release create "${VERSION}" \
-            --repo "${GH_REPO}" \
-            --title "${VERSION}" \
-            --generate-notes \
-            --verify-tag \
-            --latest=false
+          if [[ "$DRY_RUN" == "true" ]]; then
+            gh release create "${VERSION}" \
+              --repo "${GH_REPO}" \
+              --title "${VERSION}" \
+              --generate-notes \
+              --target "${GITHUB_SHA}" \
+              --draft \
+              --latest=false \
+              --fail-on-no-commits
+          else
+            gh release create "${VERSION}" \
+              --repo "${GH_REPO}" \
+              --title "${VERSION}" \
+              --generate-notes \
+              --verify-tag \
+              --latest=false \
+              --fail-on-no-commits
+          fi
 
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -113,12 +121,22 @@ jobs:
             --repo "${GH_REPO}"
 
       - name: Mark as latest
+        if: inputs.dry_run == false
         env:
           VERSION: ${{ steps.version.outputs.version }}
           GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           gh release edit "${VERSION}" --latest --repo "${GH_REPO}"
+
+      - name: Delete draft release and tag
+        if: always() && inputs.dry_run == true && steps.create-release.conclusion == 'success'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release delete "${VERSION}" --repo "${GH_REPO}" --yes --cleanup-tag
 
       - name: Delete release and tag on failure
         if: steps.create-tag.conclusion == 'success' && failure()
