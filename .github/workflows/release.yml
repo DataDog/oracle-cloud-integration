@@ -31,9 +31,14 @@ jobs:
           GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          latest=$(gh api "repos/${GH_REPO}/tags" --jq '.[].name' \
+          if [[ "$GITHUB_REF" != "refs/heads/master" ]]; then
+            echo "ERROR: release workflow must run from master (got $GITHUB_REF)"
+            exit 1
+          fi
+
+          latest=$(gh api "repos/${GH_REPO}/tags" --paginate --jq '.[].name' \
             | grep -E '^datadog-oci-orm-v[0-9]+\.[0-9]+\.[0-9]+$' \
-            | sort -t. -k1,1 -k2,2n -k3,3n \
+            | sort -V \
             | tail -1)
 
           if [[ -z "$latest" ]]; then
