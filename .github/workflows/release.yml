@@ -3,10 +3,14 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: "Version tag to create (e.g. datadog-oci-orm-v1.6.0)"
+      bump:
+        description: "Version component to bump"
         required: true
-        type: string
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 jobs:
   release:
@@ -20,23 +24,43 @@ jobs:
           scope: DataDog/oracle-cloud-integration
           policy: self.github.release.main
 
-      - name: Validate version format
+      - name: Compute next version
+        id: version
         env:
-          VERSION: ${{ inputs.version }}
-        run: |
-          if [[ ! "$VERSION" =~ ^datadog-oci-orm-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "ERROR: Invalid version format: $VERSION"
-            echo "Expected: datadog-oci-orm-vX.Y.Z"
-            exit 1
-          fi
-
-      - name: Create tag and GitHub release
-        env:
-          VERSION: ${{ inputs.version }}
+          BUMP: ${{ inputs.bump }}
           GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          # Create tag via API to avoid git credential issues (no checkout needed)
+          latest=$(gh api "repos/${GH_REPO}/tags" --jq '.[].name' \
+            | grep -E '^datadog-oci-orm-v[0-9]+\.[0-9]+\.[0-9]+$' \
+            | sort -t. -k1,1 -k2,2n -k3,3n \
+            | tail -1)
+
+          if [[ -z "$latest" ]]; then
+            echo "ERROR: no existing tag matching datadog-oci-orm-vX.Y.Z found"
+            exit 1
+          fi
+
+          ver="${latest#datadog-oci-orm-v}"
+          major="${ver%%.*}"; rest="${ver#*.}"
+          minor="${rest%%.*}"; patch="${rest#*.}"
+
+          case "$BUMP" in
+            major) major=$((major+1)); minor=0; patch=0 ;;
+            minor) minor=$((minor+1)); patch=0 ;;
+            patch) patch=$((patch+1)) ;;
+          esac
+
+          next="datadog-oci-orm-v${major}.${minor}.${patch}"
+          echo "Previous: $latest  →  Next: $next"
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag and GitHub release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
           gh api "repos/${GH_REPO}/git/refs" \
             --method POST \
             --raw-field "ref=refs/tags/${VERSION}" \
