@@ -41,16 +41,16 @@ jobs:
           fi
 
           latest=$(gh api "repos/${GH_REPO}/tags" --paginate --jq '.[].name' \
-            | grep -E '^datadog-oci-orm-v[0-9]+\.[0-9]+\.[0-9]+$' \
+            | grep -E '^datadog-integration-v[0-9]+\.[0-9]+\.[0-9]+$' \
             | sort -V \
             | tail -1)
 
           if [[ -z "$latest" ]]; then
-            echo "ERROR: no existing tag matching datadog-oci-orm-vX.Y.Z found"
+            echo "ERROR: no existing tag matching datadog-integration-vX.Y.Z found"
             exit 1
           fi
 
-          ver="${latest#datadog-oci-orm-v}"
+          ver="${latest#datadog-integration-v}"
           major="${ver%%.*}"; rest="${ver#*.}"
           minor="${rest%%.*}"; patch="${rest#*.}"
 
@@ -60,7 +60,7 @@ jobs:
             patch) patch=$((patch+1)) ;;
           esac
 
-          next="datadog-oci-orm-v${major}.${minor}.${patch}"
+          next="datadog-integration-v${major}.${minor}.${patch}"
           echo "Previous: $latest  →  Next: $next"
           echo "version=$next" >> "$GITHUB_OUTPUT"
 
