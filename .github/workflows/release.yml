@@ -81,8 +81,12 @@ jobs:
             --raw-field "ref=refs/tags/${VERSION}" \
             --raw-field "sha=${GITHUB_SHA}"
 
-          gh release create "${VERSION}" \
+          if ! gh release create "${VERSION}" \
             --repo "${GH_REPO}" \
             --title "${VERSION}" \
             --generate-notes \
-            --verify-tag
+            --verify-tag; then
+            echo "Release creation failed — deleting orphan tag ${VERSION}"
+            gh api "repos/${GH_REPO}/git/refs/tags/${VERSION}" --method DELETE
+            exit 1
+          fi
