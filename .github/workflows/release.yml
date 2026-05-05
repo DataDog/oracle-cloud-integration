@@ -1,0 +1,149 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version component to bump"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      dry_run:
+        description: "Dry run: build and upload assets to a draft release, then delete it. An ephemeral tag is created and deleted."
+        type: boolean
+        default: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # required for dd-octo-sts OIDC token exchange
+    steps:
+      - uses: DataDog/dd-octo-sts-action@96a25462dbcb10ebf0bfd6e2ccc917d2ab235b9a # v1.0.4
+        id: octo-sts
+        with:
+          scope: DataDog/oracle-cloud-integration
+          policy: self.github.release.main
+
+      - name: Compute next version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+          GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/master" ]]; then
+            echo "ERROR: release workflow must run from master (got $GITHUB_REF)"
+            exit 1
+          fi
+
+          latest=$(gh api "repos/${GH_REPO}/tags" --paginate --jq '.[].name' \
+            | grep -E '^datadog-oci-orm-v[0-9]+\.[0-9]+\.[0-9]+$' \
+            | sort -V \
+            | tail -1)
+
+          if [[ -z "$latest" ]]; then
+            echo "ERROR: no existing tag matching datadog-oci-orm-vX.Y.Z found"
+            exit 1
+          fi
+
+          ver="${latest#datadog-oci-orm-v}"
+          major="${ver%%.*}"; rest="${ver#*.}"
+          minor="${rest%%.*}"; patch="${rest#*.}"
+
+          case "$BUMP" in
+            major) major=$((major+1)); minor=0; patch=0 ;;
+            minor) minor=$((minor+1)); patch=0 ;;
+            patch) patch=$((patch+1)) ;;
+          esac
+
+          next="datadog-oci-orm-v${major}.${minor}.${patch}"
+          echo "Previous: $latest  →  Next: $next"
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag
+        id: create-tag
+        if: inputs.dry_run == false
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh api "repos/${GH_REPO}/git/refs" \
+            --method POST \
+            --raw-field "ref=refs/tags/${VERSION}" \
+            --raw-field "sha=${GITHUB_SHA}"
+
+      - name: Create release
+        id: create-release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [[ "$DRY_RUN" == "true" ]]; then
+            gh release create "${VERSION}" \
+              --repo "${GH_REPO}" \
+              --title "${VERSION}" \
+              --generate-notes \
+              --target "${GITHUB_SHA}" \
+              --draft \
+              --latest=false \
+              --fail-on-no-commits
+          else
+            gh release create "${VERSION}" \
+              --repo "${GH_REPO}" \
+              --title "${VERSION}" \
+              --generate-notes \
+              --verify-tag \
+              --latest=false \
+              --fail-on-no-commits
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Build artifacts
+        working-directory: datadog-integration
+        run: zip -r ../datadog-integration.zip ./*
+
+      - name: Upload assets
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release upload "${VERSION}" datadog-integration.zip \
+            --repo "${GH_REPO}"
+
+      - name: Mark as latest
+        if: inputs.dry_run == false
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release edit "${VERSION}" --latest --repo "${GH_REPO}"
+
+      - name: Delete draft release and tag
+        if: always() && inputs.dry_run == true && steps.create-release.conclusion == 'success'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release delete "${VERSION}" --repo "${GH_REPO}" --yes --cleanup-tag
+
+      - name: Delete release and tag on failure
+        if: steps.create-tag.conclusion == 'success' && failure()
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release delete "${VERSION}" --repo "${GH_REPO}" --yes --cleanup-tag 2>/dev/null || \
+            gh api "repos/${GH_REPO}/git/refs/tags/${VERSION}" --method DELETE
