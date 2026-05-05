@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag to create (e.g. datadog-oci-orm-v1.6.0)"
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # required for dd-octo-sts OIDC token exchange
+    steps:
+      - uses: DataDog/dd-octo-sts-action@96a25462dbcb10ebf0bfd6e2ccc917d2ab235b9a # v1.0.4
+        id: octo-sts
+        with:
+          scope: DataDog/oracle-cloud-integration
+          policy: self.github.release.main
+
+      - name: Validate version format
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [[ ! "$VERSION" =~ ^datadog-oci-orm-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "ERROR: Invalid version format: $VERSION"
+            echo "Expected: datadog-oci-orm-vX.Y.Z"
+            exit 1
+          fi
+
+      - name: Create tag and GitHub release
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # Create tag via API to avoid git credential issues (no checkout needed)
+          gh api "repos/${GH_REPO}/git/refs" \
+            --method POST \
+            --raw-field "ref=refs/tags/${VERSION}" \
+            --raw-field "sha=${GITHUB_SHA}"
+
+          gh release create "${VERSION}" \
+            --repo "${GH_REPO}" \
+            --title "${VERSION}" \
+            --generate-notes \
+            --verify-tag
