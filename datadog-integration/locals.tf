@@ -51,23 +51,18 @@ locals {
       # If a user and group are specified, find the associated domain
       var.existing_user_id != null && var.existing_user_id != "" ?
       (
-        length([for k, v in data.oci_identity_domains_user.existing_user_in_domain : k if v.active != null]) > 0 ?
-        [for k, v in data.oci_identity_domains_user.existing_user_in_domain : k if v.active != null][0] :
+        length([for k, v in data.oci_identity_domains_user.existing_user_in_domain : k if v.id != null]) > 0 ?
+        [for k, v in data.oci_identity_domains_user.existing_user_in_domain : k if v.id != null][0] :
         null
       ) :
       # If no user or group is specified, find the domain associated with the current user
       (
-        length([for k, v in data.oci_identity_domains_user.user_in_domain : k if v.active != null]) > 0 ?
-        [for k, v in data.oci_identity_domains_user.user_in_domain : k if v.active != null][0] :
+        length([for k, v in data.oci_identity_domains_user.user_in_domain : k if v.id != null]) > 0 ?
+        [for k, v in data.oci_identity_domains_user.user_in_domain : k if v.id != null][0] :
         null
       )
     )
   )
-
-  matching_domain = [
-    for d in data.oci_identity_domains.all_domains.domains : d
-    if d.id == local.matching_domain_id
-  ][0]
 
   user_email = (
     # If the email is provided, use that
@@ -82,8 +77,8 @@ locals {
       )
   )
 
-  domain_display_name = local.matching_domain.display_name
-  idcs_endpoint       = local.matching_domain.url
+  domain_display_name = data.oci_identity_domain.domain.display_name
+  idcs_endpoint       = data.oci_identity_domain.domain.url
 
   actual_user_name  = (var.existing_user_id == null || var.existing_user_id == "") ? local.user_name : null
   actual_group_name = (var.existing_group_id == null || var.existing_group_id == "") ? local.user_group_name : null
