@@ -14,6 +14,6 @@ data "oci_identity_domains_user" "user_in_domain" {
 }
 
 locals {
-  matching_domain = data.oci_identity_user.current_user.email == null ? [for k, v in data.oci_identity_domains_user.user_in_domain : k if v.id != null][0] : null
+  matching_domain = data.oci_identity_user.current_user.email == null ? [for k, v in data.oci_identity_domains_user.user_in_domain : k if v.emails != null][0] : null
   email           = data.oci_identity_user.current_user.email != null ? data.oci_identity_user.current_user.email : data.oci_identity_domains_user.user_in_domain[local.matching_domain].emails[0].value
 }

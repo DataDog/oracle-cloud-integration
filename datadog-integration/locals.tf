@@ -51,16 +51,16 @@ locals {
       # If a user and group are specified, find the associated domain
       var.existing_user_id != null && var.existing_user_id != "" ?
       (
-        length([for k, v in data.oci_identity_domains_user.existing_user_in_domain : k if v.id != null]) > 0 ?
-        [for k, v in data.oci_identity_domains_user.existing_user_in_domain : k if v.id != null][0] :
+        length([for k, v in data.oci_identity_domains_user.existing_user_in_domain : k if v.active != null]) > 0 ?
+        [for k, v in data.oci_identity_domains_user.existing_user_in_domain : k if v.active != null][0] :
         null
       ) :
       # If no user or group is specified, find the domain associated with the current user.
       # Note: all_domains only lists domains in the tenancy root compartment. If the
       # domain is in a child compartment, provide domain_id explicitly.
       (
-        length([for k, v in data.oci_identity_domains_user.user_in_domain : k if v.id != null]) > 0 ?
-        [for k, v in data.oci_identity_domains_user.user_in_domain : k if v.id != null][0] :
+        length([for k, v in data.oci_identity_domains_user.user_in_domain : k if v.active != null]) > 0 ?
+        [for k, v in data.oci_identity_domains_user.user_in_domain : k if v.active != null][0] :
         null
       )
     )
