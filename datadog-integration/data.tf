@@ -43,7 +43,11 @@ data "oci_identity_domain" "domain" {
 # from that domain rather than the all_domains-derived map, which only covers
 # domains in the tenancy root compartment.
 data "oci_identity_domains_user" "user_in_explicit_domain" {
-  count         = var.domain_id != null && var.domain_id != "" && (var.existing_user_id == null || var.existing_user_id == "") ? 1 : 0
+  count = (
+    var.domain_id != null && var.domain_id != "" &&
+    (var.existing_user_id == null || var.existing_user_id == "") &&
+    (var.user_email == null || var.user_email == "")
+  ) ? 1 : 0
   idcs_endpoint = data.oci_identity_domain.domain.url
   user_id       = var.current_user_ocid
 }
