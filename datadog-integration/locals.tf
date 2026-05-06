@@ -55,7 +55,9 @@ locals {
         [for k, v in data.oci_identity_domains_user.existing_user_in_domain : k if v.id != null][0] :
         null
       ) :
-      # If no user or group is specified, find the domain associated with the current user
+      # If no user or group is specified, find the domain associated with the current user.
+      # Note: all_domains only lists domains in the tenancy root compartment. If the
+      # domain is in a child compartment, provide domain_id explicitly.
       (
         length([for k, v in data.oci_identity_domains_user.user_in_domain : k if v.id != null]) > 0 ?
         [for k, v in data.oci_identity_domains_user.user_in_domain : k if v.id != null][0] :
@@ -72,8 +74,12 @@ locals {
         var.existing_user_id != null && var.existing_user_id != "" ? (
           null
         ):
-          # If no user is specified, infer the email from the current logged in user
-          data.oci_identity_domains_user.user_in_domain[local.matching_domain_id].emails[0].value
+          # If no user is specified, infer the email from the current logged in user.
+          # When domain_id is explicitly provided, use the direct lookup so child-compartment
+          # domains (absent from the all_domains map) don't cause an invalid key error.
+          var.domain_id != null && var.domain_id != "" ?
+            data.oci_identity_domains_user.user_in_explicit_domain[0].emails[0].value :
+            data.oci_identity_domains_user.user_in_domain[local.matching_domain_id].emails[0].value
       )
   )
 

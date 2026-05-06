@@ -39,3 +39,12 @@ data "oci_identity_domain" "domain" {
   domain_id = local.matching_domain_id
 }
 
+# Used when an explicit domain_id is provided so email can be inferred directly
+# from that domain rather than the all_domains-derived map, which only covers
+# domains in the tenancy root compartment.
+data "oci_identity_domains_user" "user_in_explicit_domain" {
+  count         = var.domain_id != null && var.domain_id != "" && (var.existing_user_id == null || var.existing_user_id == "") ? 1 : 0
+  idcs_endpoint = data.oci_identity_domain.domain.url
+  user_id       = var.current_user_ocid
+}
+

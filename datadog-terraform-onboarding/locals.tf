@@ -40,23 +40,20 @@ locals {
       # If a user and group are specified, find the associated domain
       var.existing_user_id != null && var.existing_user_id != "" ?
       (
-        length([for k, v in data.oci_identity_domains_user.existing_user_in_domain : k if v.active != null]) > 0 ?
-        [for k, v in data.oci_identity_domains_user.existing_user_in_domain : k if v.active != null][0] :
+        length([for k, v in data.oci_identity_domains_user.existing_user_in_domain : k if v.id != null]) > 0 ?
+        [for k, v in data.oci_identity_domains_user.existing_user_in_domain : k if v.id != null][0] :
         null
       ) :
-      # If no user or group is specified, find the domain associated with the current user
+      # If no user or group is specified, find the domain associated with the current user.
+      # Note: all_domains only lists domains in the tenancy root compartment. If the
+      # domain is in a child compartment, provide domain_id explicitly.
       (
-        length([for k, v in data.oci_identity_domains_user.user_in_domain : k if v.active != null]) > 0 ?
-        [for k, v in data.oci_identity_domains_user.user_in_domain : k if v.active != null][0] :
+        length([for k, v in data.oci_identity_domains_user.user_in_domain : k if v.id != null]) > 0 ?
+        [for k, v in data.oci_identity_domains_user.user_in_domain : k if v.id != null][0] :
         null
       )
     )
   )
-
-  matching_domain = [
-    for d in data.oci_identity_domains.all_domains.domains : d
-    if d.id == local.matching_domain_id
-  ][0]
 
   user_email = (
     # If the email is provided, use that
@@ -66,13 +63,17 @@ locals {
         var.existing_user_id != null && var.existing_user_id != "" ? (
           null
         ):
-          # If no user is specified, infer the email from the current logged in user
-          data.oci_identity_domains_user.user_in_domain[local.matching_domain_id].emails[0].value
+          # If no user is specified, infer the email from the current logged in user.
+          # When domain_id is explicitly provided, use the direct lookup so child-compartment
+          # domains (absent from the all_domains map) don't cause an invalid key error.
+          var.domain_id != null && var.domain_id != "" ?
+            data.oci_identity_domains_user.user_in_explicit_domain[0].emails[0].value :
+            data.oci_identity_domains_user.user_in_domain[local.matching_domain_id].emails[0].value
       )
   )
 
-  domain_display_name = local.matching_domain.display_name
-  idcs_endpoint       = local.matching_domain.url
+  domain_display_name = data.oci_identity_domain.domain.display_name
+  idcs_endpoint       = data.oci_identity_domain.domain.url
 
   actual_user_name  = (var.existing_user_id == null || var.existing_user_id == "") ? local.user_name : null
   actual_group_name = (var.existing_group_id == null || var.existing_group_id == "") ? local.user_group_name : null
