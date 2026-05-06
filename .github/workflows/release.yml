@@ -12,7 +12,7 @@ on:
           - minor
           - major
       dry_run:
-        description: "Dry run: build and upload assets to a draft release, then delete it. An ephemeral tag is created and deleted."
+        description: "Dry run: build and upload assets to a draft release, then delete it."
         type: boolean
         default: false
 
@@ -41,16 +41,16 @@ jobs:
           fi
 
           latest=$(gh api "repos/${GH_REPO}/tags" --paginate --jq '.[].name' \
-            | grep -E '^datadog-oci-orm-v[0-9]+\.[0-9]+\.[0-9]+$' \
+            | grep -E '^datadog-integration-v[0-9]+\.[0-9]+\.[0-9]+$' \
             | sort -V \
             | tail -1)
 
           if [[ -z "$latest" ]]; then
-            echo "ERROR: no existing tag matching datadog-oci-orm-vX.Y.Z found"
+            echo "ERROR: no existing tag matching datadog-integration-vX.Y.Z found"
             exit 1
           fi
 
-          ver="${latest#datadog-oci-orm-v}"
+          ver="${latest#datadog-integration-v}"
           major="${ver%%.*}"; rest="${ver#*.}"
           minor="${rest%%.*}"; patch="${rest#*.}"
 
@@ -60,7 +60,7 @@ jobs:
             patch) patch=$((patch+1)) ;;
           esac
 
-          next="datadog-oci-orm-v${major}.${minor}.${patch}"
+          next="datadog-integration-v${major}.${minor}.${patch}"
           echo "Previous: $latest  →  Next: $next"
           echo "version=$next" >> "$GITHUB_OUTPUT"
 
@@ -129,14 +129,14 @@ jobs:
         run: |
           gh release edit "${VERSION}" --latest --repo "${GH_REPO}"
 
-      - name: Delete draft release and tag
+      - name: Delete draft release
         if: always() && inputs.dry_run == true && steps.create-release.conclusion == 'success'
         env:
           VERSION: ${{ steps.version.outputs.version }}
           GH_TOKEN: ${{ steps.octo-sts.outputs.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release delete "${VERSION}" --repo "${GH_REPO}" --yes --cleanup-tag
+          gh release delete "${VERSION}" --repo "${GH_REPO}" --yes
 
       - name: Delete release and tag on failure
         if: steps.create-tag.conclusion == 'success' && failure()
