@@ -34,9 +34,10 @@ const eventEnvelope = `{"eventType":"com.oraclecloud.objectstorage.deletebucket"
 
 func withTestClient(t *testing.T) {
 	t.Helper()
+	t.Setenv("TENANCY_OCID", "ocid1.tenancy.oc1..test")
 	original := datadogClientFunc
 	t.Cleanup(func() { datadogClientFunc = original })
-	datadogClientFunc = client.NewTestDatadogClientWithSite
+	datadogClientFunc = client.NewTestDatadogClientWithTenancyAndSite
 }
 
 func runHandler(t *testing.T, body string) fnResponse {
@@ -85,12 +86,28 @@ func TestMyHandler_InvalidJSON(t *testing.T) {
 	}
 }
 
-func TestMyHandler_MissingEnv(t *testing.T) {
-	// Skip withTestClient so the real client constructor runs and the env-var check fires.
+func TestMyHandler_MissingTenancyOCID(t *testing.T) {
 	original := datadogClientFunc
 	t.Cleanup(func() { datadogClientFunc = original })
-	datadogClientFunc = client.NewDatadogClientWithSite
+	datadogClientFunc = client.NewDatadogClientWithTenancyAndSite
 
+	os.Unsetenv("TENANCY_OCID")
+
+	resp := runHandler(t, eventEnvelope)
+	if resp.Status != "error" {
+		t.Fatalf("status = %q, want error", resp.Status)
+	}
+	if !strings.Contains(resp.Error, "TENANCY_OCID") {
+		t.Fatalf("error = %q, want substring %q", resp.Error, "TENANCY_OCID")
+	}
+}
+
+func TestMyHandler_MissingDDSite(t *testing.T) {
+	original := datadogClientFunc
+	t.Cleanup(func() { datadogClientFunc = original })
+	datadogClientFunc = client.NewDatadogClientWithTenancyAndSite
+
+	t.Setenv("TENANCY_OCID", "ocid1.tenancy.oc1..test")
 	os.Unsetenv("DD_SITE")
 
 	resp := runHandler(t, eventEnvelope)

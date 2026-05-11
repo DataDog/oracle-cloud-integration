@@ -10,7 +10,7 @@ import (
 	"datadog-functions/lib/client"
 )
 
-var datadogClientFunc = client.NewDatadogClientWithSite
+var datadogClientFunc = client.NewDatadogClientWithTenancyAndSite
 
 func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	events, err := formatter.Decode(in)
@@ -20,14 +20,14 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 		return
 	}
 
-	ddclient, site, err := datadogClientFunc()
+	ddclient, tenancyOCID, site, err := datadogClientFunc()
 	if err != nil {
 		log.Println(err)
 		writeResponse(out, "error", "", err)
 		return
 	}
 
-	events, err = formatter.Stamp(events)
+	events, err = formatter.Stamp(events, tenancyOCID)
 	if err != nil {
 		log.Printf("Error stamping events: %v", err)
 		writeResponse(out, "error", "", err)

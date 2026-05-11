@@ -36,19 +36,22 @@ func Decode(in io.Reader) ([]json.RawMessage, error) {
 	return []json.RawMessage{body}, nil
 }
 
-// Stamp injects "source":"oci" into each event envelope before forwarding.
-// Events routed through the Datadog-provisioned dd-event-forwarder carry this
-// stamp so cloudchanges-worker can route by source field without structural
-// inspection. Customer events forwarded directly to the v2 API (no stamp) fall
-// back to cloudEventsVersion detection on the worker side.
-func Stamp(events []json.RawMessage) ([]json.RawMessage, error) {
+// Stamp injects forwarder metadata into each event envelope before forwarding.
+// "ddForwarder":"oci" identifies events routed through the Datadog-provisioned
+// forwarder without touching the native OCI "source" field. tenancyOCID enriches
+// the envelope since OCI CloudEvents don't include it natively.
+func Stamp(events []json.RawMessage, tenancyOCID string) ([]json.RawMessage, error) {
 	stamped := make([]json.RawMessage, 0, len(events))
 	for _, ev := range events {
 		var m map[string]json.RawMessage
 		if err := json.Unmarshal(ev, &m); err != nil {
 			return nil, fmt.Errorf("failed to parse event for stamping: %w", err)
 		}
-		m["source"] = json.RawMessage(`"oci"`)
+		m["ddForwarder"] = json.RawMessage(`"oci"`)
+		if tenancyOCID != "" {
+			b, _ := json.Marshal(tenancyOCID)
+			m["tenancyOCID"] = b
+		}
 		b, err := json.Marshal(m)
 		if err != nil {
 			return nil, fmt.Errorf("failed to re-encode event after stamping: %w", err)
@@ -86,6 +89,7 @@ func Chunk(events []json.RawMessage) (payloads [][]byte, dropped int) {
 	for _, ev := range events {
 		evSize := len(ev)
 		if evSize+2 > MaxBodyBytes {
+			// OCI events average ~1KB; a single event reaching 5MB is not expected in practice.
 			dropped++
 			continue
 		}

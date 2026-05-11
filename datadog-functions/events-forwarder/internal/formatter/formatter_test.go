@@ -111,9 +111,9 @@ func TestChunk_DropsOversizeEvent(t *testing.T) {
 	}
 }
 
-func TestStamp_AddsSourceField(t *testing.T) {
+func TestStamp_AddsFields(t *testing.T) {
 	events := []json.RawMessage{json.RawMessage(sampleEvent), json.RawMessage(sampleEvent)}
-	stamped, err := Stamp(events)
+	stamped, err := Stamp(events, "ocid1.tenancy.oc1..test")
 	if err != nil {
 		t.Fatalf("Stamp: %v", err)
 	}
@@ -125,14 +125,17 @@ func TestStamp_AddsSourceField(t *testing.T) {
 		if err := json.Unmarshal(ev, &m); err != nil {
 			t.Fatalf("unmarshal event %d: %v", i, err)
 		}
-		if got, ok := m["source"]; !ok || got != "oci" {
-			t.Errorf("event %d: source = %v, want \"oci\"", i, got)
+		if got, ok := m["ddForwarder"]; !ok || got != "oci" {
+			t.Errorf("event %d: ddForwarder = %v, want \"oci\"", i, got)
+		}
+		if got, ok := m["tenancyOCID"]; !ok || got != "ocid1.tenancy.oc1..test" {
+			t.Errorf("event %d: tenancyOCID = %v, want \"ocid1.tenancy.oc1..test\"", i, got)
 		}
 	}
 }
 
 func TestStamp_PreservesExistingFields(t *testing.T) {
-	stamped, err := Stamp([]json.RawMessage{json.RawMessage(sampleEvent)})
+	stamped, err := Stamp([]json.RawMessage{json.RawMessage(sampleEvent)}, "")
 	if err != nil {
 		t.Fatalf("Stamp: %v", err)
 	}
@@ -149,7 +152,7 @@ func TestStamp_PreservesExistingFields(t *testing.T) {
 }
 
 func TestStamp_Empty(t *testing.T) {
-	stamped, err := Stamp(nil)
+	stamped, err := Stamp(nil, "")
 	if err != nil {
 		t.Fatalf("Stamp(nil): %v", err)
 	}
@@ -159,7 +162,7 @@ func TestStamp_Empty(t *testing.T) {
 }
 
 func TestStamp_InvalidJSON(t *testing.T) {
-	if _, err := Stamp([]json.RawMessage{json.RawMessage("not json")}); err == nil {
+	if _, err := Stamp([]json.RawMessage{json.RawMessage("not json")}, ""); err == nil {
 		t.Fatal("expected error for invalid JSON, got nil")
 	}
 }
