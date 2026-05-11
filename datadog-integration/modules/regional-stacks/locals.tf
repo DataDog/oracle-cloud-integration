@@ -43,7 +43,10 @@ locals {
   # Using terraform_data rather than the data source directly avoids the idempotency
   # trap: without this freeze, the data source finds the app Terraform itself just
   # created, flips count to 0, and plans to destroy the managed app on the next apply.
-  existing_function_app_id = try(tostring(terraform_data.adopted_function_app_id.output), null)
+  #
+  # When var.subnet_ocid is explicitly provided we treat this as a fresh deploy and
+  # do NOT adopt the orphaned app, so the explicit subnet preference is honoured.
+  existing_function_app_id = var.subnet_ocid == "" ? try(tostring(terraform_data.adopted_function_app_id.output), null) : null
 
   # The application ID to attach Datadog functions to.
   # Prefers the orphaned app so the customer's custom function stays co-located with

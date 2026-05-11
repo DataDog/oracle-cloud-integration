@@ -4,6 +4,24 @@ data "oci_functions_applications" "existing_dd_function_app" {
   state          = "ACTIVE"
 }
 
+check "adopted_app_config" {
+  # When an orphaned dd-function-app is adopted, Terraform cannot update its config
+  # (the resource is unmanaged). Warn if the key forwarding settings diverge from
+  # the current stack variables so the operator knows to update them manually via
+  # the OCI Console or CLI.
+  assert {
+    condition = (
+      local.existing_function_app_id == null ||
+      length(data.oci_functions_applications.existing_dd_function_app.applications) == 0 ||
+      (
+        lookup(data.oci_functions_applications.existing_dd_function_app.applications[0].config, "DD_SITE", "") == var.datadog_site &&
+        lookup(data.oci_functions_applications.existing_dd_function_app.applications[0].config, "API_KEY_SECRET_OCID", "") == var.api_key_secret_id
+      )
+    )
+    error_message = "Adopted dd-function-app config is stale: DD_SITE or API_KEY_SECRET_OCID differ from current stack variables. Update the application config manually via the OCI Console or with: oci fn application update --application-id ${coalesce(local.existing_function_app_id, "n/a")} --config '{...}'."
+  }
+}
+
 data "http" "token_logs" {
   url = local.token_logs
 }

@@ -22,6 +22,7 @@ resource "terraform_data" "adopted_function_app_id" {
   }
 }
 
+
 resource "oci_functions_function" "logs_function" {
   application_id = local.function_app_id
   display_name   = "dd-logs-forwarder"
