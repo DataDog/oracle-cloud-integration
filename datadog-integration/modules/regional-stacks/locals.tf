@@ -31,14 +31,37 @@ locals {
 
   # Subnet region validation when OCID is provided (handles both 3-letter codes and full names)
   subnet_region_from_ocid = var.subnet_ocid != "" ? split(".", var.subnet_ocid)[3] : ""
-  
+
   # Check if the region from OCID matches current region (either by full name or region key)
   # Convert extracted region to uppercase for comparison since region_key is uppercase
   subnet_region_matches = var.subnet_ocid == "" || (
-    local.subnet_region_from_ocid == var.region || 
+    local.subnet_region_from_ocid == var.region ||
     upper(local.subnet_region_from_ocid) == var.region_key
   )
-  
-  # Simple subnet selection logic: use provided OCID or create new
-  subnet_id = var.subnet_ocid != "" ? var.subnet_ocid : module.subnet[0].subnet_id[local.subnet]
+
+  # ID of an existing dd-function-app, frozen at first apply via terraform_data.
+  # Using terraform_data rather than the data source directly avoids the idempotency
+  # trap: without this freeze, the data source finds the app Terraform itself just
+  # created, flips count to 0, and plans to destroy the managed app on the next apply.
+  existing_function_app_id = try(tostring(terraform_data.adopted_function_app_id.output), null)
+
+  # The application ID to attach Datadog functions to.
+  # Prefers the orphaned app so the customer's custom function stays co-located with
+  # the Datadog forwarders.
+  function_app_id = coalesce(
+    local.existing_function_app_id,
+    one(oci_functions_application.dd_function_app[*].id)
+  )
+
+  # Only provision VCN/subnet when there is no existing app to inherit the network from
+  # and no explicit subnet OCID was provided.
+  create_network = local.existing_function_app_id == null && var.subnet_ocid == ""
+
+  # Subnet selection priority: explicit OCID → existing app's subnet → newly created subnet
+  subnet_id = (
+    var.subnet_ocid != "" ? var.subnet_ocid :
+    local.existing_function_app_id != null && length(data.oci_functions_applications.existing_dd_function_app.applications) > 0 ?
+      data.oci_functions_applications.existing_dd_function_app.applications[0].subnet_ids[0] :
+    module.subnet[0].subnet_id[local.subnet]
+  )
 }

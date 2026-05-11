@@ -1,3 +1,9 @@
+data "oci_functions_applications" "existing_dd_function_app" {
+  compartment_id = var.compartment_ocid
+  display_name   = "dd-function-app"
+  state          = "ACTIVE"
+}
+
 data "http" "token_logs" {
   url = local.token_logs
 }
@@ -37,6 +43,6 @@ data "oci_core_subnet" "provided_subnet" {
 }
 
 data "oci_core_vcn" "dd_vcn" {
-  count  = var.subnet_ocid == "" ? 1 : 0
+  count  = local.create_network ? 1 : 0
   vcn_id = module.vcn[0].vcn_id
 }

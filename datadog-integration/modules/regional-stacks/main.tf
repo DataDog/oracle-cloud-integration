@@ -12,8 +12,18 @@ terraform {
   }
 }
 
+resource "terraform_data" "adopted_function_app_id" {
+  # Captures the OCID of an orphaned dd-function-app (left behind by a failed destroy)
+  # at first apply, then freezes it. ignore_changes prevents the value from updating on
+  # subsequent plans when the data source starts returning the app Terraform itself created.
+  input = one(data.oci_functions_applications.existing_dd_function_app.applications[*].id)
+  lifecycle {
+    ignore_changes = [input]
+  }
+}
+
 resource "oci_functions_function" "logs_function" {
-  application_id = oci_functions_application.dd_function_app.id
+  application_id = local.function_app_id
   display_name   = "dd-logs-forwarder"
   memory_in_mbs  = "1024"
   freeform_tags  = var.tags
@@ -24,7 +34,7 @@ resource "oci_functions_function" "logs_function" {
 }
 
 resource "oci_functions_function" "metrics_function" {
-  application_id = oci_functions_application.dd_function_app.id
+  application_id = local.function_app_id
   display_name   = "dd-metrics-forwarder"
   memory_in_mbs  = "512"
   freeform_tags  = var.tags
@@ -34,7 +44,7 @@ resource "oci_functions_function" "metrics_function" {
 }
 
 module "vcn" {
-  count                    = var.subnet_ocid == "" ? 1 : 0
+  count                    = local.create_network ? 1 : 0
   source                   = "oracle-terraform-modules/vcn/oci"
   version                  = "3.6.0"
   compartment_id           = var.compartment_ocid
@@ -54,7 +64,7 @@ module "vcn" {
 
 # Same VCN module's subnet submodule; we call it directly so we can pass defined_tags (parent VCN module doesn't).
 module "subnet" {
-  count          = var.subnet_ocid == "" ? 1 : 0
+  count          = local.create_network ? 1 : 0
   source        = "oracle-terraform-modules/vcn/oci//modules/subnet"
   version       = "3.6.0"
   compartment_id = var.compartment_ocid
@@ -73,7 +83,7 @@ module "subnet" {
 }
 
 resource "oci_core_default_security_list" "dd_default" {
-  count                      = var.subnet_ocid == "" ? 1 : 0
+  count                      = local.create_network ? 1 : 0
   manage_default_resource_id = data.oci_core_vcn.dd_vcn[0].default_security_list_id
   depends_on                 = [module.vcn]
   freeform_tags              = var.tags
@@ -107,6 +117,7 @@ resource "oci_core_default_security_list" "dd_default" {
 }
 
 resource "oci_functions_application" "dd_function_app" {
+  count          = local.existing_function_app_id == null ? 1 : 0
   compartment_id = var.compartment_ocid
   display_name   = "dd-function-app"
   freeform_tags  = var.tags
