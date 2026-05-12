@@ -5,7 +5,7 @@ echo "Getting details for building the images in your repo. Make sure you have:
   1. oci cli installed and cofigured for your tenancy
   2. jq installed
   3. access to push images to tenancy
-  4. You tenancy in every region has the registry created with the names: oci-datadog-forwarder/metrics and oci-datadog-forwarder/logs
+  4. You tenancy in every region has the registry created with the names: oci-datadog-forwarder/metrics, oci-datadog-forwarder/logs and oci-datadog-forwarder/events
   5. Docker buildx is installed.
 "
 
@@ -77,9 +77,11 @@ for TARGET in "${BUILD_TARGETS[@]}"; do
   LOGIN_USER="${NAMESPACE}/${USERNAME}"
   IMAGE_PATH_METRICS="${REGISTRY}/${NAMESPACE}/oci-datadog-forwarder/metrics"
   IMAGE_PATH_LOGS="${REGISTRY}/${NAMESPACE}/oci-datadog-forwarder/logs"
+  IMAGE_PATH_EVENTS="${REGISTRY}/${NAMESPACE}/oci-datadog-forwarder/events"
 
   echo "Metrics image: $IMAGE_PATH_METRICS"
   echo "Logs image: $IMAGE_PATH_LOGS"
+  echo "Events image: $IMAGE_PATH_EVENTS"
 
   echo "Logging in to $REGISTRY..."
   echo "$PASSWORD" | docker login "$REGISTRY" --username "$LOGIN_USER" --password-stdin
@@ -87,9 +89,10 @@ for TARGET in "${BUILD_TARGETS[@]}"; do
     echo "Login failed for $REGISTRY"
     continue
   fi
-  
+
   build_and_push_image "$IMAGE_PATH_METRICS" "$REGISTRY" "$TAG" "Dockerfile-metrics"
   build_and_push_image "$IMAGE_PATH_LOGS" "$REGISTRY" "$TAG" "Dockerfile-logs"
+  build_and_push_image "$IMAGE_PATH_EVENTS" "$REGISTRY" "$TAG" "Dockerfile-events"
 done
 
 # Clear the password from memory
