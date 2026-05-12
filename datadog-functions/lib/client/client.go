@@ -39,27 +39,35 @@ type DatadogClient struct {
 // Returns:
 //
 //	error - An error if the message could not be sent or if the API key could not be refreshed.
-func (client *DatadogClient) SendMessageToDatadog(ctx context.Context, message []byte, url string) error {
+// SendMessageToDatadog sends a message to Datadog. extraHeaders are merged into
+// the request headers and can be used to pass caller-specific metadata (e.g.
+// "Dd-Oci-Tenancy-Id"). If the initial attempt fails with a 403, the API key
+// is refreshed and the request is retried once.
+func (client *DatadogClient) SendMessageToDatadog(ctx context.Context, message []byte, url string, extraHeaders ...map[string]string) error {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
-	defer cancel() // releases resources if sendMessage or refreshAPIKey completes before timeout elapses
-	status, err := client.sendMessage(ctx, message, url)
+	defer cancel()
+	status, err := client.sendMessage(ctx, message, url, extraHeaders...)
 	if err != nil && status == http.StatusForbidden {
-		// Attempt to fetch the API key again in case it has been rotated
 		err = client.refreshAPIKey(ctx)
 		if err != nil {
 			return err
 		}
-		_, err = client.sendMessage(ctx, message, url)
+		_, err = client.sendMessage(ctx, message, url, extraHeaders...)
 		return err
 	}
 	return err
 }
 
-func (client *DatadogClient) sendMessage(ctx context.Context, message []byte, url string) (int, error) {
+func (client *DatadogClient) sendMessage(ctx context.Context, message []byte, url string, extraHeaders ...map[string]string) (int, error) {
 	apiHeaders := map[string]string{
 		"Content-Encoding": "gzip",
 		"Content-Type":     "application/json",
 		"DD-API-KEY":       client.apiKey,
+	}
+	for _, h := range extraHeaders {
+		for k, v := range h {
+			apiHeaders[k] = v
+		}
 	}
 	fmt.Printf("Uncompressed payload size=%.2fKB\n", float64(len(message))/1024.0)
 	req, err := client.client.PrepareRequest(ctx, url, http.MethodPost, message, apiHeaders, nil, nil, nil)
