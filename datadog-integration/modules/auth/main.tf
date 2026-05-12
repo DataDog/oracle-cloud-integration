@@ -187,11 +187,11 @@ resource "oci_identity_policy" "dd_auth" {
   name           = var.user_policy_name
   statements = [
     "Define tenancy usage-report as ocid1.tenancy.oc1..aaaaaaaaned4fkpkisbwjlr56u7cj63lf3wffbilvqknstgtvzub7vhqkggq",
-    "Allow group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to read all-resources in tenancy",
-    "Allow group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to use tag-namespaces in tenancy",
-    "Allow group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to manage serviceconnectors in compartment id ${var.compartment_id}",
-    "Allow group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to manage functions-family in compartment id ${var.compartment_id} where ANY {request.permission = 'FN_FUNCTION_UPDATE', request.permission = 'FN_FUNCTION_LIST', request.permission = 'FN_APP_LIST'}",
-    "Endorse group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to read objects in tenancy usage-report"
+    "Allow group id ${local.dd_group_ocid} to read all-resources in tenancy",
+    "Allow group id ${local.dd_group_ocid} to use tag-namespaces in tenancy",
+    "Allow group id ${local.dd_group_ocid} to manage serviceconnectors in compartment id ${var.compartment_id}",
+    "Allow group id ${local.dd_group_ocid} to manage functions-family in compartment id ${var.compartment_id} where ANY {request.permission = 'FN_FUNCTION_UPDATE', request.permission = 'FN_FUNCTION_LIST', request.permission = 'FN_APP_LIST'}",
+    "Endorse group id ${local.dd_group_ocid} to read objects in tenancy usage-report"
   ]
   freeform_tags = var.tags
   defined_tags  = var.defined_tags
