@@ -1,11 +1,11 @@
 FROM --platform=$BUILDPLATFORM registry.ddbuild.io/images/mirror/golang:1.25.9 AS builder
 WORKDIR /app
 COPY lib/ lib/
-COPY metrics-forwarder/ metrics-forwarder/
+COPY events-forwarder/ events-forwarder/
 ARG TARGETARCH
 
 # Enable Go modules & build with optimizations
-WORKDIR /app/metrics-forwarder
+WORKDIR /app/events-forwarder
 RUN go mod tidy  && \
     CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -ldflags="-s -w" -o func .
 
@@ -14,7 +14,7 @@ FROM scratch
 WORKDIR /function
 
 # Copy only the compiled binary and certificates from the builder stage
-COPY --from=builder /app/metrics-forwarder/func .
+COPY --from=builder /app/events-forwarder/func .
 COPY --from=builder /etc/ssl/certs/ /etc/ssl/certs/
 
 # Run the application
