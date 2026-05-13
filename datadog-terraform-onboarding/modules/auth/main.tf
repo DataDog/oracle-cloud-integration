@@ -194,7 +194,10 @@ resource "oci_identity_policy" "dd_auth" {
     "Allow group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to read all-resources in tenancy",
     "Allow group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to use tag-namespaces in tenancy",
     "Allow group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to manage serviceconnectors in compartment id ${var.compartment_id}",
-    "Allow group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to manage functions-family in compartment id ${var.compartment_id} where ANY {request.permission = 'FN_FUNCTION_UPDATE', request.permission = 'FN_FUNCTION_LIST', request.permission = 'FN_APP_LIST'}",
+    "Allow group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to manage functions-family in compartment id ${var.compartment_id}",
+    "Allow group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to manage buckets in compartment id ${var.compartment_id} where target.bucket.name=/dd-*/",
+    "Allow group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to manage object-family in compartment id ${var.compartment_id} where target.bucket.name=/dd-*/",
+    "Allow group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to use fn-invocation in compartment id ${var.compartment_id}",
     "Endorse group id ${var.existing_group_id != null && var.existing_group_id != "" ? var.existing_group_id : oci_identity_domains_group.dd_auth[0].ocid} to read objects in tenancy usage-report"
   ]
   freeform_tags = var.tags
@@ -222,14 +225,15 @@ resource "oci_identity_domains_dynamic_resource_group" "forwarding_function" {
 resource "oci_identity_policy" "dynamic_group" {
   depends_on     = [null_resource.user_group_variable_validation, oci_identity_domains_dynamic_resource_group.service_connector]
   compartment_id = var.tenancy_id
-  description    = "[DO NOT REMOVE] Policy to have any connector hub read from eligible sources and write to a target function"
+  description    = "[DO NOT REMOVE] Policy for connector hubs and forwarding functions"
   name           = var.dg_policy_name
   statements = [
     "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.service_connector.ocid} to read log-content in tenancy",
     "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.service_connector.ocid} to read metrics in tenancy",
     "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.service_connector.ocid} to use fn-function in compartment id ${var.compartment_id}",
     "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.service_connector.ocid} to use fn-invocation in compartment id ${var.compartment_id}",
-    "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.forwarding_function.ocid} to read secret-bundles in compartment id ${var.compartment_id}"
+    "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.forwarding_function.ocid} to read secret-bundles in compartment id ${var.compartment_id}",
+    "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.forwarding_function.ocid} to manage object-family in compartment id ${var.compartment_id} where target.bucket.name=/dd-*/"
   ]
   freeform_tags = var.tags
   defined_tags  = var.defined_tags
