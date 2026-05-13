@@ -1,11 +1,14 @@
 #!/bin/bash
 
+# Metrics image path: <region-key>.ocir.io/<namespace>/oci-datadog-forwarder/metrics:<tag>
+# (matches Datadog integration Terraform). Namespace comes from the prompt; region keys from OCI.
+
 # Prompt once for credentials and image tag
-echo "Getting details for building the images in your repo. Make sure you have:
-  1. oci cli installed and cofigured for your tenancy
+echo "Getting details for building the metrics image in your repo. Make sure you have:
+  1. oci cli installed and configured for your tenancy
   2. jq installed
   3. access to push images to tenancy
-  4. You tenancy in every region has the registry created with the names: oci-datadog-forwarder/metrics, oci-datadog-forwarder/logs and oci-datadog-forwarder/events
+  4. Your tenancy has the metrics repo (default: <region>.ocir.io/<namespace>/oci-datadog-forwarder/metrics)
   5. Docker buildx is installed.
 "
 
@@ -33,10 +36,10 @@ if [ ${#BUILD_TARGETS[@]} -eq 0 ]; then
   exit 1
 fi
 
-echo "Image will be built in following regions: ${BUILD_TARGETS[@]}"
+echo "Metrics image will be built in following regions: ${BUILD_TARGETS[@]}"
 
 # Prompt for confirmation
-read -p "Do you want to continue with building and pushing images? (y/n): " CONFIRMATION
+read -p "Do you want to continue with building and pushing the metrics image? (y/n): " CONFIRMATION
 
 # Convert input to lowercase for flexible handling
 CONFIRMATION=$(echo "$CONFIRMATION" | tr '[:upper:]' '[:lower:]')
@@ -59,12 +62,11 @@ build_and_push_image() {
   docker buildx build -f ${DOCKER_FILE} \
     --platform linux/amd64,linux/arm64 \
     --tag "${IMAGE_PATH}:${TAG}" \
-    --tag "${IMAGE_PATH}:latest" \
     --push \
     .
 
   if [ $? -eq 0 ]; then
-    echo "Successfully built and pushed ${IMAGE_PATH}:${TAG} and :latest"
+    echo "Successfully built and pushed ${IMAGE_PATH}:${TAG}"
   else
     echo "Failed to build and push image for $IMAGE_PATH"
   fi
@@ -76,12 +78,8 @@ for TARGET in "${BUILD_TARGETS[@]}"; do
   REGISTRY="${TARGET}.ocir.io"  # Convert region key to lowercase
   LOGIN_USER="${NAMESPACE}/${USERNAME}"
   IMAGE_PATH_METRICS="${REGISTRY}/${NAMESPACE}/oci-datadog-forwarder/metrics"
-  IMAGE_PATH_LOGS="${REGISTRY}/${NAMESPACE}/oci-datadog-forwarder/logs"
-  IMAGE_PATH_EVENTS="${REGISTRY}/${NAMESPACE}/oci-datadog-forwarder/events"
 
   echo "Metrics image: $IMAGE_PATH_METRICS"
-  echo "Logs image: $IMAGE_PATH_LOGS"
-  echo "Events image: $IMAGE_PATH_EVENTS"
 
   echo "Logging in to $REGISTRY..."
   echo "$PASSWORD" | docker login "$REGISTRY" --username "$LOGIN_USER" --password-stdin
@@ -91,8 +89,6 @@ for TARGET in "${BUILD_TARGETS[@]}"; do
   fi
 
   build_and_push_image "$IMAGE_PATH_METRICS" "$REGISTRY" "$TAG" "Dockerfile-metrics"
-  build_and_push_image "$IMAGE_PATH_LOGS" "$REGISTRY" "$TAG" "Dockerfile-logs"
-  build_and_push_image "$IMAGE_PATH_EVENTS" "$REGISTRY" "$TAG" "Dockerfile-events"
 done
 
 # Clear the password from memory
