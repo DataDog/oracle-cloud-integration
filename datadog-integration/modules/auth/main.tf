@@ -180,8 +180,22 @@ resource "oci_identity_domains_group" "dd_auth" {
   }
 }
 
+resource "oci_identity_tag_namespace" "datadog_managed" {
+  compartment_id = var.compartment_id
+  name           = "DatadogManaged"
+  description    = "[DO NOT REMOVE] Marker namespace for Datadog-managed resources. Removing this breaks the IAM grant scoping for the events rule."
+  freeform_tags  = var.tags
+  defined_tags   = var.defined_tags
+}
+
+resource "oci_identity_tag" "marker" {
+  tag_namespace_id = oci_identity_tag_namespace.datadog_managed.id
+  name             = "marker"
+  description      = "[DO NOT REMOVE] Applied to resources that the Datadog group is allowed to manage (e.g. the events rule). Removing this breaks the scoped IAM grant."
+}
+
 resource "oci_identity_policy" "dd_auth" {
-  depends_on     = [null_resource.user_group_variable_validation, oci_identity_domains_group.dd_auth]
+  depends_on     = [null_resource.user_group_variable_validation, oci_identity_domains_group.dd_auth, oci_identity_tag_namespace.datadog_managed]
   compartment_id = var.tenancy_id
   description    = "[DO NOT REMOVE] Policies required by Datadog User"
   name           = var.user_policy_name
@@ -194,7 +208,9 @@ resource "oci_identity_policy" "dd_auth" {
     "Allow group id ${local.dd_group_ocid} to manage buckets in compartment id ${var.compartment_id} where target.bucket.name=/dd-*/",
     "Allow group id ${local.dd_group_ocid} to manage object-family in compartment id ${var.compartment_id} where target.bucket.name=/dd-*/",
     "Allow group id ${local.dd_group_ocid} to use fn-invocation in compartment id ${var.compartment_id}",
-    "Endorse group id ${local.dd_group_ocid} to read objects in tenancy usage-report"
+    "Endorse group id ${local.dd_group_ocid} to read objects in tenancy usage-report",
+    "Allow group id ${local.dd_group_ocid} to manage cloudevents-rules in tenancy where any {request.permission = 'EVENTRULE_CREATE', target.resource.tag.DatadogManaged.marker = 'true'}",
+    "Allow group id ${local.dd_group_ocid} to manage streams in compartment id ${var.compartment_id} where any {request.permission = 'STREAM_CREATE', target.resource.tag.DatadogManaged.marker = 'true'}",
   ]
   freeform_tags = var.tags
   defined_tags  = var.defined_tags
@@ -229,7 +245,9 @@ resource "oci_identity_policy" "dynamic_group" {
     "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.service_connector.ocid} to use fn-function in compartment id ${var.compartment_id}",
     "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.service_connector.ocid} to use fn-invocation in compartment id ${var.compartment_id}",
     "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.forwarding_function.ocid} to read secret-bundles in compartment id ${var.compartment_id}",
-    "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.forwarding_function.ocid} to manage object-family in compartment id ${var.compartment_id} where target.bucket.name=/dd-*/"
+    "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.forwarding_function.ocid} to manage object-family in compartment id ${var.compartment_id} where target.bucket.name=/dd-*/",
+    "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.service_connector.ocid} to use stream-pull in compartment id ${var.compartment_id} where target.resource.tag.DatadogManaged.marker = 'true'",
+    "Allow any-user to use stream-push in compartment id ${var.compartment_id} where all {request.principal.type = 'eventrule', target.resource.tag.DatadogManaged.marker = 'true'}"
   ]
   freeform_tags = var.tags
   defined_tags  = var.defined_tags
