@@ -29,7 +29,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Set up Go
-        uses: actions/setup-go@40a081fd88c2ab18ca4c65a8bfc6c49a0b574f0c # v5.6.2
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: datadog-functions/${{ matrix.module }}/go.mod
           cache-dependency-path: datadog-functions/${{ matrix.module }}/go.sum
@@ -57,7 +57,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@b9cd54cbfe094ef7c5e0ca0aca929cd2ba0b2b67 # v3.1.2
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: 1.5.7
 
@@ -86,7 +86,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@b9cd54cbfe094ef7c5e0ca0aca929cd2ba0b2b67 # v3.1.2
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: 1.5.7
 
