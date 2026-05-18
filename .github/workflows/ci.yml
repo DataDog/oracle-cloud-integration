@@ -6,6 +6,10 @@ on:
     branches:
       - master
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
@@ -13,6 +17,7 @@ jobs:
   go:
     name: Go (${{ matrix.module }})
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -41,7 +46,7 @@ jobs:
         run: go mod tidy && git diff --exit-code go.mod go.sum
 
       - name: Test
-        run: go test ./...
+        run: go test -race ./...
 
       - name: Vet
         run: go vet ./...
@@ -50,8 +55,15 @@ jobs:
         run: go build -o /dev/null ./...
 
   terraform-fmt:
-    name: Terraform fmt
+    name: Terraform fmt (${{ matrix.terraform_version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        terraform_version:
+          - 1.5.7
+          - latest
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -59,7 +71,7 @@ jobs:
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
-          terraform_version: 1.5.7
+          terraform_version: ${{ matrix.terraform_version }}
 
       - name: Check formatting
         run: |
@@ -68,11 +80,15 @@ jobs:
             datadog-terraform-onboarding
 
   terraform-validate:
-    name: Terraform validate (${{ matrix.directory }})
+    name: Terraform validate (${{ matrix.directory }}, TF ${{ matrix.terraform_version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
+        terraform_version:
+          - 1.5.7
+          - latest
         directory:
           - datadog-integration
           - datadog-terraform-onboarding
@@ -88,7 +104,7 @@ jobs:
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
-          terraform_version: 1.5.7
+          terraform_version: ${{ matrix.terraform_version }}
 
       - name: Init
         run: terraform init -backend=false -input=false
