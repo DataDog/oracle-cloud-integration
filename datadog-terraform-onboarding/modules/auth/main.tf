@@ -14,11 +14,11 @@ terraform {
 
 # Stage 1: Validate that both user and group variables are either both null/empty OR both provided
 resource "null_resource" "user_group_variable_validation" {
-  
+
   provisioner "local-exec" {
     when       = create
     on_failure = fail
-    command = <<-EOT
+    command    = <<-EOT
       # Check variable consistency
       USER_PROVIDED="${var.existing_user_id != null && var.existing_user_id != "" ? "true" : "false"}"
       GROUP_PROVIDED="${var.existing_group_id != null && var.existing_group_id != "" ? "true" : "false"}"
@@ -43,13 +43,13 @@ resource "null_resource" "user_group_variable_validation" {
 # Stage 2: Validate data sources only when both variables are provided
 resource "null_resource" "existing_user_group_validation" {
   count = var.existing_user_id != null && var.existing_user_id != "" && var.existing_group_id != null && var.existing_group_id != "" ? 1 : 0
-  
+
   depends_on = [null_resource.user_group_variable_validation]
-  
+
   provisioner "local-exec" {
     when       = create
     on_failure = fail
-    command = <<-EOT
+    command    = <<-EOT
       # First check if the data sources returned any results
       USER_DATA_COUNT=${length(data.oci_identity_domains_users.existing_user_with_groups)}
       GROUP_DATA_COUNT=${length(data.oci_identity_domains_groups.existing_group)}

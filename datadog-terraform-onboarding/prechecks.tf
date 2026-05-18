@@ -110,9 +110,9 @@ data "external" "check_resources_in_state" {
 
 # Data source: Check vault quota availability
 data "oci_limits_resource_availability" "vault_quota" {
-  compartment_id     = var.tenancy_ocid
-  limit_name         = "virtual-vault-count"
-  service_name       = "kms"
+  compartment_id      = var.tenancy_ocid
+  limit_name          = "virtual-vault-count"
+  service_name        = "kms"
   availability_domain = null
 }
 
