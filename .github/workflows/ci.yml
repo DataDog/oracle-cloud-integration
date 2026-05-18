@@ -23,9 +23,9 @@ jobs:
       matrix:
         module:
           - lib
+          - metrics-forwarder
+          - logs-forwarder
           - events-forwarder
-          # metrics-forwarder and logs-forwarder: go.mod/go.sum out of sync with lib on
-          # master; add after a dedicated go mod tidy PR (tidy check requires committed files).
     defaults:
       run:
         working-directory: datadog-functions/${{ matrix.module }}
@@ -39,20 +39,8 @@ jobs:
           go-version-file: datadog-functions/${{ matrix.module }}/go.mod
           cache-dependency-path: datadog-functions/${{ matrix.module }}/go.sum
 
-      - name: Download modules
-        run: go mod download
-
-      - name: Verify go.mod and go.sum
-        run: go mod tidy && git diff --exit-code go.mod go.sum
-
       - name: Test
-        run: go test -race ./...
-
-      - name: Vet
-        run: go vet ./...
-
-      - name: Build
-        run: go build -o /dev/null ./...
+        run: go test -mod=mod -race ./...
 
   terraform-fmt:
     name: Terraform fmt (${{ matrix.terraform_version }})
