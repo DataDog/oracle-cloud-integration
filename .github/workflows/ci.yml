@@ -42,6 +42,12 @@ jobs:
       - name: Test
         run: go test -mod=mod -race ./...
 
+      - name: Vet
+        run: go vet -mod=mod ./...
+
+      - name: Build
+        run: go build -mod=mod -o /dev/null ./...
+
   terraform-fmt:
     name: Terraform fmt (${{ matrix.terraform_version }})
     runs-on: ubuntu-latest
