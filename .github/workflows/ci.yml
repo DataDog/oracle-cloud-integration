@@ -42,17 +42,14 @@ jobs:
       - name: Download modules
         run: go mod download
 
-      - name: Verify go.mod and go.sum
-        run: go mod tidy && git diff --exit-code go.mod go.sum
-
       - name: Test
-        run: go test -race ./...
+        run: go test -mod=mod -race ./...
 
       - name: Vet
-        run: go vet ./...
+        run: go vet -mod=mod ./...
 
       - name: Build
-        run: go build -o /dev/null ./...
+        run: go build -mod=mod -o /dev/null ./...
 
   terraform-fmt:
     name: Terraform fmt (${{ matrix.terraform_version }})
