@@ -45,13 +45,13 @@ locals {
 # Create API key for the user using native Terraform resource
 resource "oci_identity_domains_api_key" "datadog_key" {
   idcs_endpoint = var.idcs_endpoint
-  
+
   # The key value in PEM format
   key = tls_private_key.datadog_api_key.public_key_pem
-  
+
   # Required schemas for Identity Domains API key
   schemas = ["urn:ietf:params:scim:schemas:oracle:idcs:apikey"]
-  
+
   # Link to the user
   user {
     value = local.user_idcs_id

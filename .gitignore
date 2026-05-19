@@ -15,6 +15,9 @@ terraform.tfstate*
 # Examples directory
 examples/
 
+# Local onboarding test workspaces (see .claude/skills/datadog-onboarding-testing/)
+onboarding-test-runs/
+
 # IDE files
 .vscode/
 *.swp

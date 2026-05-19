@@ -1,10 +1,10 @@
 # Validate user and group configurations
 resource "null_resource" "user_group_validation" {
-  
+
   provisioner "local-exec" {
     when       = create
     on_failure = fail
-    command = <<-EOT
+    command    = <<-EOT
       # Check existing_user_id format if provided
       if [ "${var.existing_user_id != null ? var.existing_user_id : ""}" != "" ]; then
         if ! echo "${var.existing_user_id != null ? var.existing_user_id : ""}" | grep -q "^ocid1\\.user\\.oc[0-9]\\."; then
@@ -40,7 +40,7 @@ resource "null_resource" "user_group_validation" {
   }
 
   triggers = {
-    existing_user_id = var.existing_user_id != null ? var.existing_user_id : "null"
+    existing_user_id  = var.existing_user_id != null ? var.existing_user_id : "null"
     existing_group_id = var.existing_group_id != null ? var.existing_group_id : "null"
   }
 }
@@ -48,11 +48,11 @@ resource "null_resource" "user_group_validation" {
 # Validate subnet regions and fail if any unknown regions detected
 resource "null_resource" "subnet_region_validation" {
   depends_on = [null_resource.user_group_validation]
-  
+
   provisioner "local-exec" {
     when       = create
     on_failure = fail
-    command = <<-EOT
+    command    = <<-EOT
       # First check OCID structure validity
       INVALID_OCIDS="${join(" ", local.invalid_structure_ocids)}"
       if [ ! -z "$INVALID_OCIDS" ] && [ ${length(local.subnet_ocids_list)} -gt 0 ]; then
@@ -102,21 +102,21 @@ resource "null_resource" "subnet_region_validation" {
   }
 
   triggers = {
-    subnet_regions = jsonencode(local.subnet_regions)
-    invalid_ocids = jsonencode(local.invalid_structure_ocids)
-    duplicate_ocids = jsonencode(local.duplicate_ocids)
+    subnet_regions    = jsonencode(local.subnet_regions)
+    invalid_ocids     = jsonencode(local.invalid_structure_ocids)
+    duplicate_ocids   = jsonencode(local.duplicate_ocids)
     duplicate_regions = jsonencode(local.duplicate_regions)
   }
 }
 
 # Output region intersection logic and validate region consistency
 resource "null_resource" "region_intersection_info" {
-  depends_on = [null_resource.subnet_region_validation,data.external.supported_regions]
-  
+  depends_on = [null_resource.subnet_region_validation, data.external.supported_regions]
+
   provisioner "local-exec" {
     when       = create
     on_failure = fail
-    command = <<-EOT
+    command    = <<-EOT
       echo "==================== DATADOG REGIONAL STACK DEPLOYMENT INFO ===================="
       echo "Subscribed regions in tenancy: ${join(", ", sort(tolist(local.subscribed_regions_set)))}"
       echo "Regions available in identity domain: ${join(", ", sort(tolist(local.regions_in_domain_set)))}"
@@ -163,15 +163,15 @@ resource "null_resource" "region_intersection_info" {
   triggers = {
     region_validation = jsonencode({
       subscribed_regions = local.subscribed_regions_set
-      domain_regions = local.regions_in_domain_set
-      target_regions = local.target_regions_for_stacks
+      domain_regions     = local.regions_in_domain_set
+      target_regions     = local.target_regions_for_stacks
     })
   }
 }
 
 resource "null_resource" "precheck_marker" {
   depends_on = [null_resource.region_intersection_info]
-  
+
   provisioner "local-exec" {
     when       = create
     on_failure = fail
@@ -249,7 +249,7 @@ module "key" {
 }
 
 module "integration" {
-  depends_on = [null_resource.precheck_marker, module.auth, module.key, module.kms,null_resource.regional_stacks_create_apply]
+  depends_on = [null_resource.precheck_marker, module.auth, module.key, module.kms, null_resource.regional_stacks_create_apply]
   source     = "./modules/integration"
   providers = {
     restapi = restapi
