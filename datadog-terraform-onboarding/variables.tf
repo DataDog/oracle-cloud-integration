@@ -70,6 +70,12 @@ variable "logs_enabled" {
   default     = true
 }
 
+variable "logs_only" {
+  type        = bool
+  description = "If true, onboard the integration for logs only. Metrics and resource collection will be disabled in the Datadog integration."
+  default     = false
+}
+
 variable "domain_id" {
   type        = string
   description = "The OCID of the Identity Domain to use for the Datadog QuickStart stack"

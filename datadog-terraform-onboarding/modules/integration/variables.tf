@@ -55,6 +55,12 @@ variable "logs_enabled" {
   default     = false
 }
 
+variable "logs_only" {
+  type        = bool
+  description = "If true, disable metrics and resource collection in the integration request body."
+  default     = false
+}
+
 variable "defined_tags" {
   type        = map(string)
   description = "OCI defined tags applied to resources (namespace.key -> value). Sent to Datadog for integration config."
