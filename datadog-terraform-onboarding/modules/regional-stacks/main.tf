@@ -45,7 +45,7 @@ module "vcn" {
   vcn_cidrs                = ["10.0.0.0/16"]
   vcn_dns_label            = "ddvcnmodule"
   vcn_name                 = local.vcn_name
-  lockdown_default_seclist  = true
+  lockdown_default_seclist = true
   subnets                  = {}
 
   create_nat_gateway           = true
@@ -56,13 +56,13 @@ module "vcn" {
 
 # Subnet submodule so we can pass defined_tags (upstream VCN module does not pass them to subnets).
 module "subnet" {
-  count           = var.subnet_ocid == "" ? 1 : 0
-  source          = "oracle-terraform-modules/vcn/oci//modules/subnet"
-  version         = ">= 3.6.0"
-  compartment_id  = var.compartment_ocid
-  vcn_id          = module.vcn[0].vcn_id
-  nat_route_id    = module.vcn[0].nat_route_id
-  ig_route_id     = module.vcn[0].ig_route_id
+  count          = var.subnet_ocid == "" ? 1 : 0
+  source         = "oracle-terraform-modules/vcn/oci//modules/subnet"
+  version        = ">= 3.6.0"
+  compartment_id = var.compartment_ocid
+  vcn_id         = module.vcn[0].vcn_id
+  nat_route_id   = module.vcn[0].nat_route_id
+  ig_route_id    = module.vcn[0].ig_route_id
   subnets = {
     private = {
       cidr_block = "10.0.0.0/16"

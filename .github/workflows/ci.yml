@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Go (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - lib
+          - metrics-forwarder
+          - logs-forwarder
+          - events-forwarder
+    defaults:
+      run:
+        working-directory: datadog-functions/${{ matrix.module }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: datadog-functions/${{ matrix.module }}/go.mod
+          cache-dependency-path: datadog-functions/${{ matrix.module }}/go.sum
+
+      - name: Test
+        run: go test -mod=mod -race ./...
+
+      - name: Vet
+        run: go vet -mod=mod ./...
+
+      - name: Build
+        run: go build -mod=mod -o /dev/null ./...
+
+  terraform-fmt:
+    name: Terraform fmt (${{ matrix.terraform_version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        terraform_version:
+          - 1.5.7
+          - latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: ${{ matrix.terraform_version }}
+
+      - name: Check formatting
+        run: |
+          terraform fmt -check -recursive \
+            datadog-integration \
+            datadog-terraform-onboarding
+
+  terraform-validate:
+    name: Terraform validate (${{ matrix.directory }}, TF ${{ matrix.terraform_version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        terraform_version:
+          - 1.5.7
+          - latest
+        directory:
+          - datadog-integration
+          - datadog-terraform-onboarding
+          - datadog-integration/modules/regional-stacks
+          - datadog-terraform-onboarding/modules/regional-stacks
+    defaults:
+      run:
+        working-directory: ${{ matrix.directory }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: ${{ matrix.terraform_version }}
+
+      - name: Init
+        run: terraform init -backend=false -input=false
+
+      - name: Validate
+        run: terraform validate

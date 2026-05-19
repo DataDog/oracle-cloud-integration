@@ -29,7 +29,7 @@ provider "restapi" {
     "DD-API-KEY"         = var.datadog_api_key
     "DD-APPLICATION-KEY" = var.datadog_app_key
     "Content-Type"       = "application/json"
-    "Client-ID"        = "terraform-advanced-onboarding"
+    "Client-ID"          = "terraform-advanced-onboarding"
   }
 }
 
