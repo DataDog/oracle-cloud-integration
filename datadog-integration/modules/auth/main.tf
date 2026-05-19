@@ -205,8 +205,8 @@ resource "oci_identity_policy" "dd_auth" {
     "Allow group id ${local.dd_group_ocid} to use tag-namespaces in tenancy",
     "Allow group id ${local.dd_group_ocid} to manage serviceconnectors in compartment id ${var.compartment_id}",
     "Allow group id ${local.dd_group_ocid} to manage functions-family in compartment id ${var.compartment_id}",
-    "Allow group id ${local.dd_group_ocid} to manage buckets in compartment id ${var.compartment_id} where target.bucket.name=/dd-*/",
-    "Allow group id ${local.dd_group_ocid} to manage object-family in compartment id ${var.compartment_id} where target.bucket.name=/dd-*/",
+    "Allow group id ${local.dd_group_ocid} to manage buckets in compartment id ${var.compartment_id} where any {request.permission = 'BUCKET_CREATE', target.resource.tag.DatadogManaged.marker = 'true'}",
+    "Allow group id ${local.dd_group_ocid} to manage object-family in compartment id ${var.compartment_id} where target.resource.tag.DatadogManaged.marker = 'true'",
     "Allow group id ${local.dd_group_ocid} to use fn-invocation in compartment id ${var.compartment_id}",
     "Endorse group id ${local.dd_group_ocid} to read objects in tenancy usage-report",
     "Allow group id ${local.dd_group_ocid} to manage cloudevents-rules in tenancy where any {request.permission = 'EVENTRULE_CREATE', target.resource.tag.DatadogManaged.marker = 'true'}",
@@ -245,7 +245,7 @@ resource "oci_identity_policy" "dynamic_group" {
     "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.service_connector.ocid} to use fn-function in compartment id ${var.compartment_id}",
     "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.service_connector.ocid} to use fn-invocation in compartment id ${var.compartment_id}",
     "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.forwarding_function.ocid} to read secret-bundles in compartment id ${var.compartment_id}",
-    "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.forwarding_function.ocid} to manage object-family in compartment id ${var.compartment_id} where target.bucket.name=/dd-*/",
+    "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.forwarding_function.ocid} to manage object-family in compartment id ${var.compartment_id} where target.resource.tag.DatadogManaged.marker = 'true'",
     "Allow dynamic-group id ${oci_identity_domains_dynamic_resource_group.service_connector.ocid} to use stream-pull in compartment id ${var.compartment_id} where target.resource.tag.DatadogManaged.marker = 'true'",
     "Allow any-user to use stream-push in compartment id ${var.compartment_id} where all {request.principal.type = 'eventrule', target.resource.tag.DatadogManaged.marker = 'true'}"
   ]
