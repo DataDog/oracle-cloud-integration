@@ -12,7 +12,6 @@ variableGroups:
       - ${region}
       - ${compartment_ocid}
       - ${current_user_ocid}
-      - ${logs_only}
     visible: false
   - title: "Datadog Environment"
     variables:
@@ -20,6 +19,7 @@ variableGroups:
       - ${datadog_api_key}
       - ${datadog_site}
       - ${logs_enabled}
+      - ${logs_only}
   - title: "(Optional) Choose specific subnet(s)"
     variables:
       - ${choose_subnet}
@@ -121,7 +121,7 @@ variables:
     title: Logs Only
     type: boolean
     description: |
-      If true, the integration will be created with only logs enabled. Metrics and resource collection will be disabled, but can be re-enabled in the Datadog Tile UI.
+      Indicates if the integration should be created with metric and resource collection disabled
     required: false
     default: false
 
