@@ -121,7 +121,7 @@ variables:
     title: Logs Only
     type: boolean
     description: |
-      Indicates if the integration should be created with metric and resource collection disabled
+      Indicates if the integration should be created with metric and resource collection disabled, but available
     required: false
     default: false
 

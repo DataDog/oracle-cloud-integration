@@ -57,7 +57,7 @@ variable "logs_enabled" {
 
 variable "logs_only" {
   type        = bool
-  description = "Indicates if the integration should be created with metric and resource collection disabled"
+  description = "Indicates if the integration should be created with metric and resource collection disabled, but available"
   default     = false
 }
 
