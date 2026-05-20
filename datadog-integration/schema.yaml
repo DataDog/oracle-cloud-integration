@@ -12,6 +12,7 @@ variableGroups:
       - ${region}
       - ${compartment_ocid}
       - ${current_user_ocid}
+      - ${logs_only}
     visible: false
   - title: "Datadog Environment"
     variables:
@@ -113,6 +114,14 @@ variables:
     type: string
     description: |
       Indicates if logs should be enabled/disabled
+    required: false
+    default: false
+
+  logs_only:
+    title: Logs Only
+    type: boolean
+    description: |
+      If true, the integration will be created with only logs enabled. Metrics and resource collection will be disabled, but can be re-enabled in the Datadog Tile UI.
     required: false
     default: false
 
