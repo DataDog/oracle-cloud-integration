@@ -79,7 +79,7 @@ variable "logs_enabled" {
 
 variable "logs_only" {
   type        = bool
-  description = "If true, the integration will be created with only logs enabled. Metrics and resource collection will be disabled, but can be re-enabled in the Datadog Tile UI."
+  description = "Indicates if the integration should be created with metric and resource collection disabled, but available"
   default     = false
 }
 
