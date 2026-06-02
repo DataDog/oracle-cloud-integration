@@ -35,13 +35,9 @@ resource "null_resource" "wait_for_vault_dns" {
 
   provisioner "local-exec" {
     command = <<-EOT
-      export OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING=True
+      host=$(echo "${oci_kms_vault.datadog_vault.management_endpoint}" | sed 's|https://||')
       for i in $(seq 1 30); do
-        RESULT=$(timeout 15 oci kms management key list \
-          --endpoint "${oci_kms_vault.datadog_vault.management_endpoint}" \
-          --compartment-id "${var.compartment_id}" 2>&1)
-        EXIT_CODE=$?
-        if [ $EXIT_CODE -eq 0 ] || echo "$RESULT" | grep -q "ServiceError"; then exit 0; fi
+        timeout 5 bash -c "cat < /dev/null > /dev/tcp/$host/443" 2>/dev/null && exit 0
         echo "Attempt $i: vault endpoint not yet reachable, retrying in 10s..."
         sleep 10
       done
