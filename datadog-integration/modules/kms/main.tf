@@ -31,7 +31,7 @@ resource "null_resource" "wait_for_vault_dns" {
     command = <<-EOT
       export OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING=True
       for i in $(seq 1 30); do
-        RESULT=$(oci kms management key list \
+        RESULT=$(timeout 15 oci kms management key list \
           --endpoint "${oci_kms_vault.datadog_vault.management_endpoint}" \
           --compartment-id "${var.compartment_id}" 2>&1)
         echo "$RESULT" | grep -q "ServiceError" && exit 0
