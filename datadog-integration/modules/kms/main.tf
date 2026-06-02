@@ -22,7 +22,7 @@ resource "oci_kms_vault" "datadog_vault" {
 }
 
 # Workaround for OCI provider race condition: vault DNS endpoint is not immediately
-# resolvable after creation. See https://github.com/oracle/terraform-provider-oci/issues/1955
+# resolvable after creation, causing key creation to fail.
 resource "time_sleep" "wait_for_vault_dns" {
   depends_on      = [oci_kms_vault.datadog_vault]
   create_duration = "60s"
