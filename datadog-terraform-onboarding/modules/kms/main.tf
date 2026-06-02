@@ -5,6 +5,10 @@ terraform {
       source  = "oracle/oci"
       version = ">=7.1.0"
     }
+    time = {
+      source  = "hashicorp/time"
+      version = ">= 0.9.0"
+    }
   }
 }
 
@@ -23,6 +27,13 @@ resource "oci_kms_vault" "datadog_vault" {
   }
 }
 
+# Workaround for OCI provider race condition: vault DNS endpoint is not immediately
+# resolvable after creation. See https://github.com/oracle/terraform-provider-oci/issues/1955
+resource "time_sleep" "wait_for_vault_dns" {
+  depends_on      = [oci_kms_vault.datadog_vault]
+  create_duration = "60s"
+}
+
 resource "oci_kms_key" "datadog_key" {
   compartment_id = var.compartment_id
   display_name   = "datadog-key"
@@ -33,6 +44,7 @@ resource "oci_kms_key" "datadog_key" {
   management_endpoint = oci_kms_vault.datadog_vault.management_endpoint
   freeform_tags       = var.tags
   defined_tags        = var.defined_tags
+  depends_on          = [time_sleep.wait_for_vault_dns]
 
   timeouts {
     create = "60m"
