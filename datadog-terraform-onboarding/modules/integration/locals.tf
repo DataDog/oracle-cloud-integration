@@ -11,6 +11,7 @@ locals {
       available : var.subscribed_regions
     }
     dd_compartment_id : var.datadog_resource_compartment_id
+    dd_iac_version : trimspace(data.local_file.dd_iac_version.content)
     logs_config : {
       Enabled = var.logs_enabled
     }
