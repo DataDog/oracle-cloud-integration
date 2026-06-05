@@ -96,6 +96,16 @@ jobs:
           cp ../VERSION .
           zip -r ../datadog-integration.zip ./*
 
+      - name: Verify VERSION files are in sync
+        run: |
+          tf_version=$(cat datadog-terraform-onboarding/VERSION | tr -d '[:space:]')
+          root_version=$(cat VERSION | tr -d '[:space:]')
+          if [[ "$tf_version" != "$root_version" ]]; then
+            echo "ERROR: datadog-terraform-onboarding/VERSION ($tf_version) does not match VERSION ($root_version)"
+            echo "Update datadog-terraform-onboarding/VERSION before releasing."
+            exit 1
+          fi
+
       - name: Upload assets
         env:
           VERSION: ${{ steps.version.outputs.version }}
