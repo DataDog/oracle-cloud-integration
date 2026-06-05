@@ -2,6 +2,7 @@ package formatter
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -40,6 +41,55 @@ func TestDecode_InvalidJSON(t *testing.T) {
 func TestDecode_NotObjectOrArray(t *testing.T) {
 	if _, err := Decode(bytes.NewBufferString("123")); err == nil {
 		t.Fatal("expected error for non-object/array JSON, got nil")
+	}
+}
+
+// schMessage wraps an OCI Cloud Event as Service Connector Hub delivers it
+// when the source is OCI Streaming.
+func schMessage(event string) string {
+	encoded := base64.StdEncoding.EncodeToString([]byte(event))
+	return `{"streamPool":"ocid1.streampool.oc1..test","stream":"ocid1.stream.oc1..test","partition":"0","key":"","value":"` + encoded + `","offset":"0","timestamp":"2024-01-15T10:00:00.000Z"}`
+}
+
+func TestDecode_SCHStreamingArray(t *testing.T) {
+	msg1 := schMessage(sampleEvent)
+	msg2 := schMessage(sampleEvent)
+	in := bytes.NewBufferString("[" + msg1 + "," + msg2 + "]")
+
+	events, err := Decode(in)
+	if err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("got %d events, want 2", len(events))
+	}
+	// Each decoded event should be the original OCI Cloud Event JSON.
+	var decoded map[string]any
+	if err := json.Unmarshal(events[0], &decoded); err != nil {
+		t.Fatalf("unmarshal decoded event: %v", err)
+	}
+	if decoded["eventType"] != "com.oraclecloud.objectstorage.deletebucket" {
+		t.Fatalf("eventType = %q, want %q", decoded["eventType"], "com.oraclecloud.objectstorage.deletebucket")
+	}
+}
+
+func TestDecode_SCHStreamingSingleMessage(t *testing.T) {
+	msg := schMessage(sampleEvent)
+	in := bytes.NewBufferString("[" + msg + "]")
+
+	events, err := Decode(in)
+	if err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("got %d events, want 1", len(events))
+	}
+}
+
+func TestDecode_SCHStreamingInvalidBase64(t *testing.T) {
+	bad := `[{"streamPool":"x","value":"!!!notbase64!!!"}]`
+	if _, err := Decode(bytes.NewBufferString(bad)); err == nil {
+		t.Fatal("expected error for invalid base64, got nil")
 	}
 }
 
