@@ -2,6 +2,8 @@ module datadog-functions/lib
 
 go 1.25.7
 
+toolchain go1.26.2
+
 require (
 	github.com/DataDog/datadog-api-client-go/v2 v2.58.0
 	github.com/oracle/oci-go-sdk/v65 v65.113.0
