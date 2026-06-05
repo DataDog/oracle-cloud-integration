@@ -13,6 +13,7 @@ locals {
     }
     dd_compartment_id : var.datadog_resource_compartment_id
     dd_stack_id : try(data.external.stack_info.result.stack_id, "")
+    dd_iac_version : trimspace(data.local_file.dd_iac_version.content)
     logs_config : {
       Enabled : var.logs_enabled
     }
