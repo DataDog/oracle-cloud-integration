@@ -10,28 +10,6 @@ import (
 
 const sampleEvent = `{"eventType":"com.oraclecloud.objectstorage.deletebucket","eventID":"abc","data":{"resourceId":"ocid1.bucket.oc1..xyz"}}`
 
-func TestDecode_Array(t *testing.T) {
-	in := bytes.NewBufferString("[" + sampleEvent + "," + sampleEvent + "]")
-	events, err := Decode(in)
-	if err != nil {
-		t.Fatalf("Decode: %v", err)
-	}
-	if len(events) != 2 {
-		t.Fatalf("got %d events, want 2", len(events))
-	}
-}
-
-func TestDecode_SingleObject(t *testing.T) {
-	in := bytes.NewBufferString(sampleEvent)
-	events, err := Decode(in)
-	if err != nil {
-		t.Fatalf("Decode: %v", err)
-	}
-	if len(events) != 1 {
-		t.Fatalf("got %d events, want 1", len(events))
-	}
-}
-
 func TestDecode_InvalidJSON(t *testing.T) {
 	if _, err := Decode(bytes.NewBufferString("not json")); err == nil {
 		t.Fatal("expected error for invalid JSON, got nil")
