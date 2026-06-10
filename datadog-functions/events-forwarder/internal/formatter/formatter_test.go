@@ -71,6 +71,21 @@ func TestDecode_SCHStreamingInvalidBase64(t *testing.T) {
 	}
 }
 
+func TestDecode_SCHStreamingEmptyValue(t *testing.T) {
+	empty := `[{"streamPool":"x","value":""}]`
+	if _, err := Decode(bytes.NewBufferString(empty)); err == nil {
+		t.Fatal("expected error for empty decoded value, got nil")
+	}
+}
+
+func TestDecode_SCHStreamingNonJSONValue(t *testing.T) {
+	encoded := base64.StdEncoding.EncodeToString([]byte("not json at all"))
+	msg := `[{"streamPool":"x","value":"` + encoded + `"}]`
+	if _, err := Decode(bytes.NewBufferString(msg)); err == nil {
+		t.Fatal("expected error for non-JSON decoded value, got nil")
+	}
+}
+
 func TestChunk_FitsInOnePayload(t *testing.T) {
 	events := []json.RawMessage{json.RawMessage(sampleEvent), json.RawMessage(sampleEvent)}
 	payloads, dropped := Chunk(events)

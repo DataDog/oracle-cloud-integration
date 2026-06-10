@@ -38,6 +38,12 @@ func Decode(in io.Reader) ([]json.RawMessage, error) {
 		if err != nil {
 			return nil, fmt.Errorf("streaming message %d: failed to base64-decode value: %w", i, err)
 		}
+		if len(decoded) == 0 {
+			return nil, fmt.Errorf("streaming message %d: decoded value is empty", i)
+		}
+		if !json.Valid(decoded) {
+			return nil, fmt.Errorf("streaming message %d: decoded value is not valid JSON", i)
+		}
 		out = append(out, json.RawMessage(decoded))
 	}
 	return out, nil
