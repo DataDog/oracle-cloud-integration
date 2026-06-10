@@ -78,11 +78,12 @@ func TestDecode_SCHStreamingEmptyValue(t *testing.T) {
 	}
 }
 
-func TestDecode_SCHStreamingNonJSONValue(t *testing.T) {
-	encoded := base64.StdEncoding.EncodeToString([]byte("not json at all"))
+func TestDecode_SCHStreamingNonObjectValue(t *testing.T) {
+	// A scalar is syntactically valid JSON but not an OCI Cloud Event object.
+	encoded := base64.StdEncoding.EncodeToString([]byte("42"))
 	msg := `[{"streamPool":"x","value":"` + encoded + `"}]`
 	if _, err := Decode(bytes.NewBufferString(msg)); err == nil {
-		t.Fatal("expected error for non-JSON decoded value, got nil")
+		t.Fatal("expected error for non-object decoded value, got nil")
 	}
 }
 

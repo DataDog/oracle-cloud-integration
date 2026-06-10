@@ -41,8 +41,8 @@ func Decode(in io.Reader) ([]json.RawMessage, error) {
 		if len(decoded) == 0 {
 			return nil, fmt.Errorf("streaming message %d: decoded value is empty", i)
 		}
-		if !json.Valid(decoded) {
-			return nil, fmt.Errorf("streaming message %d: decoded value is not valid JSON", i)
+		if decoded[0] != '{' {
+			return nil, fmt.Errorf("streaming message %d: decoded value is not a JSON object", i)
 		}
 		out = append(out, json.RawMessage(decoded))
 	}
