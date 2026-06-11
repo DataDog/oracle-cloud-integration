@@ -13,13 +13,13 @@ require (
 replace datadog-functions/lib => ../lib
 
 require (
-	github.com/DataDog/datadog-api-client-go/v2 v2.57.0 // indirect
+	github.com/DataDog/datadog-api-client-go/v2 v2.58.0 // indirect
 	github.com/DataDog/zstd v1.5.6 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/google/uuid v1.5.0 // indirect
-	github.com/oracle/oci-go-sdk/v65 v65.110.0 // indirect
+	github.com/oracle/oci-go-sdk/v65 v65.113.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sony/gobreaker v1.0.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
