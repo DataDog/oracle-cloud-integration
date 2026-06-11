@@ -87,6 +87,25 @@ func TestDecode_SCHStreamingNonObjectValue(t *testing.T) {
 	}
 }
 
+func TestDecode_SCHStreamingMalformedObjectValue(t *testing.T) {
+	// Starts with '{' but is not valid JSON — json.Valid should reject it.
+	encoded := base64.StdEncoding.EncodeToString([]byte("{not valid json"))
+	msg := `[{"streamPool":"x","value":"` + encoded + `"}]`
+	if _, err := Decode(bytes.NewBufferString(msg)); err == nil {
+		t.Fatal("expected error for malformed JSON object, got nil")
+	}
+}
+
+func TestDecode_EmptyArray(t *testing.T) {
+	events, err := Decode(bytes.NewBufferString("[]"))
+	if err != nil {
+		t.Fatalf("unexpected error for empty array: %v", err)
+	}
+	if len(events) != 0 {
+		t.Fatalf("got %d events, want 0", len(events))
+	}
+}
+
 func TestChunk_FitsInOnePayload(t *testing.T) {
 	events := []json.RawMessage{json.RawMessage(sampleEvent), json.RawMessage(sampleEvent)}
 	payloads, dropped := Chunk(events)

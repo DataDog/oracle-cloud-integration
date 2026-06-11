@@ -40,14 +40,7 @@ func schBatch(events ...string) string {
 		encoded := base64.StdEncoding.EncodeToString([]byte(ev))
 		msgs[i] = `{"value":"` + encoded + `"}`
 	}
-	result := "["
-	for i, m := range msgs {
-		if i > 0 {
-			result += ","
-		}
-		result += m
-	}
-	return result + "]"
+	return "[" + strings.Join(msgs, ",") + "]"
 }
 
 func withTestClient(t *testing.T) {

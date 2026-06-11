@@ -34,6 +34,7 @@ func Decode(in io.Reader) ([]json.RawMessage, error) {
 	}
 	out := make([]json.RawMessage, 0, len(msgs))
 	for i, sm := range msgs {
+		// OCI Streaming encodes message values as standard RFC 4648 base64 (with padding).
 		decoded, err := base64.StdEncoding.DecodeString(sm.Value)
 		if err != nil {
 			return nil, fmt.Errorf("streaming message %d: failed to base64-decode value: %w", i, err)
@@ -43,6 +44,9 @@ func Decode(in io.Reader) ([]json.RawMessage, error) {
 		}
 		if decoded[0] != '{' {
 			return nil, fmt.Errorf("streaming message %d: decoded value is not a JSON object", i)
+		}
+		if !json.Valid(decoded) {
+			return nil, fmt.Errorf("streaming message %d: decoded value is not valid JSON", i)
 		}
 		out = append(out, json.RawMessage(decoded))
 	}
