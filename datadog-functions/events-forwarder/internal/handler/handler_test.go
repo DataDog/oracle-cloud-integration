@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -32,6 +33,16 @@ func (mockFnContext) TracingContextData() fdk.TracingContext { return nil }
 
 const eventEnvelope = `{"eventType":"com.oraclecloud.objectstorage.deletebucket","eventID":"abc","data":{"resourceId":"ocid1.bucket.oc1..xyz"}}`
 
+// schBatch wraps one or more OCI Cloud Events as an SCH OCI Streaming batch.
+func schBatch(events ...string) string {
+	msgs := make([]string, len(events))
+	for i, ev := range events {
+		encoded := base64.StdEncoding.EncodeToString([]byte(ev))
+		msgs[i] = `{"value":"` + encoded + `"}`
+	}
+	return "[" + strings.Join(msgs, ",") + "]"
+}
+
 func withTestClient(t *testing.T) {
 	t.Helper()
 	t.Setenv("TENANCY_OCID", "ocid1.tenancy.oc1..test")
@@ -56,7 +67,7 @@ func runHandler(t *testing.T, body string) fnResponse {
 func TestMyHandler_ArrayPayload(t *testing.T) {
 	withTestClient(t)
 
-	resp := runHandler(t, "["+eventEnvelope+","+eventEnvelope+"]")
+	resp := runHandler(t, schBatch(eventEnvelope, eventEnvelope))
 	if resp.Status != "success" {
 		t.Fatalf("status = %q, want success (resp=%+v)", resp.Status, resp)
 	}
@@ -68,7 +79,7 @@ func TestMyHandler_ArrayPayload(t *testing.T) {
 func TestMyHandler_SingleEnvelope(t *testing.T) {
 	withTestClient(t)
 
-	resp := runHandler(t, eventEnvelope)
+	resp := runHandler(t, schBatch(eventEnvelope))
 	if resp.Status != "success" {
 		t.Fatalf("status = %q, want success (resp=%+v)", resp.Status, resp)
 	}
@@ -93,7 +104,7 @@ func TestMyHandler_MissingTenancyOCID(t *testing.T) {
 
 	os.Unsetenv("TENANCY_OCID")
 
-	resp := runHandler(t, eventEnvelope)
+	resp := runHandler(t, schBatch(eventEnvelope))
 	if resp.Status != "error" {
 		t.Fatalf("status = %q, want error", resp.Status)
 	}
@@ -110,7 +121,7 @@ func TestMyHandler_MissingDDSite(t *testing.T) {
 	t.Setenv("TENANCY_OCID", "ocid1.tenancy.oc1..test")
 	os.Unsetenv("DD_SITE")
 
-	resp := runHandler(t, eventEnvelope)
+	resp := runHandler(t, schBatch(eventEnvelope))
 	if resp.Status != "error" {
 		t.Fatalf("status = %q, want error", resp.Status)
 	}

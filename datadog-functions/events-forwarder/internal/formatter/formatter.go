@@ -4,10 +4,18 @@
 package formatter
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 )
+
+// streamingMessage is the per-message envelope that Service Connector Hub
+// delivers to Functions when the source is OCI Streaming. The actual OCI
+// Cloud Event JSON is base64-encoded in the Value field.
+type streamingMessage struct {
+	Value string `json:"value"`
+}
 
 // Intake limits enforced by cloudplatform-intake/api/v2/cloudchanges.
 const (
@@ -15,25 +23,34 @@ const (
 	MaxBatchCount = 65536
 )
 
-// Decode accepts either a single OCI CloudEvents envelope or an array of
-// envelopes. Events are returned as RawMessage so downstream chunking can
-// operate on encoded sizes without re-encoding each element.
+// Decode accepts an array of OCI Streaming messages as delivered by Service
+// Connector Hub. Each message's "value" field is base64-decoded to extract
+// the inner OCI Cloud Event JSON. Events are returned as RawMessage so
+// downstream chunking can operate on encoded sizes without re-encoding.
 func Decode(in io.Reader) ([]json.RawMessage, error) {
-	var body json.RawMessage
-	if err := json.NewDecoder(in).Decode(&body); err != nil {
+	var msgs []streamingMessage
+	if err := json.NewDecoder(in).Decode(&msgs); err != nil {
 		return nil, fmt.Errorf("failed to decode JSON: %w", err)
 	}
-
-	var arr []json.RawMessage
-	if err := json.Unmarshal(body, &arr); err == nil {
-		return arr, nil
+	out := make([]json.RawMessage, 0, len(msgs))
+	for i, sm := range msgs {
+		// OCI Streaming encodes message values as standard RFC 4648 base64 (with padding).
+		decoded, err := base64.StdEncoding.DecodeString(sm.Value)
+		if err != nil {
+			return nil, fmt.Errorf("streaming message %d: failed to base64-decode value: %w", i, err)
+		}
+		if len(decoded) == 0 {
+			return nil, fmt.Errorf("streaming message %d: decoded value is empty", i)
+		}
+		if decoded[0] != '{' {
+			return nil, fmt.Errorf("streaming message %d: decoded value is not a JSON object", i)
+		}
+		if !json.Valid(decoded) {
+			return nil, fmt.Errorf("streaming message %d: decoded value is not valid JSON", i)
+		}
+		out = append(out, json.RawMessage(decoded))
 	}
-
-	var obj map[string]any
-	if err := json.Unmarshal(body, &obj); err != nil {
-		return nil, fmt.Errorf("invalid JSON format: expected object or array of objects: %w", err)
-	}
-	return []json.RawMessage{body}, nil
+	return out, nil
 }
 
 // Chunk splits events into JSON-array payloads that respect the intake's
