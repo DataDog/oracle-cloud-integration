@@ -204,7 +204,10 @@ func backfillBucketName(intakeURL string) string {
 }
 
 // newObjectStorageClient builds an Object Storage client using Resource Principal
-// authentication, mirroring the pattern in vault.go.
+// authentication, mirroring the pattern in vault.go. The client is explicitly
+// pinned to the function's own region (taken from the resource principal) so that
+// every bucket operation targets that region's Object Storage endpoint, and thus
+// that region's bucket.
 func newObjectStorageClient() (*objectstorage.ObjectStorageClient, error) {
 	rp, err := auth.ResourcePrincipalConfigurationProvider()
 	if err != nil {
@@ -215,6 +218,12 @@ func newObjectStorageClient() (*objectstorage.ObjectStorageClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create object storage client: %w", err)
 	}
+
+	region, err := rp.Region()
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine function region: %w", err)
+	}
+	osClient.SetRegion(region)
 
 	retryPolicy := common.DefaultRetryPolicy()
 	osClient.SetCustomClientConfiguration(common.CustomClientConfiguration{RetryPolicy: &retryPolicy})
