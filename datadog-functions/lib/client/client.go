@@ -157,15 +157,15 @@ func NewDatadogClientWithTenancyAndSite() (DatadogClient, string, string, error)
 // data type cannot be determined, the payload is dropped (logged). This is
 // best-effort and never changes the status/error returned to the caller.
 func handleServerErrorPayload(ctx context.Context, message []byte, intakeURL string) {
-	bucket := backfillBucketName(intakeURL)
-	if bucket == "" {
-		log.Printf("5xx payload dropped: could not determine data type from url %q", intakeURL)
+	bucket, err := backfillBucketName(intakeURL)
+	if err != nil {
+		log.Printf("5xx payload dropped: %v", err)
 		return
 	}
 
 	osClient, err := newObjectStorageClient()
 	if err != nil {
-		log.Printf("5xx payload dropped: %v", err)
+		log.Printf("5xx payload dropped: failed to create object storage client: %v", err)
 		return
 	}
 
@@ -189,17 +189,17 @@ func handleServerErrorPayload(ctx context.Context, message []byte, intakeURL str
 }
 
 // backfillBucketName maps a Datadog intake URL to the backfill bucket for that
-// data type, or "" if the type cannot be determined.
-func backfillBucketName(intakeURL string) string {
+// data type, returning an error if the type cannot be determined.
+func backfillBucketName(intakeURL string) (string, error) {
 	switch {
 	case strings.Contains(intakeURL, "ocimetrics"):
-		return "dd-metrics-backfill"
+		return "dd-metrics-backfill", nil
 	case strings.Contains(intakeURL, "cloudchanges"):
-		return "dd-events-backfill"
+		return "dd-events-backfill", nil
 	case strings.Contains(intakeURL, "logs"):
-		return "dd-logs-backfill"
+		return "dd-logs-backfill", nil
 	default:
-		return ""
+		return "", fmt.Errorf("unrecognized intake url %q", intakeURL)
 	}
 }
 
