@@ -156,14 +156,14 @@ func NewDatadogClientWithTenancyAndSite() (DatadogClient, string, string, error)
 // expected to already exist (provisioned out-of-band); if it does not, or the
 // data type cannot be determined, the payload is dropped (logged). This is
 // best-effort and never changes the status/error returned to the caller.
-func handleServerErrorPayload(ctx context.Context, message []byte, intakeURL string) {
+var handleServerErrorPayload = func(ctx context.Context, message []byte, intakeURL string) {
 	bucket, err := backfillBucketName(intakeURL)
 	if err != nil {
 		log.Printf("5xx payload dropped: %v", err)
 		return
 	}
 
-	osClient, err := newObjectStorageClient()
+	osClient, err := newObjectStorageClientFunc()
 	if err != nil {
 		log.Printf("5xx payload dropped: failed to create object storage client: %v", err)
 		return
@@ -203,12 +203,24 @@ func backfillBucketName(intakeURL string) (string, error) {
 	}
 }
 
+// objectStorageAPI is the subset of the OCI Object Storage client used to persist
+// backfill payloads. *objectstorage.ObjectStorageClient satisfies it; tests inject
+// a fake via newObjectStorageClientFunc.
+type objectStorageAPI interface {
+	GetNamespace(ctx context.Context, request objectstorage.GetNamespaceRequest) (objectstorage.GetNamespaceResponse, error)
+	HeadBucket(ctx context.Context, request objectstorage.HeadBucketRequest) (objectstorage.HeadBucketResponse, error)
+	PutObject(ctx context.Context, request objectstorage.PutObjectRequest) (objectstorage.PutObjectResponse, error)
+}
+
+// newObjectStorageClientFunc is a seam allowing tests to inject a fake client.
+var newObjectStorageClientFunc = newObjectStorageClient
+
 // newObjectStorageClient builds an Object Storage client using Resource Principal
 // authentication, mirroring the pattern in vault.go. The client is explicitly
 // pinned to the function's own region (taken from the resource principal) so that
 // every bucket operation targets that region's Object Storage endpoint, and thus
 // that region's bucket.
-func newObjectStorageClient() (*objectstorage.ObjectStorageClient, error) {
+func newObjectStorageClient() (objectStorageAPI, error) {
 	rp, err := auth.ResourcePrincipalConfigurationProvider()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create resource principal provider: %w", err)
@@ -232,7 +244,7 @@ func newObjectStorageClient() (*objectstorage.ObjectStorageClient, error) {
 }
 
 // getNamespace returns the tenancy's Object Storage namespace.
-func getNamespace(ctx context.Context, osClient *objectstorage.ObjectStorageClient) (string, error) {
+func getNamespace(ctx context.Context, osClient objectStorageAPI) (string, error) {
 	resp, err := osClient.GetNamespace(ctx, objectstorage.GetNamespaceRequest{})
 	if err != nil {
 		return "", err
@@ -246,7 +258,7 @@ func getNamespace(ctx context.Context, osClient *objectstorage.ObjectStorageClie
 
 // bucketExists reports whether the named bucket exists in the namespace. A
 // non-nil HeadBucket error (e.g. 404) is treated as "does not exist".
-func bucketExists(ctx context.Context, osClient *objectstorage.ObjectStorageClient, namespace, bucket string) bool {
+func bucketExists(ctx context.Context, osClient objectStorageAPI, namespace, bucket string) bool {
 	_, err := osClient.HeadBucket(ctx, objectstorage.HeadBucketRequest{
 		NamespaceName: common.String(namespace),
 		BucketName:    common.String(bucket),
@@ -255,7 +267,7 @@ func bucketExists(ctx context.Context, osClient *objectstorage.ObjectStorageClie
 }
 
 // putObject writes the payload to the bucket under the given object name.
-func putObject(ctx context.Context, osClient *objectstorage.ObjectStorageClient, namespace, bucket, objectName string, data []byte) error {
+func putObject(ctx context.Context, osClient objectStorageAPI, namespace, bucket, objectName string, data []byte) error {
 	_, err := osClient.PutObject(ctx, objectstorage.PutObjectRequest{
 		NamespaceName: common.String(namespace),
 		BucketName:    common.String(bucket),
