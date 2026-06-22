@@ -38,7 +38,7 @@ resource "oci_functions_function" "metrics_function" {
 module "vcn" {
   count                    = var.subnet_ocid == "" ? 1 : 0
   source                   = "oracle-terraform-modules/vcn/oci"
-  version                  = ">= 3.6.0"
+  version                  = "~> 3.6"
   compartment_id           = var.compartment_ocid
   freeform_tags            = var.tags
   defined_tags             = var.defined_tags
@@ -58,7 +58,7 @@ module "vcn" {
 module "subnet" {
   count          = var.subnet_ocid == "" ? 1 : 0
   source         = "oracle-terraform-modules/vcn/oci//modules/subnet"
-  version        = ">= 3.6.0"
+  version        = "~> 3.6"
   compartment_id = var.compartment_ocid
   vcn_id         = module.vcn[0].vcn_id
   nat_route_id   = module.vcn[0].nat_route_id
