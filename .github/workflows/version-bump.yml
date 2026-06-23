@@ -6,6 +6,11 @@ on:
       - 'datadog-integration/**'
       - 'datadog-terraform-onboarding/**'
 
+# One run per PR at a time; cancel the stale run when a new push arrives.
+concurrency:
+  group: version-bump-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
   pull-requests: write
@@ -30,55 +35,67 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
           REPO: ${{ github.repository }}
         run: |
-          pr_version=$(cat VERSION | tr -d '[:space:]')
+          pr_version=$(tr -d '[:space:]' < VERSION)
+          pr_tf_version=$(tr -d '[:space:]' < datadog-terraform-onboarding/VERSION)
           base_version=$(gh api "repos/${REPO}/contents/VERSION?ref=${BASE_REF}" \
             --jq '.content' | base64 -d | tr -d '[:space:]')
 
           IFS='.' read -r major minor patch <<< "$base_version"
           bumped_version="${major}.${minor}.$((patch + 1))"
 
-          echo "pr_version=$pr_version"
-          echo "base_version=$base_version"
-          echo "bumped_version=$bumped_version"
-
-          echo "pr_version=$pr_version"         >> "$GITHUB_OUTPUT"
-          echo "base_version=$base_version"     >> "$GITHUB_OUTPUT"
-          echo "bumped_version=$bumped_version" >> "$GITHUB_OUTPUT"
-
-      - name: Check if bump needed
-        id: check
-        run: |
           version_int() { IFS='.' read -r M m p <<< "$1"; echo $((M * 1000000 + m * 1000 + p)); }
-          if [[ $(version_int "${{ steps.versions.outputs.pr_version }}") -gt \
-                $(version_int "${{ steps.versions.outputs.base_version }}") ]]; then
+          base_int=$(version_int "$base_version")
+
+          # Only overwrite a VERSION file if it hasn't been manually bumped.
+          bump_root=false
+          bump_tf=false
+          [[ $(version_int "$pr_version")    -le $base_int ]] && bump_root=true
+          [[ $(version_int "$pr_tf_version") -le $base_int ]] && bump_tf=true
+
+          if [[ "$bump_root" == "false" && "$bump_tf" == "false" ]]; then
+            echo "Both VERSION files already bumped — skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Version already bumped (base: ${{ steps.versions.outputs.base_version }}, PR: ${{ steps.versions.outputs.pr_version }}) — skipping."
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
+          echo "base_version=$base_version"     >> "$GITHUB_OUTPUT"
+          echo "bumped_version=$bumped_version" >> "$GITHUB_OUTPUT"
+          echo "bump_root=$bump_root"           >> "$GITHUB_OUTPUT"
+          echo "bump_tf=$bump_tf"               >> "$GITHUB_OUTPUT"
+
       - name: Write bumped version
-        if: steps.check.outputs.skip == 'false'
+        if: steps.versions.outputs.skip == 'false'
+        env:
+          BUMPED_VERSION: ${{ steps.versions.outputs.bumped_version }}
+          BUMP_ROOT: ${{ steps.versions.outputs.bump_root }}
+          BUMP_TF: ${{ steps.versions.outputs.bump_tf }}
         run: |
-          printf '%s\n' "${{ steps.versions.outputs.bumped_version }}" > VERSION
-          printf '%s\n' "${{ steps.versions.outputs.bumped_version }}" > datadog-terraform-onboarding/VERSION
+          [[ "$BUMP_ROOT" == "true" ]] && printf '%s\n' "$BUMPED_VERSION" > VERSION
+          [[ "$BUMP_TF"   == "true" ]] && printf '%s\n' "$BUMPED_VERSION" > datadog-terraform-onboarding/VERSION
 
       - name: Commit and push
-        if: steps.check.outputs.skip == 'false'
+        if: steps.versions.outputs.skip == 'false'
+        env:
+          BASE_VERSION: ${{ steps.versions.outputs.base_version }}
+          BUMPED_VERSION: ${{ steps.versions.outputs.bumped_version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add VERSION datadog-terraform-onboarding/VERSION
-          git commit -m "chore: bump version ${{ steps.versions.outputs.base_version }} -> ${{ steps.versions.outputs.bumped_version }}"
+          git commit -m "chore: bump version ${BASE_VERSION} -> ${BUMPED_VERSION}"
           git push
 
       - name: Comment on PR
-        if: steps.check.outputs.skip == 'false'
+        if: steps.versions.outputs.skip == 'false'
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          BASE_VERSION: ${{ steps.versions.outputs.base_version }}
+          BUMPED_VERSION: ${{ steps.versions.outputs.bumped_version }}
         with:
           script: |
-            const from = '${{ steps.versions.outputs.base_version }}';
-            const to   = '${{ steps.versions.outputs.bumped_version }}';
+            const from = process.env.BASE_VERSION;
+            const to   = process.env.BUMPED_VERSION;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
