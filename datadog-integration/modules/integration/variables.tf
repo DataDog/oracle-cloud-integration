@@ -66,3 +66,9 @@ variable "defined_tags" {
   description = "OCI defined tags applied to resources (namespace.key -> value). Sent to Datadog for integration config."
   default     = {}
 }
+
+variable "config_file_profile" {
+  type        = string
+  description = "Oracle CLI config file profile name to be used for provider configurations."
+  default     = "DEFAULT"
+}
