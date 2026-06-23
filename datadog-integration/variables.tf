@@ -1,5 +1,5 @@
 #*************************************
-#         TF auth Requirements
+#        TF auth Requirements
 #*************************************
 
 variable "compartment_ocid" {
