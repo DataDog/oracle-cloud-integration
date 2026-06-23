@@ -1,0 +1,98 @@
+name: Bump Version
+
+on:
+  pull_request:
+    paths:
+      - 'datadog-integration/**'
+      - 'datadog-terraform-onboarding/**'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump-version:
+    name: Bump patch version
+    runs-on: ubuntu-latest
+    # Skip fork PRs — GITHUB_TOKEN cannot push to a fork branch
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute versions
+        id: versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_REF: ${{ github.base_ref }}
+          REPO: ${{ github.repository }}
+        run: |
+          pr_version=$(cat VERSION | tr -d '[:space:]')
+          base_version=$(gh api "repos/${REPO}/contents/VERSION?ref=${BASE_REF}" \
+            --jq '.content' | base64 -d | tr -d '[:space:]')
+
+          IFS='.' read -r major minor patch <<< "$base_version"
+          bumped_version="${major}.${minor}.$((patch + 1))"
+
+          echo "pr_version=$pr_version"
+          echo "base_version=$base_version"
+          echo "bumped_version=$bumped_version"
+
+          echo "pr_version=$pr_version"       >> "$GITHUB_OUTPUT"
+          echo "base_version=$base_version"   >> "$GITHUB_OUTPUT"
+          echo "bumped_version=$bumped_version" >> "$GITHUB_OUTPUT"
+
+      - name: Check if bump needed
+        id: check
+        run: |
+          pr_version="${{ steps.versions.outputs.pr_version }}"
+          base_version="${{ steps.versions.outputs.base_version }}"
+
+          # Convert semver to an integer for comparison
+          version_int() { IFS='.' read -r M m p <<< "$1"; echo $((M * 1000000 + m * 1000 + p)); }
+
+          if [[ $(version_int "$pr_version") -gt $(version_int "$base_version") ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Version already bumped (base: ${base_version}, PR: ${pr_version}) — skipping."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write bumped version
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          printf '%s\n' "${{ steps.versions.outputs.bumped_version }}" > VERSION
+          printf '%s\n' "${{ steps.versions.outputs.bumped_version }}" > datadog-terraform-onboarding/VERSION
+
+      - name: Commit and push
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VERSION datadog-terraform-onboarding/VERSION
+          git commit -m "chore: bump version ${{ steps.versions.outputs.base_version }} -> ${{ steps.versions.outputs.bumped_version }}"
+          git push
+
+      - name: Comment on PR
+        if: steps.check.outputs.skip == 'false'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const from = '${{ steps.versions.outputs.base_version }}';
+            const to   = '${{ steps.versions.outputs.bumped_version }}';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                `**Version bumped:** \`${from}\` → \`${to}\` (patch auto-bump)`,
+                '',
+                'Override if needed:',
+                '- **Breaking change** → manually set `VERSION` and `datadog-terraform-onboarding/VERSION` to bump the **major** digit.',
+                '- **New feature** → manually bump the **minor** digit.',
+                '- **Minor bug fix** → no change needed; the patch bump above is correct.',
+              ].join('\n'),
+            });
