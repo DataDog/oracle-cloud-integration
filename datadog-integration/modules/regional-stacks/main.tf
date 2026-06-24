@@ -13,26 +13,24 @@ terraform {
 }
 
 resource "oci_functions_function" "logs_function" {
-  application_id     = oci_functions_application.dd_function_app.id
-  display_name       = "dd-logs-forwarder"
-  memory_in_mbs      = "1024"
-  timeout_in_seconds = 300
-  freeform_tags      = var.tags
-  defined_tags       = local.defined_tags_map
-  image              = local.logs_image_path
-  image_digest       = length(local.image_sha_logs) > 0 ? local.image_sha_logs : null
+  application_id = oci_functions_application.dd_function_app.id
+  display_name   = "dd-logs-forwarder"
+  memory_in_mbs  = "1024"
+  freeform_tags  = var.tags
+  defined_tags   = local.defined_tags_map
+  image          = local.logs_image_path
+  image_digest   = length(local.image_sha_logs) > 0 ? local.image_sha_logs : null
 
 }
 
 resource "oci_functions_function" "metrics_function" {
-  application_id     = oci_functions_application.dd_function_app.id
-  display_name       = "dd-metrics-forwarder"
-  memory_in_mbs      = "512"
-  timeout_in_seconds = 300
-  freeform_tags      = var.tags
-  defined_tags       = local.defined_tags_map
-  image              = local.metrics_image_path
-  image_digest       = length(local.image_sha_metrics) > 0 ? local.image_sha_metrics : null
+  application_id = oci_functions_application.dd_function_app.id
+  display_name   = "dd-metrics-forwarder"
+  memory_in_mbs  = "512"
+  freeform_tags  = var.tags
+  defined_tags   = local.defined_tags_map
+  image          = local.metrics_image_path
+  image_digest   = length(local.image_sha_metrics) > 0 ? local.image_sha_metrics : null
 }
 
 module "vcn" {
