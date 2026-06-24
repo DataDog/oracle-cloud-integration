@@ -8,13 +8,26 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/oracle/oci-go-sdk/v65/common"
 	"github.com/oracle/oci-go-sdk/v65/objectstorage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-// Tier 2: the 5xx-detection contract — sendMessage must invoke the backfill
-// handler only for 5xx responses, forwarding the original payload and url.
+// okResponse builds a canned Datadog API response with the given status code.
+func okResponse(status int) *http.Response {
+	return &http.Response{StatusCode: status, Body: io.NopCloser(bytes.NewBufferString(""))}
+}
+
+// swapOSClient injects fake as the object-storage client and returns a restore func.
+func swapOSClient(fake objectStorageAPI) func() {
+	orig := newObjectStorageClientFunc
+	newObjectStorageClientFunc = func() (objectStorageAPI, error) { return fake, nil }
+	return func() { newObjectStorageClientFunc = orig }
+}
+
+// Tier 2: the 5xx-detection contract — the forward path (SendMessageToDatadog)
+// must invoke the backfill handler only for 5xx responses.
 func TestSendMessageBackfillTriggeredOnlyOn5xx(t *testing.T) {
 	cases := []struct {
 		name         string
@@ -44,13 +57,9 @@ func TestSendMessageBackfillTriggeredOnlyOn5xx(t *testing.T) {
 			defer func() { handleServerErrorPayload = orig }()
 
 			c, _ := getTestDatadogClient()
-			mockClient := c.client.(*MockAPIClient)
-			mockClient.On("CallAPI", mock.Anything).Return(&http.Response{
-				StatusCode: tc.code,
-				Body:       io.NopCloser(bytes.NewBufferString("")),
-			}, nil)
+			c.client.(*MockAPIClient).On("CallAPI", mock.Anything).Return(okResponse(tc.code), nil)
 
-			c.sendMessage(context.TODO(), []byte(payload), intakeURL)
+			_ = c.SendMessageToDatadog(context.TODO(), []byte(payload), intakeURL)
 
 			assert.Equal(t, tc.wantBackfill, called)
 			if tc.wantBackfill {
@@ -61,12 +70,22 @@ func TestSendMessageBackfillTriggeredOnlyOn5xx(t *testing.T) {
 	}
 }
 
-// fakeObjectStorage implements objectStorageAPI for tests, recording PutObject
-// calls and returning canned errors for HeadBucket / PutObject.
+// fakeObjectStorage implements objectStorageAPI for tests. It covers both the
+// write path (HeadBucket/PutObject) and the backfill read path
+// (ListObjects/GetObject/DeleteObject), recording calls for assertions.
 type fakeObjectStorage struct {
+	// write path
 	headErr  error // non-nil => bucket treated as missing
 	putErr   error
 	putCalls []objectstorage.PutObjectRequest
+
+	// backfill read path
+	objects      []string          // names returned by ListObjects
+	contents     map[string][]byte // name -> bytes returned by GetObject
+	listErr      error
+	getErr       error
+	deleteErr    error
+	deletedNames []string
 }
 
 func (f *fakeObjectStorage) GetNamespace(context.Context, objectstorage.GetNamespaceRequest) (objectstorage.GetNamespaceResponse, error) {
@@ -83,7 +102,36 @@ func (f *fakeObjectStorage) PutObject(_ context.Context, req objectstorage.PutOb
 	return objectstorage.PutObjectResponse{}, f.putErr
 }
 
-// Tier 3: the persist flow inside handleServerErrorPayload.
+func (f *fakeObjectStorage) ListObjects(context.Context, objectstorage.ListObjectsRequest) (objectstorage.ListObjectsResponse, error) {
+	if f.listErr != nil {
+		return objectstorage.ListObjectsResponse{}, f.listErr
+	}
+	summaries := make([]objectstorage.ObjectSummary, 0, len(f.objects))
+	for _, name := range f.objects {
+		summaries = append(summaries, objectstorage.ObjectSummary{Name: common.String(name)})
+	}
+	return objectstorage.ListObjectsResponse{ListObjects: objectstorage.ListObjects{Objects: summaries}}, nil
+}
+
+func (f *fakeObjectStorage) GetObject(_ context.Context, req objectstorage.GetObjectRequest) (objectstorage.GetObjectResponse, error) {
+	if f.getErr != nil {
+		return objectstorage.GetObjectResponse{}, f.getErr
+	}
+	var data []byte
+	if req.ObjectName != nil {
+		data = f.contents[*req.ObjectName]
+	}
+	return objectstorage.GetObjectResponse{Content: io.NopCloser(bytes.NewReader(data))}, nil
+}
+
+func (f *fakeObjectStorage) DeleteObject(_ context.Context, req objectstorage.DeleteObjectRequest) (objectstorage.DeleteObjectResponse, error) {
+	if req.ObjectName != nil {
+		f.deletedNames = append(f.deletedNames, *req.ObjectName)
+	}
+	return objectstorage.DeleteObjectResponse{}, f.deleteErr
+}
+
+// Tier 3: the persist flow inside handleServerErrorPayload (the write path).
 func TestHandleServerErrorPayload(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -103,9 +151,7 @@ func TestHandleServerErrorPayload(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			fake := &fakeObjectStorage{headErr: tc.headErr, putErr: tc.putErr}
-			orig := newObjectStorageClientFunc
-			newObjectStorageClientFunc = func() (objectStorageAPI, error) { return fake, nil }
-			defer func() { newObjectStorageClientFunc = orig }()
+			defer swapOSClient(fake)()
 
 			handleServerErrorPayload(context.TODO(), []byte(`{"k":"v"}`), tc.url)
 
@@ -117,4 +163,84 @@ func TestHandleServerErrorPayload(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The backfill drain loop: replay each object, delete on success, leave on failure.
+func TestBackfill(t *testing.T) {
+	const intakeURL = "https://x/api/v2/logs"
+
+	t.Run("replays and deletes each object on success", func(t *testing.T) {
+		c, _ := getTestDatadogClient()
+		mockClient := c.client.(*MockAPIClient)
+		mockClient.On("CallAPI", mock.Anything).Return(okResponse(202), nil)
+
+		fake := &fakeObjectStorage{
+			objects:  []string{"a.json", "b.json"},
+			contents: map[string][]byte{"a.json": []byte(`{"a":1}`), "b.json": []byte(`{"b":2}`)},
+		}
+		defer swapOSClient(fake)()
+
+		err := c.Backfill(context.TODO(), intakeURL)
+		assert.NoError(t, err)
+		assert.ElementsMatch(t, []string{"a.json", "b.json"}, fake.deletedNames)
+		// the bucket bytes actually reached the Datadog send
+		assert.ElementsMatch(t, [][]byte{[]byte(`{"a":1}`), []byte(`{"b":2}`)}, mockClient.SentBodies)
+		assert.Empty(t, fake.putCalls, "replay must not re-bucket")
+	})
+
+	t.Run("stops and leaves object when send fails after retry", func(t *testing.T) {
+		c, _ := getTestDatadogClient()
+		c.client.(*MockAPIClient).On("CallAPI", mock.Anything).Return(okResponse(500), nil)
+
+		fake := &fakeObjectStorage{
+			objects:  []string{"a.json"},
+			contents: map[string][]byte{"a.json": []byte(`{"a":1}`)},
+		}
+		defer swapOSClient(fake)()
+
+		err := c.Backfill(context.TODO(), intakeURL)
+		assert.Error(t, err)
+		assert.Empty(t, fake.deletedNames, "a failed replay must leave the object in the bucket")
+		assert.Empty(t, fake.putCalls, "replay must not re-bucket on failure")
+	})
+
+	t.Run("waits then retries on 429 and succeeds", func(t *testing.T) {
+		orig := throttleBackoff
+		throttleBackoff = 0
+		defer func() { throttleBackoff = orig }()
+
+		c, _ := getTestDatadogClient()
+		mockClient := c.client.(*MockAPIClient)
+		mockClient.On("CallAPI", mock.Anything).Return(okResponse(429), nil).Once()
+		mockClient.On("CallAPI", mock.Anything).Return(okResponse(202), nil)
+
+		fake := &fakeObjectStorage{
+			objects:  []string{"a.json"},
+			contents: map[string][]byte{"a.json": []byte(`{"a":1}`)},
+		}
+		defer swapOSClient(fake)()
+
+		err := c.Backfill(context.TODO(), intakeURL)
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"a.json"}, fake.deletedNames)
+	})
+
+	t.Run("empty bucket is a no-op", func(t *testing.T) {
+		c, _ := getTestDatadogClient()
+		fake := &fakeObjectStorage{}
+		defer swapOSClient(fake)()
+
+		err := c.Backfill(context.TODO(), intakeURL)
+		assert.NoError(t, err)
+		assert.Empty(t, fake.deletedNames)
+	})
+
+	t.Run("unrecognized intake url returns an error", func(t *testing.T) {
+		c, _ := getTestDatadogClient()
+		fake := &fakeObjectStorage{}
+		defer swapOSClient(fake)()
+
+		err := c.Backfill(context.TODO(), "https://x/api/v2/unknown")
+		assert.Error(t, err)
+	})
 }

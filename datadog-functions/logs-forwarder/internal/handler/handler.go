@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -41,6 +42,13 @@ const (
 //   - in: Reader containing the incoming log data in JSON format
 //   - out: Writer for the function's response
 func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
+	raw, err := io.ReadAll(in)
+	if err != nil {
+		log.Println(err)
+		writeResponse(out, "error", "", err)
+		return
+	}
+
 	ddclient, site, err := datadogClientFunc()
 	if err != nil {
 		log.Println(err)
@@ -49,13 +57,24 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	}
 	url := fmt.Sprintf("https://http-intake.logs.%s/api/v2/logs", site)
 
+	// Backfill mode: drain this region's bucket instead of forwarding new logs.
+	if client.IsBackfillTrigger(raw) {
+		if err := ddclient.Backfill(ctx, url); err != nil {
+			log.Println(err)
+			writeResponse(out, "error", "", err)
+			return
+		}
+		writeResponse(out, "success", "Backfill complete", nil)
+		return
+	}
+
 	// Create channels and wait group
 	formattedLogs := make(chan formatter.LogPayload, defaultBatchSize)
 	errChan := make(chan error, 1)
 	var wg sync.WaitGroup
 
 	// Start the pipeline
-	startLogsFormatter(ctx, &wg, in, formattedLogs, errChan)
+	startLogsFormatter(ctx, &wg, bytes.NewReader(raw), formattedLogs, errChan)
 	startLogsSender(ctx, &wg, ddclient, url, formattedLogs, errChan)
 
 	// Wait for completion and handle errors
