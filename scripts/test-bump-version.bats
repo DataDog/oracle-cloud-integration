@@ -93,3 +93,10 @@ field() { printf '%s\n' "$output" | grep "^${1}=" | cut -d= -f2; }
   [ "$(field bump_root)"      = "true"   ]
   [ "$(field bump_tf)"        = "false"  ]
 }
+
+@test "diverged base versions: script fails fast with a clear error" {
+  make_tree "1.5.2" "1.5.5"
+  run_bump  "1.5.2" "1.5.5"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"diverged"* ]]
+}

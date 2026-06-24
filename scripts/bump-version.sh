@@ -36,6 +36,7 @@ fi
 semver_re='^[0-9]+\.[0-9]+\.[0-9]+$'
 [[ "$base_version"    =~ $semver_re ]] || { echo "invalid base_version: '$base_version'" >&2; exit 1; }
 [[ "$base_tf_version" =~ $semver_re ]] || { echo "invalid base_tf_version: '$base_tf_version'" >&2; exit 1; }
+[[ "$base_version" == "$base_tf_version" ]] || { echo "base versions have diverged: root=$base_version tf=$base_tf_version — fix manually before merging" >&2; exit 1; }
 
 IFS='.' read -r major minor patch <<< "$base_version"
 auto_bumped_version="${major}.${minor}.$((patch + 1))"
