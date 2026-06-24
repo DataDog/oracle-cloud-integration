@@ -31,71 +31,13 @@ jobs:
           ref: ${{ github.head_ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute versions
+      - name: Compute and write versions
         id: versions
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BASE_REF: ${{ github.base_ref }}
           REPO: ${{ github.repository }}
-        run: |
-          pr_version=$(tr -d '[:space:]' < VERSION)
-          pr_tf_version=$(tr -d '[:space:]' < datadog-terraform-onboarding/VERSION)
-          base_version=$(gh api "repos/${REPO}/contents/VERSION?ref=${BASE_REF}" \
-            --jq '.content' | base64 -d | tr -d '[:space:]')
-          base_tf_version=$(gh api "repos/${REPO}/contents/datadog-terraform-onboarding/VERSION?ref=${BASE_REF}" \
-            --jq '.content' | base64 -d | tr -d '[:space:]')
-
-          IFS='.' read -r major minor patch <<< "$base_version"
-          auto_bumped_version="${major}.${minor}.$((patch + 1))"
-
-          version_int() { IFS='.' read -r M m p <<< "$1"; echo $((M * 1000000 + m * 1000 + p)); }
-          base_int=$(version_int "$base_version")
-          base_tf_int=$(version_int "$base_tf_version")
-
-          # Detect valid manual bumps (strictly above the respective base).
-          root_manually_bumped=false
-          tf_manually_bumped=false
-          [[ $(version_int "$pr_version")    -gt $base_int    ]] && root_manually_bumped=true
-          [[ $(version_int "$pr_tf_version") -gt $base_tf_int ]] && tf_manually_bumped=true
-
-          # If a developer manually bumped one file, propagate that version to
-          # both files so they stay in sync. Root takes priority over TF when
-          # both were bumped to different values.
-          if [[ "$root_manually_bumped" == "true" ]]; then
-            target_version="$pr_version"
-          elif [[ "$tf_manually_bumped" == "true" ]]; then
-            target_version="$pr_tf_version"
-          else
-            target_version="$auto_bumped_version"
-          fi
-
-          # Only overwrite a VERSION file if it doesn't already match the target.
-          bump_root=false
-          bump_tf=false
-          [[ "$pr_version"    != "$target_version" ]] && bump_root=true
-          [[ "$pr_tf_version" != "$target_version" ]] && bump_tf=true
-
-          if [[ "$bump_root" == "false" && "$bump_tf" == "false" ]]; then
-            echo "Both VERSION files already at ${target_version} — skipping."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
-          echo "base_version=$base_version"       >> "$GITHUB_OUTPUT"
-          echo "bumped_version=$target_version"   >> "$GITHUB_OUTPUT"
-          echo "bump_root=$bump_root"             >> "$GITHUB_OUTPUT"
-          echo "bump_tf=$bump_tf"                 >> "$GITHUB_OUTPUT"
-
-      - name: Write bumped version
-        if: steps.versions.outputs.skip == 'false'
-        env:
-          BUMPED_VERSION: ${{ steps.versions.outputs.bumped_version }}
-          BUMP_ROOT: ${{ steps.versions.outputs.bump_root }}
-          BUMP_TF: ${{ steps.versions.outputs.bump_tf }}
-        run: |
-          [[ "$BUMP_ROOT" == "true" ]] && printf '%s\n' "$BUMPED_VERSION" > VERSION
-          [[ "$BUMP_TF"   == "true" ]] && printf '%s\n' "$BUMPED_VERSION" > datadog-terraform-onboarding/VERSION
+        run: bash scripts/bump-version.sh
 
       - name: Commit and push
         if: steps.versions.outputs.skip == 'false'
