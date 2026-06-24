@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Read input JSON from stdin
+# Read input JSON from stdin.
 # Through CLI run like this: 
 # echo '{"region":"<oci-region-name>","regionKey":"<oci-region-key eg:IAD>"}' | ./docker_image_check.sh
 input=$(cat)
