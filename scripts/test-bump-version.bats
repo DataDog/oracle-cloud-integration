@@ -75,7 +75,7 @@ field() { printf '%s\n' "$output" | grep "^${1}=" | cut -d= -f2; }
   [ "$(field skip)" = "true" ]
 }
 
-@test "both files manually bumped to different versions: root wins" {
+@test "both files manually bumped to different versions: root wins with warning" {
   make_tree "2.0.0" "1.9.0"
   run_bump  "1.5.2" "1.5.2"
   [ "$status" -eq 0 ]
@@ -83,6 +83,7 @@ field() { printf '%s\n' "$output" | grep "^${1}=" | cut -d= -f2; }
   [ "$(field bump_root)"      = "false"  ]
   [ "$(field bump_tf)"        = "true"   ]
   [ "$(field skip)"           = "false"  ]
+  [[ "$output" == *"WARNING"* ]]
 }
 
 @test "TF bumped above its own base while root stays at base" {

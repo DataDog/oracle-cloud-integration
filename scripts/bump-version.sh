@@ -53,6 +53,10 @@ tf_manually_bumped=false
 
 # If a developer manually bumped one file, propagate that version to both so
 # they stay in sync. Root takes priority over TF when both differ.
+if [[ "$root_manually_bumped" == "true" && "$tf_manually_bumped" == "true" && "$pr_version" != "$pr_tf_version" ]]; then
+  echo "WARNING: both VERSION files were manually bumped to different values (root=$pr_version tf=$pr_tf_version); using root for both." >&2
+fi
+
 if [[ "$root_manually_bumped" == "true" ]]; then
   target_version="$pr_version"
 elif [[ "$tf_manually_bumped" == "true" ]]; then
