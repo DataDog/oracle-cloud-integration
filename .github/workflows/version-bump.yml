@@ -1,0 +1,78 @@
+name: Bump Version
+
+on:
+  pull_request:
+    paths:
+      - 'datadog-integration/**'
+      - 'datadog-terraform-onboarding/**'
+
+# One run per PR at a time; cancel the stale run when a new push arrives.
+# Known limitation: two concurrent PRs that both auto-bump will compute the
+# same patch version from the same base; the second merge will be a no-op bump.
+# This is only a problem when "require branches to be up to date" is not enforced.
+concurrency:
+  group: version-bump-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump-version:
+    name: Bump patch version
+    runs-on: ubuntu-latest
+    # Only runs on same-repo PRs; GITHUB_TOKEN cannot push to a fork branch.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute and write versions
+        id: versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_REF: ${{ github.base_ref }}
+          REPO: ${{ github.repository }}
+        run: bash scripts/bump-version.sh
+
+      - name: Commit and push
+        if: steps.versions.outputs.skip == 'false'
+        env:
+          BASE_VERSION: ${{ steps.versions.outputs.base_version }}
+          BUMPED_VERSION: ${{ steps.versions.outputs.bumped_version }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VERSION datadog-terraform-onboarding/VERSION
+          git commit -m "chore: bump version ${BASE_VERSION} -> ${BUMPED_VERSION}"
+          git pull --rebase origin "$HEAD_REF"
+          git push
+
+      - name: Comment on PR
+        if: steps.versions.outputs.skip == 'false'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          BASE_VERSION: ${{ steps.versions.outputs.base_version }}
+          BUMPED_VERSION: ${{ steps.versions.outputs.bumped_version }}
+        with:
+          script: |
+            const from = process.env.BASE_VERSION;
+            const to   = process.env.BUMPED_VERSION;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                `**Version bumped:** \`${from}\` → \`${to}\` (patch auto-bump)`,
+                '',
+                'Override if needed:',
+                '- **Breaking change** → manually set `VERSION` and `datadog-terraform-onboarding/VERSION` to bump the **major** digit.',
+                '- **New feature** → manually bump the **minor** digit.',
+                '- **Minor bug fix** → no change needed; the patch bump above is correct.',
+              ].join('\n'),
+            });
