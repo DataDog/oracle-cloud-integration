@@ -44,12 +44,13 @@ jobs:
         env:
           BASE_VERSION: ${{ steps.versions.outputs.base_version }}
           BUMPED_VERSION: ${{ steps.versions.outputs.bumped_version }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add VERSION datadog-terraform-onboarding/VERSION
           git commit -m "chore: bump version ${BASE_VERSION} -> ${BUMPED_VERSION}"
-          git pull --rebase origin ${{ github.head_ref }}
+          git pull --rebase origin "$HEAD_REF"
           git push
 
       - name: Comment on PR
