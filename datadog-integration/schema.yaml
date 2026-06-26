@@ -92,10 +92,10 @@ variables:
     confirmation: true
 
   datadog_app_key:
-    title: Datadog Application Key
+    title: Datadog Application Key or PAT
     type: string
     description: |
-      The Application key for creating and updating an integration with Datadog. See <a href="https://docs.datadoghq.com/account_management/api-app-keys/" target="_blank">Datadog Application Key</a> for more information.
+      A Datadog Application Key or Personal Access Token (PAT) used to register and manage this integration. PATs are the recommended option. See <a href="https://docs.datadoghq.com/account_management/api-app-keys/" target="_blank">Datadog Application Keys and PATs</a> for more information.
     required: true
     sensitive: true
     password: true
