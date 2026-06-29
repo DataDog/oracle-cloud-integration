@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/oracle/oci-go-sdk/v65/common"
@@ -74,6 +76,10 @@ func TestSendMessageBackfillTriggeredOnlyOn5xx(t *testing.T) {
 // write path (HeadBucket/PutObject) and the backfill read path
 // (ListObjects/GetObject/DeleteObject), recording calls for assertions.
 type fakeObjectStorage struct {
+	// mu guards the recorded slices, which backfill's worker pool appends to
+	// concurrently (GetObject/DeleteObject run from multiple goroutines).
+	mu sync.Mutex
+
 	// write path
 	headErr  error // non-nil => bucket treated as missing
 	putErr   error
@@ -98,7 +104,9 @@ func (f *fakeObjectStorage) HeadBucket(context.Context, objectstorage.HeadBucket
 }
 
 func (f *fakeObjectStorage) PutObject(_ context.Context, req objectstorage.PutObjectRequest) (objectstorage.PutObjectResponse, error) {
+	f.mu.Lock()
 	f.putCalls = append(f.putCalls, req)
+	f.mu.Unlock()
 	return objectstorage.PutObjectResponse{}, f.putErr
 }
 
@@ -126,7 +134,9 @@ func (f *fakeObjectStorage) GetObject(_ context.Context, req objectstorage.GetOb
 
 func (f *fakeObjectStorage) DeleteObject(_ context.Context, req objectstorage.DeleteObjectRequest) (objectstorage.DeleteObjectResponse, error) {
 	if req.ObjectName != nil {
+		f.mu.Lock()
 		f.deletedNames = append(f.deletedNames, *req.ObjectName)
+		f.mu.Unlock()
 	}
 	return objectstorage.DeleteObjectResponse{}, f.deleteErr
 }
@@ -226,6 +236,27 @@ func TestBackfill(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, []string{"a.json"}, fake.deletedNames)
 		assert.Equal(t, 1, summary.Replayed)
+	})
+
+	t.Run("drains more objects than workers concurrently", func(t *testing.T) {
+		c, _ := getTestDatadogClient()
+		c.client.(*MockAPIClient).On("CallAPI", mock.Anything).Return(okResponse(202), nil)
+
+		const n = backfillConcurrency * 3
+		objects := make([]string, 0, n)
+		contents := make(map[string][]byte, n)
+		for i := 0; i < n; i++ {
+			name := fmt.Sprintf("obj-%02d.json", i)
+			objects = append(objects, name)
+			contents[name] = []byte(fmt.Sprintf(`{"i":%d}`, i))
+		}
+		fake := &fakeObjectStorage{objects: objects, contents: contents}
+		defer swapOSClient(fake)()
+
+		summary, err := c.Backfill(context.TODO(), intakeURL)
+		assert.NoError(t, err)
+		assert.Equal(t, n, summary.Replayed)
+		assert.Len(t, fake.deletedNames, n)
 	})
 
 	t.Run("counts delivered-but-not-deleted objects", func(t *testing.T) {

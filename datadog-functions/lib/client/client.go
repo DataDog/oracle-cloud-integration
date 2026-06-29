@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	datadog "github.com/DataDog/datadog-api-client-go/v2/api/datadog"
@@ -315,73 +316,132 @@ func (s BackfillSummary) String() string {
 	return fmt.Sprintf("replayed=%d skipped=%d delete_failures=%d", s.Replayed, s.Skipped, s.DeleteFailures)
 }
 
-// Backfill drains this region's backfill bucket for the given intake URL, replaying
-// each stored batch to Datadog and deleting it on success. It is invoked on a
-// schedule (every ~5 min) and processes objects until the bucket is empty, an
-// unrecoverable send failure occurs, or the function times out — all of which are
-// safe interruption points, since any undelivered object is left for the next run.
-// It returns a BackfillSummary of what happened; the summary is also returned on
-// error, reflecting partial progress.
-func (client *DatadogClient) Backfill(ctx context.Context, intakeURL string, extraHeaders ...map[string]string) (BackfillSummary, error) {
-	var summary BackfillSummary
+// backfillConcurrency bounds how many objects are replayed in parallel during a
+// single run. Kept modest to limit pressure on OCI Object Storage and the Datadog
+// intake — higher values increase the chance of throttling (429s).
+const backfillConcurrency = 5
 
+// Backfill drains this region's backfill bucket for the given intake URL, replaying
+// each stored batch to Datadog and deleting it on success. Objects are processed by
+// a bounded pool of backfillConcurrency workers. It is invoked on a schedule (every
+// ~5 min) and runs until the bucket is empty, an unrecoverable replay failure occurs
+// (which cancels the run — in-flight objects are left for the next run), or the
+// function times out — all safe interruption points, since any undelivered object
+// stays in the bucket. It returns a BackfillSummary of what happened, also on error.
+func (client *DatadogClient) Backfill(ctx context.Context, intakeURL string, extraHeaders ...map[string]string) (BackfillSummary, error) {
 	bucket, err := backfillBucketName(intakeURL)
 	if err != nil {
-		return summary, err
+		return BackfillSummary{}, err
 	}
 
 	osClient, err := newObjectStorageClientFunc()
 	if err != nil {
-		return summary, fmt.Errorf("backfill: failed to create object storage client: %w", err)
+		return BackfillSummary{}, fmt.Errorf("backfill: failed to create object storage client: %w", err)
 	}
 
 	namespace, err := getNamespace(ctx, osClient)
 	if err != nil {
-		return summary, fmt.Errorf("backfill: failed to resolve object storage namespace: %w", err)
+		return BackfillSummary{}, fmt.Errorf("backfill: failed to resolve object storage namespace: %w", err)
 	}
 
+	// Cancelable so the first unrecoverable replay failure stops the run: the
+	// producer stops feeding and in-flight sends abort, leaving their objects in
+	// the bucket for the next run.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var (
+		mu       sync.Mutex
+		summary  BackfillSummary
+		fatalErr error
+	)
+	markFatal := func(err error) {
+		mu.Lock()
+		if fatalErr == nil {
+			fatalErr = err
+		}
+		mu.Unlock()
+		cancel()
+	}
+
+	names := make(chan string)
+	var wg sync.WaitGroup
+	for i := 0; i < backfillConcurrency; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for name := range names {
+				data, err := getObject(ctx, osClient, namespace, bucket, name)
+				if err != nil {
+					if ctx.Err() != nil {
+						return // run canceled; the failure isn't a real skip
+					}
+					log.Printf("backfill: failed to read object %q, skipping: %v", name, err)
+					mu.Lock()
+					summary.Skipped++
+					mu.Unlock()
+					continue
+				}
+
+				if err := client.replayWithRetry(ctx, data, intakeURL, extraHeaders...); err != nil {
+					// Unrecoverable after one retry. Leave the object in place and stop
+					// the run; hubmanager will invoke again shortly.
+					markFatal(fmt.Errorf("backfill: replay failed for object %q, stopping run: %w", name, err))
+					return
+				}
+				mu.Lock()
+				summary.Replayed++
+				mu.Unlock()
+
+				if err := deleteObject(ctx, osClient, namespace, bucket, name); err != nil {
+					// Delivered but not deleted: it will be re-sent next run (at-least-once).
+					log.Printf("backfill: delivered but failed to delete object %q: %v", name, err)
+					mu.Lock()
+					summary.DeleteFailures++
+					mu.Unlock()
+				}
+			}
+		}()
+	}
+
+	// Producer: page through the bucket and hand object names to the workers,
+	// stopping early if the run is canceled by a fatal replay failure.
+	var listErr error
 	req := objectstorage.ListObjectsRequest{
 		NamespaceName: common.String(namespace),
 		BucketName:    common.String(bucket),
 	}
+producer:
 	for {
 		resp, err := osClient.ListObjects(ctx, req)
 		if err != nil {
-			return summary, fmt.Errorf("backfill: failed to list objects in bucket %q: %w", bucket, err)
+			if ctx.Err() == nil { // don't report a cancellation-induced list error
+				listErr = fmt.Errorf("backfill: failed to list objects in bucket %q: %w", bucket, err)
+			}
+			break
 		}
-
 		for _, obj := range resp.Objects {
 			if obj.Name == nil {
 				continue
 			}
-			name := *obj.Name
-
-			data, err := getObject(ctx, osClient, namespace, bucket, name)
-			if err != nil {
-				log.Printf("backfill: failed to read object %q, skipping: %v", name, err)
-				summary.Skipped++
-				continue
-			}
-
-			if err := client.replayWithRetry(ctx, data, intakeURL, extraHeaders...); err != nil {
-				// Unrecoverable after one retry. Leave the object in place and stop
-				// this run; hubmanager will invoke again shortly.
-				return summary, fmt.Errorf("backfill: replay failed for object %q, stopping run: %w", name, err)
-			}
-			summary.Replayed++
-
-			if err := deleteObject(ctx, osClient, namespace, bucket, name); err != nil {
-				// Delivered but not deleted: it will be re-sent next run (at-least-once).
-				log.Printf("backfill: delivered but failed to delete object %q: %v", name, err)
-				summary.DeleteFailures++
+			select {
+			case names <- *obj.Name:
+			case <-ctx.Done():
+				break producer
 			}
 		}
-
 		if resp.NextStartWith == nil || *resp.NextStartWith == "" {
-			return summary, nil
+			break
 		}
 		req.Start = resp.NextStartWith
 	}
+	close(names)
+	wg.Wait()
+
+	if fatalErr != nil {
+		return summary, fatalErr
+	}
+	return summary, listErr
 }
 
 // replayWithRetry sends a replayed payload, retrying once on failure. On a 429 it
