@@ -19,8 +19,8 @@ variableGroups:
       - ${datadog_api_key}
       - ${datadog_site}
       - ${logs_enabled}
-      - ${logs_only}
       - ${events_collection_enabled}
+      - ${logs_only}
   - title: "(Optional) Choose specific subnet(s)"
     variables:
       - ${choose_subnet}
@@ -118,19 +118,19 @@ variables:
     required: false
     default: false
 
+  events_collection_enabled:
+    title: Event Collection Enabled
+    type: string
+    description: |
+      Indicates if event collection (OCI Events Service) should be enabled. Note: this setting is ignored when Logs Only is enabled.
+    required: false
+    default: false
+
   logs_only:
     title: Logs Only
     type: boolean
     description: |
-      Indicates if the integration should be created with metric and resource collection disabled, but available
-    required: false
-    default: false
-
-  events_collection_enabled:
-    title: Event Collection Enabled
-    type: boolean
-    description: |
-      Indicates if event collection (OCI Events Service) should be enabled
+      Indicates if the integration should be created with metric, resource and event collection disabled, but available
     required: false
     default: false
 

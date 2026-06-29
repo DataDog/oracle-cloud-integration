@@ -232,19 +232,19 @@ module "integration" {
   providers = {
     restapi = restapi
   }
-  datadog_api_key                     = var.datadog_api_key
-  datadog_app_key                     = var.datadog_app_key
-  datadog_site                        = var.datadog_site
-  home_region                         = local.home_region_name
-  tenancy_ocid                        = var.tenancy_ocid
-  private_key                         = module.key.private_key
-  user_ocid                           = module.auth.user_id
-  subscribed_regions                  = tolist(local.final_regions_for_stacks)
-  datadog_resource_compartment_id     = module.compartment.id
-  logs_enabled                        = var.logs_enabled
-  logs_only                           = var.logs_only
-  events_collection_enabled            = var.events_collection_enabled
-  defined_tags                        = local.defined_tags
+  datadog_api_key                 = var.datadog_api_key
+  datadog_app_key                 = var.datadog_app_key
+  datadog_site                    = var.datadog_site
+  home_region                     = local.home_region_name
+  tenancy_ocid                    = var.tenancy_ocid
+  private_key                     = module.key.private_key
+  user_ocid                       = module.auth.user_id
+  subscribed_regions              = tolist(local.final_regions_for_stacks)
+  datadog_resource_compartment_id = module.compartment.id
+  logs_enabled                    = var.logs_enabled
+  logs_only                       = var.logs_only
+  events_collection_enabled       = var.events_collection_enabled
+  defined_tags                    = local.defined_tags
 }
 
 

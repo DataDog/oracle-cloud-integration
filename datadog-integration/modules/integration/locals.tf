@@ -25,6 +25,7 @@ locals {
     metrics_config : {
       enabled : false
     }
+    events_collection_enabled : false
   } : k => v if var.logs_only }
   json_object = {
     data : {
