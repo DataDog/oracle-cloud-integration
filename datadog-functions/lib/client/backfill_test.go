@@ -180,12 +180,13 @@ func TestBackfill(t *testing.T) {
 		}
 		defer swapOSClient(fake)()
 
-		err := c.Backfill(context.TODO(), intakeURL)
+		summary, err := c.Backfill(context.TODO(), intakeURL)
 		assert.NoError(t, err)
 		assert.ElementsMatch(t, []string{"a.json", "b.json"}, fake.deletedNames)
 		// the bucket bytes actually reached the Datadog send
 		assert.ElementsMatch(t, [][]byte{[]byte(`{"a":1}`), []byte(`{"b":2}`)}, mockClient.SentBodies)
 		assert.Empty(t, fake.putCalls, "replay must not re-bucket")
+		assert.Equal(t, BackfillSummary{Replayed: 2}, summary)
 	})
 
 	t.Run("stops and leaves object when send fails after retry", func(t *testing.T) {
@@ -198,10 +199,11 @@ func TestBackfill(t *testing.T) {
 		}
 		defer swapOSClient(fake)()
 
-		err := c.Backfill(context.TODO(), intakeURL)
+		summary, err := c.Backfill(context.TODO(), intakeURL)
 		assert.Error(t, err)
 		assert.Empty(t, fake.deletedNames, "a failed replay must leave the object in the bucket")
 		assert.Empty(t, fake.putCalls, "replay must not re-bucket on failure")
+		assert.Zero(t, summary.Replayed)
 	})
 
 	t.Run("waits then retries on 429 and succeeds", func(t *testing.T) {
@@ -220,9 +222,27 @@ func TestBackfill(t *testing.T) {
 		}
 		defer swapOSClient(fake)()
 
-		err := c.Backfill(context.TODO(), intakeURL)
+		summary, err := c.Backfill(context.TODO(), intakeURL)
 		assert.NoError(t, err)
 		assert.Equal(t, []string{"a.json"}, fake.deletedNames)
+		assert.Equal(t, 1, summary.Replayed)
+	})
+
+	t.Run("counts delivered-but-not-deleted objects", func(t *testing.T) {
+		c, _ := getTestDatadogClient()
+		c.client.(*MockAPIClient).On("CallAPI", mock.Anything).Return(okResponse(202), nil)
+
+		fake := &fakeObjectStorage{
+			objects:   []string{"a.json"},
+			contents:  map[string][]byte{"a.json": []byte(`{"a":1}`)},
+			deleteErr: errors.New("delete boom"),
+		}
+		defer swapOSClient(fake)()
+
+		summary, err := c.Backfill(context.TODO(), intakeURL)
+		assert.NoError(t, err, "a delete failure is non-fatal")
+		assert.Equal(t, 1, summary.Replayed)
+		assert.Equal(t, 1, summary.DeleteFailures)
 	})
 
 	t.Run("empty bucket is a no-op", func(t *testing.T) {
@@ -230,9 +250,10 @@ func TestBackfill(t *testing.T) {
 		fake := &fakeObjectStorage{}
 		defer swapOSClient(fake)()
 
-		err := c.Backfill(context.TODO(), intakeURL)
+		summary, err := c.Backfill(context.TODO(), intakeURL)
 		assert.NoError(t, err)
 		assert.Empty(t, fake.deletedNames)
+		assert.Equal(t, BackfillSummary{}, summary)
 	})
 
 	t.Run("unrecognized intake url returns an error", func(t *testing.T) {
@@ -240,7 +261,7 @@ func TestBackfill(t *testing.T) {
 		fake := &fakeObjectStorage{}
 		defer swapOSClient(fake)()
 
-		err := c.Backfill(context.TODO(), "https://x/api/v2/unknown")
+		_, err := c.Backfill(context.TODO(), "https://x/api/v2/unknown")
 		assert.Error(t, err)
 	})
 }

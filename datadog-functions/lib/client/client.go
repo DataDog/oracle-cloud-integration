@@ -302,25 +302,42 @@ func IsBackfillTrigger(raw []byte) bool {
 	return json.Unmarshal(raw, &t) == nil && t.BackfillMode == "true"
 }
 
+// BackfillSummary reports what a backfill run accomplished, so the outcome is
+// visible in the function's response and not only in logs.
+type BackfillSummary struct {
+	Replayed       int // objects delivered to Datadog (whether or not the delete then succeeded)
+	Skipped        int // objects that could not be read; left in place for the next run
+	DeleteFailures int // objects delivered but not deleted; re-sent next run (at-least-once)
+}
+
+// String renders the summary for inclusion in the function response.
+func (s BackfillSummary) String() string {
+	return fmt.Sprintf("replayed=%d skipped=%d delete_failures=%d", s.Replayed, s.Skipped, s.DeleteFailures)
+}
+
 // Backfill drains this region's backfill bucket for the given intake URL, replaying
 // each stored batch to Datadog and deleting it on success. It is invoked on a
 // schedule (every ~5 min) and processes objects until the bucket is empty, an
 // unrecoverable send failure occurs, or the function times out — all of which are
 // safe interruption points, since any undelivered object is left for the next run.
-func (client *DatadogClient) Backfill(ctx context.Context, intakeURL string, extraHeaders ...map[string]string) error {
+// It returns a BackfillSummary of what happened; the summary is also returned on
+// error, reflecting partial progress.
+func (client *DatadogClient) Backfill(ctx context.Context, intakeURL string, extraHeaders ...map[string]string) (BackfillSummary, error) {
+	var summary BackfillSummary
+
 	bucket, err := backfillBucketName(intakeURL)
 	if err != nil {
-		return err
+		return summary, err
 	}
 
 	osClient, err := newObjectStorageClientFunc()
 	if err != nil {
-		return fmt.Errorf("backfill: failed to create object storage client: %w", err)
+		return summary, fmt.Errorf("backfill: failed to create object storage client: %w", err)
 	}
 
 	namespace, err := getNamespace(ctx, osClient)
 	if err != nil {
-		return fmt.Errorf("backfill: failed to resolve object storage namespace: %w", err)
+		return summary, fmt.Errorf("backfill: failed to resolve object storage namespace: %w", err)
 	}
 
 	req := objectstorage.ListObjectsRequest{
@@ -330,35 +347,38 @@ func (client *DatadogClient) Backfill(ctx context.Context, intakeURL string, ext
 	for {
 		resp, err := osClient.ListObjects(ctx, req)
 		if err != nil {
-			return fmt.Errorf("backfill: failed to list objects in bucket %q: %w", bucket, err)
+			return summary, fmt.Errorf("backfill: failed to list objects in bucket %q: %w", bucket, err)
 		}
 
-		for _, summary := range resp.Objects {
-			if summary.Name == nil {
+		for _, obj := range resp.Objects {
+			if obj.Name == nil {
 				continue
 			}
-			name := *summary.Name
+			name := *obj.Name
 
 			data, err := getObject(ctx, osClient, namespace, bucket, name)
 			if err != nil {
 				log.Printf("backfill: failed to read object %q, skipping: %v", name, err)
+				summary.Skipped++
 				continue
 			}
 
 			if err := client.replayWithRetry(ctx, data, intakeURL, extraHeaders...); err != nil {
 				// Unrecoverable after one retry. Leave the object in place and stop
 				// this run; hubmanager will invoke again shortly.
-				return fmt.Errorf("backfill: replay failed for object %q, stopping run: %w", name, err)
+				return summary, fmt.Errorf("backfill: replay failed for object %q, stopping run: %w", name, err)
 			}
+			summary.Replayed++
 
 			if err := deleteObject(ctx, osClient, namespace, bucket, name); err != nil {
 				// Delivered but not deleted: it will be re-sent next run (at-least-once).
 				log.Printf("backfill: delivered but failed to delete object %q: %v", name, err)
+				summary.DeleteFailures++
 			}
 		}
 
 		if resp.NextStartWith == nil || *resp.NextStartWith == "" {
-			return nil
+			return summary, nil
 		}
 		req.Start = resp.NextStartWith
 	}

@@ -44,12 +44,13 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 
 	// Backfill mode: drain this region's bucket instead of forwarding new metrics.
 	if client.IsBackfillTrigger(raw) {
-		if err := ddclient.Backfill(ctx, url); err != nil {
+		summary, err := ddclient.Backfill(ctx, url)
+		if err != nil {
 			log.Println(err)
-			writeResponse(out, "error", "", err)
+			writeResponse(out, "error", summary.String(), err)
 			return
 		}
-		writeResponse(out, "success", "Backfill complete", nil)
+		writeResponse(out, "success", "Backfill complete: "+summary.String(), nil)
 		return
 	}
 
