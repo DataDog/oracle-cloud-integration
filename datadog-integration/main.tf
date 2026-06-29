@@ -266,7 +266,7 @@ module "integration" {
   datadog_resource_compartment_id = module.compartment.id
   logs_enabled                    = var.logs_enabled
   logs_only                       = var.logs_only
-  event_collection_enabled        = var.event_collection_enabled
+  events_collection_enabled        = var.events_collection_enabled
   defined_tags                    = local.defined_tags
 }
 

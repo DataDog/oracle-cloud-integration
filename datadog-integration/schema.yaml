@@ -20,7 +20,7 @@ variableGroups:
       - ${datadog_site}
       - ${logs_enabled}
       - ${logs_only}
-      - ${event_collection_enabled}
+      - ${events_collection_enabled}
   - title: "(Optional) Choose specific subnet(s)"
     variables:
       - ${choose_subnet}
@@ -126,7 +126,7 @@ variables:
     required: false
     default: false
 
-  event_collection_enabled:
+  events_collection_enabled:
     title: Event Collection Enabled
     type: boolean
     description: |

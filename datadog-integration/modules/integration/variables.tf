@@ -61,7 +61,7 @@ variable "logs_only" {
   default     = false
 }
 
-variable "event_collection_enabled" {
+variable "events_collection_enabled" {
   type        = bool
   description = "Indicates if event collection (OCI Events Service) should be enabled"
   default     = false
