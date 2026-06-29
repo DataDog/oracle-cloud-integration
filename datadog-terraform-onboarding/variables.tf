@@ -88,6 +88,12 @@ variable "user_email" {
   default     = null
 }
 
+variable "event_collection_enabled" {
+  type        = bool
+  description = "Indicates if event collection (OCI Events Service) should be enabled"
+  default     = false
+}
+
 variable "defined_tags" {
   type        = string
   description = "Defined tags to apply to all created resources. One entry per line in the format namespace.key:value (e.g. CostCenter.Environment:prod). Leave blank unless your tenancy has mandatory tag defaults."

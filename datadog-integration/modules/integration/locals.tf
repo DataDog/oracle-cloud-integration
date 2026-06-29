@@ -17,6 +17,7 @@ locals {
     logs_config : {
       Enabled : var.logs_enabled
     }
+    events_collection_enabled : var.event_collection_enabled
     defined_tags : [for k, v in var.defined_tags : "${k}:${v}"]
   }
   logs_only_attributes = { for k, v in {
