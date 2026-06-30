@@ -41,17 +41,77 @@ jobs:
 
       - name: Commit and push
         if: steps.versions.outputs.skip == 'false'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         env:
           BASE_VERSION: ${{ steps.versions.outputs.base_version }}
           BUMPED_VERSION: ${{ steps.versions.outputs.bumped_version }}
           HEAD_REF: ${{ github.head_ref }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add VERSION datadog-terraform-onboarding/VERSION
-          git commit -m "chore: bump version ${BASE_VERSION} -> ${BUMPED_VERSION}"
-          git pull --rebase origin "$HEAD_REF"
-          git push
+        with:
+          script: |
+            const fs = require('fs');
+            const from = process.env.BASE_VERSION;
+            const to   = process.env.BUMPED_VERSION;
+            const branch = process.env.HEAD_REF;
+
+            // Resolve current branch HEAD
+            const refData = await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              ref:   `heads/${branch}`,
+            });
+            const parentSha = refData.data.object.sha;
+
+            const parentCommit = await github.rest.git.getCommit({
+              owner:      context.repo.owner,
+              repo:       context.repo.repo,
+              commit_sha: parentSha,
+            });
+
+            // Build a tree with both VERSION files
+            const tree = await github.rest.git.createTree({
+              owner:     context.repo.owner,
+              repo:      context.repo.repo,
+              base_tree: parentCommit.data.tree.sha,
+              tree: [
+                {
+                  path:    'VERSION',
+                  mode:    '100644',
+                  type:    'blob',
+                  content: fs.readFileSync('VERSION', 'utf8'),
+                },
+                {
+                  path:    'datadog-terraform-onboarding/VERSION',
+                  mode:    '100644',
+                  type:    'blob',
+                  content: fs.readFileSync('datadog-terraform-onboarding/VERSION', 'utf8'),
+                },
+              ],
+            });
+
+            // Commit via REST API — GitHub auto-signs these as "Verified"
+            const BOT_AUTHOR = {
+              name:  'github-actions[bot]',
+              email: '41898282+github-actions[bot]@users.noreply.github.com',
+            };
+            const commit = await github.rest.git.createCommit({
+              owner:     context.repo.owner,
+              repo:      context.repo.repo,
+              message:   `chore: bump version ${from} -> ${to}`,
+              tree:      tree.data.sha,
+              parents:   [parentSha],
+              author:    BOT_AUTHOR,
+              committer: BOT_AUTHOR,
+            });
+
+            // force: true is safe here because the concurrency group ensures only one
+            // instance of this workflow runs per PR at a time (cancel-in-progress: true).
+            await github.rest.git.updateRef({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              ref:   `heads/${branch}`,
+              sha:   commit.data.sha,
+              force: true,
+            });
 
       - name: Comment on PR
         if: steps.versions.outputs.skip == 'false'
