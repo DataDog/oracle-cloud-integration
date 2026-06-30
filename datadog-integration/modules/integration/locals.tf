@@ -17,6 +17,7 @@ locals {
     logs_config : {
       Enabled : var.logs_enabled
     }
+    events_collection_enabled : var.events_collection_enabled
     defined_tags : [for k, v in var.defined_tags : "${k}:${v}"]
   }
   logs_only_attributes = { for k, v in {
@@ -24,6 +25,7 @@ locals {
     metrics_config : {
       enabled : false
     }
+    events_collection_enabled : false
   } : k => v if var.logs_only }
   json_object = {
     data : {
