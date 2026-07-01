@@ -85,12 +85,3 @@ func TestMyHandler(t *testing.T) {
 		})
 	}
 }
-
-func TestGetSerializedMetricData(t *testing.T) {
-	input := bytes.NewBufferString("test input data")
-
-	result, err := getSerializedMetricData(input)
-
-	assert.NoError(t, err)
-	assert.Equal(t, "test input data", result)
-}

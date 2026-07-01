@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -26,8 +25,8 @@ var datadogClientFunc = client.NewDatadogClientWithTenancyAndSite
 // - in: An io.Reader from which the metrics data is read.
 // - out: An io.Writer to which the response is written.
 func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
-	// 1. Read metrics data
-	serializedMetricData, err := getSerializedMetricData(in)
+	// 1. Read input
+	raw, err := io.ReadAll(in)
 	if err != nil {
 		log.Printf("Error reading metric data: %v", err)
 		writeResponse(out, "error", "", err)
@@ -41,9 +40,22 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 		writeResponse(out, "error", "", err)
 		return
 	}
+	url := fmt.Sprintf("https://ocimetrics-intake.%s/api/v2/ocimetrics", site)
+
+	// Backfill mode: drain this region's bucket instead of forwarding new metrics.
+	if client.IsBackfillTrigger(raw) {
+		summary, err := ddclient.Backfill(ctx, url)
+		if err != nil {
+			log.Println(err)
+			writeResponse(out, "error", summary.String(), err)
+			return
+		}
+		writeResponse(out, "success", "Backfill complete: "+summary.String(), nil)
+		return
+	}
 
 	// 3. Generate metrics message
-	metricsMsg, err := formatter.GenerateMetricsMsg(ctx, serializedMetricData, tenancyOCID)
+	metricsMsg, err := formatter.GenerateMetricsMsg(ctx, string(raw), tenancyOCID)
 	if err != nil {
 		log.Printf("Error serializing metrics message: %v", err)
 		writeResponse(out, "error", "", err)
@@ -51,7 +63,6 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	}
 
 	// 4. Send message to Datadog
-	url := fmt.Sprintf("https://ocimetrics-intake.%s/api/v2/ocimetrics", site)
 	err = ddclient.SendMessageToDatadog(ctx, metricsMsg, url)
 	if err != nil {
 		log.Printf("Error sending metrics to Datadog: %v", err)
@@ -59,15 +70,6 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 		return
 	}
 
-	// 4. Return response
+	// 5. Return response
 	writeResponse(out, "success", "Metrics sent to Datadog", nil)
-}
-
-func getSerializedMetricData(rawMetrics io.Reader) (string, error) {
-	buf := new(bytes.Buffer)
-	_, err := buf.ReadFrom(rawMetrics)
-	if err != nil {
-		return "", err
-	}
-	return buf.String(), nil
 }

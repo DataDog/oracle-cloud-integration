@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sync"
 
 	datadog "github.com/DataDog/datadog-api-client-go/v2/api/datadog"
 	"github.com/stretchr/testify/mock"
@@ -16,6 +17,11 @@ import (
 // Mock HTTP Client for Datadog API
 type MockAPIClient struct {
 	mock.Mock
+	// SentBodies records the payloads passed to PrepareRequest, so tests can
+	// assert which bytes were sent to Datadog. Guarded by mu since backfill calls
+	// PrepareRequest concurrently from its worker pool.
+	mu         sync.Mutex
+	SentBodies [][]byte
 }
 
 // Mock `CallAPI` method to simulate API response
@@ -26,6 +32,11 @@ func (m *MockAPIClient) CallAPI(req *http.Request) (*http.Response, error) {
 
 // Mock `PrepareRequest` method to simulate API request
 func (m *MockAPIClient) PrepareRequest(ctx context.Context, path string, method string, postBody interface{}, headerParams map[string]string, queryParams url.Values, formParams url.Values, fileName *datadog.FormFile) (*http.Request, error) {
+	if body, ok := postBody.([]byte); ok {
+		m.mu.Lock()
+		m.SentBodies = append(m.SentBodies, body)
+		m.mu.Unlock()
+	}
 	return &http.Request{}, nil
 }
 
