@@ -72,6 +72,23 @@ func TestSendMessageBackfillTriggeredOnlyOn5xx(t *testing.T) {
 	}
 }
 
+// A failure before/without a Datadog response (e.g. a network error) has no HTTP
+// status and must not be treated as a Datadog 5xx — so it is not persisted.
+func TestSendMessagePreDatadogErrorNotPersisted(t *testing.T) {
+	var called bool
+	orig := handleServerErrorPayload
+	handleServerErrorPayload = func(context.Context, []byte, string) { called = true }
+	defer func() { handleServerErrorPayload = orig }()
+
+	c, _ := getTestDatadogClient()
+	c.client.(*MockAPIClient).On("CallAPI", mock.Anything).
+		Return((*http.Response)(nil), errors.New("connection refused"))
+
+	err := c.SendMessageToDatadog(context.TODO(), []byte(`{}`), "https://x/api/v2/logs")
+	assert.Error(t, err)
+	assert.False(t, called, "a pre-Datadog error must not be persisted as a 5xx")
+}
+
 // fakeObjectStorage implements objectStorageAPI for tests. It covers both the
 // write path (HeadBucket/PutObject) and the backfill read path
 // (ListObjects/GetObject/DeleteObject), recording calls for assertions.
@@ -211,8 +228,25 @@ func TestBackfill(t *testing.T) {
 
 		summary, err := c.Backfill(context.TODO(), intakeURL)
 		assert.Error(t, err)
-		assert.Empty(t, fake.deletedNames, "a failed replay must leave the object in the bucket")
+		assert.Empty(t, fake.deletedNames, "a 5xx must leave the object in the bucket")
 		assert.Empty(t, fake.putCalls, "replay must not re-bucket on failure")
+		assert.Zero(t, summary.Replayed)
+	})
+
+	t.Run("drops the point on a non-429/5xx error and continues", func(t *testing.T) {
+		c, _ := getTestDatadogClient()
+		c.client.(*MockAPIClient).On("CallAPI", mock.Anything).Return(okResponse(400), nil)
+
+		fake := &fakeObjectStorage{
+			objects:  []string{"bad.json"},
+			contents: map[string][]byte{"bad.json": []byte(`{"bad":1}`)},
+		}
+		defer swapOSClient(fake)()
+
+		summary, err := c.Backfill(context.TODO(), intakeURL)
+		assert.NoError(t, err, "a non-429/5xx error drops the point, it does not stop the run")
+		assert.Equal(t, []string{"bad.json"}, fake.deletedNames, "dropped object is deleted")
+		assert.Equal(t, 1, summary.Dropped)
 		assert.Zero(t, summary.Replayed)
 	})
 

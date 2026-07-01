@@ -87,12 +87,16 @@ func (client *DatadogClient) sendMessage(ctx context.Context, message []byte, ur
 	fmt.Printf("Uncompressed payload size=%.2fKB\n", float64(len(message))/1024.0)
 	req, err := client.client.PrepareRequest(ctx, url, http.MethodPost, message, apiHeaders, nil, nil, nil)
 	if err != nil {
-		return http.StatusInternalServerError, err
+		// Building the request failed before it ever reached Datadog — return 0
+		// (no HTTP status) so callers don't mistake this for a Datadog 5xx.
+		return 0, err
 	}
 
 	resp, err := client.client.CallAPI(req)
 	if err != nil {
-		return http.StatusInternalServerError, err
+		// No response from Datadog (network/connection error), so there's no status
+		// code — return 0 so it isn't treated as a Datadog 5xx.
+		return 0, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		log.Printf("Error: Received non-200 response from Datadog: %d", resp.StatusCode)
@@ -308,12 +312,13 @@ func IsBackfillTrigger(raw []byte) bool {
 type BackfillSummary struct {
 	Replayed       int // objects delivered to Datadog (whether or not the delete then succeeded)
 	Skipped        int // objects that could not be read; left in place for the next run
+	Dropped        int // objects Datadog rejected with a non-429/5xx error; deleted and skipped
 	DeleteFailures int // objects delivered but not deleted; re-sent next run (at-least-once)
 }
 
 // String renders the summary for inclusion in the function response.
 func (s BackfillSummary) String() string {
-	return fmt.Sprintf("replayed=%d skipped=%d delete_failures=%d", s.Replayed, s.Skipped, s.DeleteFailures)
+	return fmt.Sprintf("replayed=%d skipped=%d dropped=%d delete_failures=%d", s.Replayed, s.Skipped, s.Dropped, s.DeleteFailures)
 }
 
 // backfillConcurrency bounds how many objects are replayed in parallel during a
@@ -323,11 +328,12 @@ const backfillConcurrency = 5
 
 // Backfill drains this region's backfill bucket for the given intake URL, replaying
 // each stored batch to Datadog and deleting it on success. Objects are processed by
-// a bounded pool of backfillConcurrency workers. It is invoked on a schedule (every
-// ~5 min) and runs until the bucket is empty, an unrecoverable replay failure occurs
-// (which cancels the run — in-flight objects are left for the next run), or the
-// function times out — all safe interruption points, since any undelivered object
-// stays in the bucket. It returns a BackfillSummary of what happened, also on error.
+// a bounded pool of backfillConcurrency workers. It runs until the bucket is empty,
+// the function times out, or a 429/5xx replay error cancels the run (those objects
+// are left in the bucket for the next run). A replay that fails with any other
+// status is treated as a bad point: the object is dropped (deleted) and the run
+// continues, mirroring how the forward path drops non-5xx failures. It returns a
+// BackfillSummary of what happened, also on error.
 func (client *DatadogClient) Backfill(ctx context.Context, intakeURL string, extraHeaders ...map[string]string) (BackfillSummary, error) {
 	bucket, err := backfillBucketName(intakeURL)
 	if err != nil {
@@ -383,11 +389,28 @@ func (client *DatadogClient) Backfill(ctx context.Context, intakeURL string, ext
 					continue
 				}
 
-				if err := client.replayWithRetry(ctx, data, intakeURL, extraHeaders...); err != nil {
-					// Unrecoverable after one retry. Leave the object in place and stop
-					// the run; hubmanager will invoke again shortly.
-					markFatal(fmt.Errorf("backfill: replay failed for object %q, stopping run: %w", name, err))
-					return
+				if status, err := client.replayWithRetry(ctx, data, intakeURL, extraHeaders...); err != nil {
+					if ctx.Err() != nil {
+						return // run already canceled; leave this object for the next run
+					}
+					if status == http.StatusTooManyRequests || (status >= 500 && status < 600) {
+						// Datadog can't take it right now (throttled or server error).
+						// Leave the object in place and stop the run; hubmanager will
+						// invoke again shortly.
+						markFatal(fmt.Errorf("backfill: replay failed for object %q, stopping run: %w", name, err))
+						return
+					}
+					// Any other error (e.g. a rejected/bad payload) isn't going to
+					// succeed on retry, so drop the point and continue — mirroring how
+					// the forward path drops non-5xx failures.
+					log.Printf("backfill: dropping object %q after non-retryable replay error: %v", name, err)
+					if derr := deleteObject(ctx, osClient, namespace, bucket, name); derr != nil {
+						log.Printf("backfill: failed to delete dropped object %q: %v", name, derr)
+					}
+					mu.Lock()
+					summary.Dropped++
+					mu.Unlock()
+					continue
 				}
 				mu.Lock()
 				summary.Replayed++
@@ -445,24 +468,24 @@ producer:
 }
 
 // replayWithRetry sends a replayed payload, retrying once on failure. On a 429 it
-// waits throttleBackoff before the retry. It returns an error only if the retry
-// also fails.
-func (client *DatadogClient) replayWithRetry(ctx context.Context, data []byte, intakeURL string, extraHeaders ...map[string]string) error {
+// waits throttleBackoff before the retry. It returns the final HTTP status (so the
+// caller can decide whether to stop the run or drop the point) and an error only if
+// the retry also fails.
+func (client *DatadogClient) replayWithRetry(ctx context.Context, data []byte, intakeURL string, extraHeaders ...map[string]string) (int, error) {
 	status, err := client.replaySend(ctx, data, intakeURL, extraHeaders...)
 	if err == nil {
-		return nil
+		return status, nil
 	}
 
 	if status == http.StatusTooManyRequests {
 		select {
 		case <-time.After(throttleBackoff):
 		case <-ctx.Done():
-			return ctx.Err()
+			return status, ctx.Err()
 		}
 	}
 
-	_, err = client.replaySend(ctx, data, intakeURL, extraHeaders...)
-	return err
+	return client.replaySend(ctx, data, intakeURL, extraHeaders...)
 }
 
 // getObject reads an object's contents from the bucket.
