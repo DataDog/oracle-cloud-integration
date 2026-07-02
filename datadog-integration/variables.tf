@@ -106,3 +106,9 @@ variable "defined_tags" {
   description = "Defined tags to apply to all created resources. One entry per line in the format namespace.key:value (e.g. CostCenter.Environment:prod). Leave blank unless your tenancy has mandatory tag defaults."
   default     = ""
 }
+
+variable "config_file_profile" {
+  type        = string
+  description = "Oracle CLI config file profile name to be used for provider configurations."
+  default     = "DEFAULT"
+}
