@@ -214,7 +214,7 @@ resource "oci_identity_policy" "dd_auth" {
     "Endorse group id ${local.dd_group_ocid} to read objects in tenancy usage-report",
     "Allow group id ${local.dd_group_ocid} to manage cloudevents-rules in tenancy where any {request.permission = 'EVENTRULE_CREATE', target.resource.tag.DatadogManaged.marker = 'true'}",
     "Allow group id ${local.dd_group_ocid} to manage streams in compartment id ${var.compartment_id} where any {request.permission = 'STREAM_CREATE', target.resource.tag.DatadogManaged.marker = 'true'}",
-  ], [
+    ], [
     for region in var.subscribed_regions :
     "Allow service objectstorage-${region} to manage object-family in compartment id ${var.compartment_id} where target.bucket.name=/dd-*/"
   ])

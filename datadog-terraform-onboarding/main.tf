@@ -197,22 +197,22 @@ module "kms" {
 }
 
 module "auth" {
-  depends_on        = [terraform_data.prechecks_complete]
-  source            = "./modules/auth"
-  user_name         = local.actual_user_name
-  user_email        = local.user_email
-  tenancy_id        = var.tenancy_ocid
-  tags              = local.tags
-  defined_tags      = local.defined_tags
-  current_user_id   = var.current_user_ocid
-  compartment_id    = module.compartment.id
-  idcs_endpoint     = local.idcs_endpoint
-  existing_user_id  = var.existing_user_id
-  existing_group_id = var.existing_group_id
-  user_group_name   = local.actual_group_name
-  user_policy_name  = local.user_group_policy_name
-  dg_sch_name       = local.dg_sch_name
-  dg_fn_name        = local.dg_fn_name
+  depends_on         = [terraform_data.prechecks_complete]
+  source             = "./modules/auth"
+  user_name          = local.actual_user_name
+  user_email         = local.user_email
+  tenancy_id         = var.tenancy_ocid
+  tags               = local.tags
+  defined_tags       = local.defined_tags
+  current_user_id    = var.current_user_ocid
+  compartment_id     = module.compartment.id
+  idcs_endpoint      = local.idcs_endpoint
+  existing_user_id   = var.existing_user_id
+  existing_group_id  = var.existing_group_id
+  user_group_name    = local.actual_group_name
+  user_policy_name   = local.user_group_policy_name
+  dg_sch_name        = local.dg_sch_name
+  dg_fn_name         = local.dg_fn_name
   dg_policy_name     = local.dg_policy_name
   subscribed_regions = local.subscribed_regions_list
 }

@@ -216,25 +216,25 @@ module "kms" {
 }
 
 module "auth" {
-  depends_on        = [null_resource.precheck_marker]
-  source            = "./modules/auth"
-  count             = local.is_current_region_home_region ? 1 : 0
-  user_name         = local.actual_user_name
-  user_email        = local.user_email
-  tenancy_id        = var.tenancy_ocid
-  tags              = local.tags
-  current_user_id   = var.current_user_ocid
-  compartment_id    = module.compartment.id
-  idcs_endpoint     = local.idcs_endpoint
-  existing_user_id  = var.existing_user_id
-  existing_group_id = var.existing_group_id
-  user_group_name   = local.actual_group_name
-  user_policy_name  = local.user_group_policy_name
-  dg_sch_name       = local.dg_sch_name
-  dg_fn_name        = local.dg_fn_name
-  dg_policy_name      = local.dg_policy_name
-  defined_tags        = local.defined_tags
-  subscribed_regions  = local.subscribed_regions_list
+  depends_on         = [null_resource.precheck_marker]
+  source             = "./modules/auth"
+  count              = local.is_current_region_home_region ? 1 : 0
+  user_name          = local.actual_user_name
+  user_email         = local.user_email
+  tenancy_id         = var.tenancy_ocid
+  tags               = local.tags
+  current_user_id    = var.current_user_ocid
+  compartment_id     = module.compartment.id
+  idcs_endpoint      = local.idcs_endpoint
+  existing_user_id   = var.existing_user_id
+  existing_group_id  = var.existing_group_id
+  user_group_name    = local.actual_group_name
+  user_policy_name   = local.user_group_policy_name
+  dg_sch_name        = local.dg_sch_name
+  dg_fn_name         = local.dg_fn_name
+  dg_policy_name     = local.dg_policy_name
+  defined_tags       = local.defined_tags
+  subscribed_regions = local.subscribed_regions_list
 }
 
 module "key" {
