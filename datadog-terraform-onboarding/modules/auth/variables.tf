@@ -80,3 +80,8 @@ variable "dg_policy_name" {
   type        = string
 }
 
+variable "subscribed_regions" {
+  description = "List of OCI region names the tenancy is subscribed to (e.g. [\"us-ashburn-1\", \"ap-batam-1\"]). Used to grant the per-region Object Storage service principal permission to execute object lifecycle policies on Datadog-managed buckets."
+  type        = list(string)
+}
+

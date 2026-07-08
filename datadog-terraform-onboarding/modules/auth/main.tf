@@ -238,6 +238,25 @@ resource "oci_identity_domains_dynamic_resource_group" "forwarding_function" {
   matching_rule = "All {resource.type = 'fnfunc', resource.compartment.id = '${var.compartment_id}'}"
 }
 
+# The Object Storage service principal (objectstorage-<region>) must be granted
+# permission to manage objects in Datadog-managed buckets so that object lifecycle
+# policies (e.g. 7-day TTL on backfill buckets) can execute. Without this policy
+# OCI rejects PutObjectLifecyclePolicy with InsufficientServicePermissions.
+# One statement is required per subscribed region because the service principal
+# name is region-scoped.
+resource "oci_identity_policy" "objectstorage_lifecycle" {
+  depends_on     = [null_resource.user_group_variable_validation]
+  compartment_id = var.tenancy_id
+  description    = "[DO NOT REMOVE] Grants per-region Object Storage service principals permission to execute lifecycle policies on Datadog-managed buckets"
+  name           = "${var.user_policy_name}-objectstorage-lifecycle"
+  statements = [
+    for region in var.subscribed_regions :
+    "Allow service objectstorage-${region} to manage object-family in compartment id ${var.compartment_id} where target.bucket.name=/dd-*/"
+  ]
+  freeform_tags = var.tags
+  defined_tags  = var.defined_tags
+}
+
 resource "oci_identity_policy" "dynamic_group" {
   depends_on     = [null_resource.user_group_variable_validation, oci_identity_domains_dynamic_resource_group.service_connector]
   compartment_id = var.tenancy_id
