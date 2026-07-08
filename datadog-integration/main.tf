@@ -232,8 +232,9 @@ module "auth" {
   user_policy_name  = local.user_group_policy_name
   dg_sch_name       = local.dg_sch_name
   dg_fn_name        = local.dg_fn_name
-  dg_policy_name    = local.dg_policy_name
-  defined_tags      = local.defined_tags
+  dg_policy_name      = local.dg_policy_name
+  defined_tags        = local.defined_tags
+  subscribed_regions  = local.subscribed_regions_list
 }
 
 module "key" {
