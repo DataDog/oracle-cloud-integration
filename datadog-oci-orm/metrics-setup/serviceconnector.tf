@@ -19,7 +19,7 @@ locals {
 
 # external script to balance the compartments and their namespaces. Returns a batch based on which connector hubs are created.
 data "external" "connector_namespace_distribution" {
-  program = ["export", "OCI_CLI_PROFILE=${var.config_file_profile}", "&&", "python", "${path.module}/connector_namespaces.py", "${local.derived_namespaces_str}"]
+  program = ["python", "${path.module}/connector_namespaces.py", "${local.derived_namespaces_str}"]
 }
 
 resource "oci_sch_service_connector" "metrics_service_connector" {
