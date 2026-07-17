@@ -192,9 +192,6 @@ resource "null_resource" "precheck_marker" {
         --idcs-endpoint '${local.idcs_endpoint}' \
         --compartment-id '${var.compartment_id != null ? var.compartment_id : ""}'
     EOT
-    environment = {
-      OCI_CLI_PROFILE = var.config_file_profile
-    }
   }
 }
 
@@ -272,7 +269,4 @@ module "integration" {
   logs_only                       = var.logs_only
   events_collection_enabled       = var.events_collection_enabled
   defined_tags                    = local.defined_tags
-  config_file_profile             = var.config_file_profile
 }
-
-

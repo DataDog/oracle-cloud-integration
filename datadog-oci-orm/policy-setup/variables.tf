@@ -10,9 +10,3 @@ variable "current_user_ocid" {
   type        = string
   description = "The OCID of the current user executing the terraform script. Do not modify."
 }
-
-variable "config_file_profile" {
-  type        = string
-  description = "Oracle CLI config file profile name to be used for provider configurations."
-  default     = "DEFAULT"
-}

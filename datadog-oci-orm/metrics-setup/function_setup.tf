@@ -35,7 +35,7 @@ locals {
 # external script to manage the auth tokens. Destroy existing ones and generate new
 data "external" "auth_token_fetch" {
   count   = local.perform_docker_login ? 1 : 0
-  program = ["export", "OCI_CLI_PROFILE=${var.config_file_profile}", "&&", "python", "${path.module}/auth_token.py"]
+  program = ["python", "${path.module}/auth_token.py"]
   query = {
     "user_ocid" : local.datadog_write_user_id
     "region" : local.home_region_name

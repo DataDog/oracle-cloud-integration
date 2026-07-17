@@ -1,5 +1,5 @@
 data "external" "stack_info" {
-  program = ["export", "OCI_CLI_PROFILE=${var.config_file_profile}", "&&", "python", "${path.module}/stack_id_from_job.py"]
+  program = ["python", "${path.module}/stack_id_from_job.py"]
   query   = {}
 }
 
