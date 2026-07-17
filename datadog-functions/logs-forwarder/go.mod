@@ -2,6 +2,8 @@ module datadog-functions/logs-forwarder
 
 go 1.25.7
 
+toolchain go1.26.2
+
 require (
 	datadog-functions/lib v0.0.0
 	github.com/fnproject/fdk-go v0.0.66
