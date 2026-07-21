@@ -21,6 +21,7 @@ module "regional_deployment_af_johannesburg_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "af-johannesburg-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -47,6 +48,7 @@ module "regional_deployment_ap_batam_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-batam-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -73,6 +75,7 @@ module "regional_deployment_ap_chuncheon_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-chuncheon-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -99,6 +102,7 @@ module "regional_deployment_ap_hyderabad_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-hyderabad-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -125,6 +129,7 @@ module "regional_deployment_ap_melbourne_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-melbourne-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -151,6 +156,7 @@ module "regional_deployment_ap_mumbai_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-mumbai-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -177,6 +183,7 @@ module "regional_deployment_ap_osaka_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-osaka-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -203,6 +210,7 @@ module "regional_deployment_ap_seoul_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-seoul-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -229,6 +237,7 @@ module "regional_deployment_ap_singapore_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-singapore-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -255,6 +264,7 @@ module "regional_deployment_ap_singapore_2" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-singapore-2", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -281,6 +291,7 @@ module "regional_deployment_ap_sydney_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-sydney-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -307,6 +318,7 @@ module "regional_deployment_ap_tokyo_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ap-tokyo-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -333,6 +345,7 @@ module "regional_deployment_ca_montreal_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ca-montreal-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -359,6 +372,7 @@ module "regional_deployment_ca_toronto_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "ca-toronto-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -385,6 +399,7 @@ module "regional_deployment_eu_amsterdam_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-amsterdam-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -411,6 +426,7 @@ module "regional_deployment_eu_frankfurt_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-frankfurt-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -437,6 +453,7 @@ module "regional_deployment_eu_madrid_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-madrid-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -463,6 +480,7 @@ module "regional_deployment_eu_marseille_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-marseille-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -489,6 +507,7 @@ module "regional_deployment_eu_milan_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-milan-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -515,6 +534,7 @@ module "regional_deployment_eu_paris_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-paris-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -541,6 +561,7 @@ module "regional_deployment_eu_stockholm_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-stockholm-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -567,6 +588,7 @@ module "regional_deployment_eu_zurich_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-zurich-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -593,6 +615,7 @@ module "regional_deployment_il_jerusalem_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "il-jerusalem-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -619,6 +642,7 @@ module "regional_deployment_me_abudhabi_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "me-abudhabi-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -645,6 +669,7 @@ module "regional_deployment_me_dubai_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "me-dubai-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -671,6 +696,7 @@ module "regional_deployment_me_jeddah_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "me-jeddah-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -697,6 +723,7 @@ module "regional_deployment_me_riyadh_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "me-riyadh-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -723,6 +750,7 @@ module "regional_deployment_mx_monterrey_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "mx-monterrey-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -749,6 +777,7 @@ module "regional_deployment_mx_queretaro_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "mx-queretaro-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -775,6 +804,7 @@ module "regional_deployment_sa_bogota_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "sa-bogota-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -801,6 +831,7 @@ module "regional_deployment_sa_santiago_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "sa-santiago-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -827,6 +858,7 @@ module "regional_deployment_sa_saopaulo_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "sa-saopaulo-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -853,6 +885,7 @@ module "regional_deployment_sa_valparaiso_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "sa-valparaiso-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -879,6 +912,7 @@ module "regional_deployment_sa_vinhedo_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "sa-vinhedo-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -905,6 +939,7 @@ module "regional_deployment_uk_cardiff_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "uk-cardiff-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -931,6 +966,7 @@ module "regional_deployment_uk_london_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "uk-london-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -957,6 +993,7 @@ module "regional_deployment_us_ashburn_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "us-ashburn-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -983,6 +1020,7 @@ module "regional_deployment_us_chicago_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "us-chicago-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -1009,6 +1047,7 @@ module "regional_deployment_us_phoenix_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "us-phoenix-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -1035,6 +1074,7 @@ module "regional_deployment_us_sanjose_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "us-sanjose-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -1061,6 +1101,7 @@ module "regional_deployment_eu_madrid_3" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-madrid-3", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
@@ -1087,6 +1128,7 @@ module "regional_deployment_eu_turin_1" {
   subnet_ocid       = lookup(local.region_to_subnet_ocid_map, "eu-turin-1", "")
   datadog_site      = var.datadog_site
   api_key_secret_id = local.api_key_secret_id
+  datadog_api_key   = var.datadog_api_key
   home_region       = local.home_region_name
   tags              = local.tags
   defined_tags      = local.defined_tags
