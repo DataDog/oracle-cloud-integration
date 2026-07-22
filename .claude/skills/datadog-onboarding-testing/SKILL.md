@@ -263,6 +263,7 @@ Deploy via Resource Manager using a **local zip** of the module (not the GitHub 
 
 ```bash
 cd datadog-integration
+cp ../VERSION .
 zip -rq /tmp/datadog-integration-onboarding-test.zip ./*
 ```
 
