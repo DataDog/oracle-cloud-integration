@@ -42,6 +42,17 @@ variable "datadog_api_key" {
   sensitive   = true
 }
 
+variable "create_regional_vault" {
+  type        = bool
+  description = "Whether this region has spare Vault quota to create its own vault; if false, falls back to the home-region vault"
+}
+
+variable "regional_vault_exists_in_state" {
+  type        = string
+  description = "\"true\" if this region's own vault already exists in state (computed by the caller); keeps create_regional_vault sticky so a later quota dip can't destroy an already-created vault"
+  default     = "false"
+}
+
 variable "region_key" {
   type        = string
   description = "The 3 letter key of the region used."

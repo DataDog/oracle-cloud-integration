@@ -10,10 +10,26 @@ locals {
   image_url_logs     = "${local.image_base_path}/logs/manifests/latest"
   image_url_metrics  = "${local.image_base_path}/metrics/manifests/latest"
 
+  # Create this region's own vault only if it isn't the home region (which
+  # already has its own vault from module.kms) and it has spare vault quota;
+  # otherwise fall back to the home-region vault so forwarding still works.
+  # Once a regional vault exists in state, keep creating it even if live quota
+  # later drops to 0 (the vault itself consumes a quota unit) so re-applies
+  # never flap and destroy/recreate it.
+  create_regional_vault = var.region != var.home_region && (
+    data.oci_limits_resource_availability.vault_quota.available > 0 ||
+    data.external.check_regional_vault_in_state.result.vault_exists == "true"
+  )
+
+  # The region/secret actually backing this function's Datadog API key: this
+  # region's own vault when created, otherwise the home-region vault.
+  vault_region      = local.create_regional_vault ? var.region : var.home_region
+  api_key_secret_id = local.create_regional_vault ? oci_vault_secret.api_key[0].id : var.api_key_secret_id
+
   config = {
     "DD_SITE"                  = var.datadog_site,
-    "HOME_REGION"              = var.home_region,
-    "API_KEY_SECRET_OCID"      = var.api_key_secret_id
+    "HOME_REGION"              = local.vault_region,
+    "API_KEY_SECRET_OCID"      = local.api_key_secret_id
     "DATADOG_TAGS"             = "",
     "EXCLUDE"                  = "{}",
     "DD_BATCH_SIZE"            = "1000",

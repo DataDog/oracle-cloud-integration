@@ -19,14 +19,6 @@ terraform {
   }
 }
 
-# Vault-count quota availability in this region, used to decide whether this
-# region can have its own vault or must fall back to the home-region vault.
-data "oci_limits_resource_availability" "vault_quota" {
-  compartment_id = var.tenancy_ocid
-  service_name   = "kms"
-  limit_name     = "virtual-vault-count"
-}
-
 resource "oci_kms_vault" "datadog_vault" {
   count          = local.create_regional_vault ? 1 : 0
   compartment_id = var.compartment_ocid
