@@ -50,6 +50,8 @@ fi
 # Ensure buildx is initialized
 docker buildx create --use --name multiarch-builder >/dev/null 2>&1 || docker buildx use multiarch-builder
 
+FAILED_ITEMS=()
+
 build_and_push_image() {
   IMAGE_PATH=$1
   REGISTRY=$2
@@ -66,7 +68,10 @@ build_and_push_image() {
   if [ $? -eq 0 ]; then
     echo "Successfully built and pushed ${IMAGE_PATH}:${TAG} and :latest"
   else
-    echo "Failed to build and push image for $IMAGE_PATH"
+    echo "############################################################"
+    echo "## FAILED to build and push image for $IMAGE_PATH"
+    echo "############################################################"
+    FAILED_ITEMS+=("$IMAGE_PATH")
   fi
 }
 
@@ -86,7 +91,10 @@ for TARGET in "${BUILD_TARGETS[@]}"; do
   echo "Logging in to $REGISTRY..."
   echo "$PASSWORD" | docker login "$REGISTRY" --username "$LOGIN_USER" --password-stdin
   if [ $? -ne 0 ]; then
-    echo "Login failed for $REGISTRY"
+    echo "############################################################"
+    echo "## LOGIN FAILED for $REGISTRY"
+    echo "############################################################"
+    FAILED_ITEMS+=("login:$REGISTRY")
     continue
   fi
 
@@ -97,3 +105,16 @@ done
 
 # Clear the password from memory
 unset PASSWORD
+
+if [ ${#FAILED_ITEMS[@]} -gt 0 ]; then
+  echo ""
+  echo "############################################################"
+  echo "## BUILD/PUSH COMPLETED WITH FAILURES:"
+  for ITEM in "${FAILED_ITEMS[@]}"; do
+    echo "##   - $ITEM"
+  done
+  echo "############################################################"
+  exit 1
+fi
+
+echo "All images built and pushed successfully in all regions."
