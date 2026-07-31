@@ -339,6 +339,7 @@ func (client *DatadogClient) Backfill(ctx context.Context, intakeURL string, ext
 	if err != nil {
 		return BackfillSummary{}, err
 	}
+	log.Printf("backfill: invoked with backfill_mode=true for bucket %q", bucket)
 
 	osClient, err := newObjectStorageClientFunc()
 	if err != nil {
