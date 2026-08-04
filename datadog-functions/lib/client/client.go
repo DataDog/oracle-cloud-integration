@@ -468,7 +468,60 @@ producer:
 		return summary, listErr
 	}
 	log.Printf("backfill: complete for bucket %q: %s", bucket, summary.String())
+	// Reaching here means every replay in this run already succeeded against
+	// Datadog, so intake is provably reachable right now — safe to notify
+	// Datadog directly rather than relying solely on OCI Logging. Skipped when
+	// nothing was actually replayed (an empty-bucket no-op run), so this stays a
+	// signal about real backfilled data rather than noise on every empty check.
+	if summary.Replayed > 0 {
+		client.notifyBackfillComplete(ctx, bucket, summary)
+	}
 	return summary, nil
+}
+
+// backfillCompleteLog is the payload sent to Datadog's Logs API on a successful
+// backfill completion. Fields beyond message/ddsource/service become facets in
+// Log Explorer.
+type backfillCompleteLog struct {
+	Message        string `json:"message"`
+	DDSource       string `json:"ddsource"`
+	Service        string `json:"service"`
+	Bucket         string `json:"bucket"`
+	Replayed       int    `json:"replayed"`
+	Skipped        int    `json:"skipped"`
+	Dropped        int    `json:"dropped"`
+	DeleteFailures int    `json:"delete_failures"`
+}
+
+// notifyBackfillComplete sends a log event to Datadog's Logs API reporting a
+// successful backfill completion. Best-effort: a failure here only logs to OCI
+// and never changes Backfill's returned error, since this is an observability
+// signal, not the replay itself.
+func (client *DatadogClient) notifyBackfillComplete(ctx context.Context, bucket string, summary BackfillSummary) {
+	site := os.Getenv("DD_SITE")
+	if site == "" {
+		log.Printf("backfill: skipping completion notify for bucket %q: DD_SITE not set", bucket)
+		return
+	}
+	entry := backfillCompleteLog{
+		Message:        fmt.Sprintf("backfill complete for bucket %q: %s", bucket, summary.String()),
+		DDSource:       "oci-backfill",
+		Service:        "oci-hubmanager-backfill",
+		Bucket:         bucket,
+		Replayed:       summary.Replayed,
+		Skipped:        summary.Skipped,
+		Dropped:        summary.Dropped,
+		DeleteFailures: summary.DeleteFailures,
+	}
+	payload, err := json.Marshal([]backfillCompleteLog{entry})
+	if err != nil {
+		log.Printf("backfill: failed to marshal completion notify for bucket %q: %v", bucket, err)
+		return
+	}
+	logsURL := fmt.Sprintf("https://http-intake.logs.%s/api/v2/logs", site)
+	if err := client.SendMessageToDatadog(ctx, payload, logsURL); err != nil {
+		log.Printf("backfill: failed to notify Datadog of completion for bucket %q: %v", bucket, err)
+	}
 }
 
 // replayWithRetry sends a replayed payload, retrying once on failure. On a 429 it
