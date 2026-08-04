@@ -21,7 +21,7 @@
 
 data "external" "vault_state" {
   for_each = toset(local.final_regions_for_stacks)
-  program  = ["bash", "-c", <<-EOT
+  program = ["bash", "-c", <<-EOT
     STATE=$(terraform state list 2>/dev/null)
     VAULT_EXISTS="false"
     echo "$STATE" | grep -qE '^module\.regional_deployment_${replace(each.key, "-", "_")}(\[[0-9]+\])?\.oci_kms_vault\.datadog_vault' && VAULT_EXISTS="true"
