@@ -16,7 +16,7 @@ locals {
   # Once a regional vault exists in state, keep creating it even if live quota
   # later drops to 0 (the vault itself consumes a quota unit) so re-applies
   # never flap and destroy/recreate it.
-  create_regional_vault = var.region != var.home_region && (
+  create_regional_vault = var.enable_regional_vaults && var.region != var.home_region && (
     data.oci_limits_resource_availability.vault_quota.available > 0 ||
     data.external.check_regional_vault_in_state.result.vault_exists == "true"
   )

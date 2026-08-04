@@ -105,3 +105,9 @@ variable "config_file_profile" {
   description = "Oracle CLI config file profile name to be used for provider configurations."
   default     = "DEFAULT"
 }
+
+variable "enable_regional_vaults" {
+  type        = bool
+  description = "Create a regional Vault, Key, and Secret in each subscribed region so that region's forwarder reads its API key locally instead of crossing to the home region. Existing customers must explicitly set this to true to opt in; the default is false to preserve prior behavior."
+  default     = false
+}

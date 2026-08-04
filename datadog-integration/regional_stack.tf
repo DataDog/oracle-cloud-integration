@@ -44,12 +44,6 @@ resource "null_resource" "regional_stacks_create_apply" {
       exit 0
     fi
 
-    # Do not wait for the stack to be applied except for home region
-    WAIT_COMMAND=""
-    if [[ "$CURRENT_REGION" == "${local.home_region_name}" ]]; then
-      WAIT_COMMAND="--wait-for-state SUCCEEDED --wait-for-state FAILED"
-    fi
-
     echo "Checking any existing stacks in the compartment...."
     
     # The name of the stack to be created. Combined with the stack_digest to make it unique to this stack
@@ -65,7 +59,7 @@ resource "null_resource" "regional_stacks_create_apply" {
       --config-source ${path.module}/modules/regional-stacks/dd_regional_stack.zip  --variables '{"tenancy_ocid": "${var.tenancy_ocid}", "region": "${each.key}", \
       "compartment_ocid": "${module.compartment.id}", "datadog_site": "${var.datadog_site}", "api_key_secret_id": "${module.kms[0].api_key_secret_id}", \
       "home_region": "${local.home_region_name}", "region_key": "${local.subscribed_regions_map[each.key].region_key}", \
-      "subnet_ocid": "${lookup(local.region_to_subnet_ocid_map, each.key, "")}", "defined_tags": ${jsonencode(jsonencode(local.defined_tags))}}' \
+      "subnet_ocid": "${lookup(local.region_to_subnet_ocid_map, each.key, "")}", "defined_tags": ${jsonencode(jsonencode(local.defined_tags))}, "enable_regional_vaults": ${var.enable_regional_vaults}}' \
       ${local.stack_create_defined_tags_flag} \
       --wait-for-state ACTIVE \
       --max-wait-seconds 120 \
@@ -79,15 +73,18 @@ resource "null_resource" "regional_stacks_create_apply" {
   
 
     # Create and wait for apply job
-    
     echo "Apply Job for stack: $STACK_ID in region ${each.key}"
-    
-    # Retry job creation up to 5 times with 6 second intervals
-    JOB_ID=""
+
+    # Retry up to 5 times for transient OCI API errors; a FAILED apply state is not retried.
+    JOB_JSON=""
     for attempt in {1..5}; do
       echo "Attempting to create job (attempt $attempt/5)..."
-      if JOB_ID=$(oci resource-manager job create-apply-job --stack-id $STACK_ID ${local.stack_create_defined_tags_flag} $WAIT_COMMAND --execution-plan-strategy AUTO_APPROVED --region ${each.key} --query "data.id"); then
-        echo "Job created successfully: $JOB_ID for region ${each.key}"
+      if JOB_JSON=$(oci resource-manager job create-apply-job \
+        --stack-id $STACK_ID ${local.stack_create_defined_tags_flag} \
+        --wait-for-state SUCCEEDED --wait-for-state FAILED \
+        --execution-plan-strategy AUTO_APPROVED \
+        --region ${each.key} \
+        --query "data.{id:id,state:\"lifecycle-state\"}"); then
         break
       else
         echo "Job creation failed on attempt $attempt"
@@ -97,9 +94,20 @@ resource "null_resource" "regional_stacks_create_apply" {
         fi
       fi
     done
-    
-    if [ -z "$JOB_ID" ]; then
-      echo "WARNING: Failed to create job after 5 attempts for region ${each.key}. Continuing with next region..."
+
+    JOB_ID=$(echo "$JOB_JSON" | jq -r '.id')
+    JOB_STATE=$(echo "$JOB_JSON" | jq -r '.state')
+
+    if [[ -z "$JOB_ID" || "$JOB_ID" == "null" ]]; then
+      echo "ERROR: Failed to create apply job after 5 attempts for region ${each.key}."
+      exit 1
+    fi
+
+    echo "Apply job ($JOB_ID) for region ${each.key} finished with state $JOB_STATE"
+
+    if [[ "$JOB_STATE" != "SUCCEEDED" ]]; then
+      echo "ERROR: Apply job $JOB_ID did not succeed (state: $JOB_STATE) for region ${each.key}."
+      exit 1
     fi
 
     EOT
