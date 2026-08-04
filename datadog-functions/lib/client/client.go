@@ -464,7 +464,11 @@ producer:
 	if fatalErr != nil {
 		return summary, fatalErr
 	}
-	return summary, listErr
+	if listErr != nil {
+		return summary, listErr
+	}
+	log.Printf("backfill: complete for bucket %q: %s", bucket, summary.String())
+	return summary, nil
 }
 
 // replayWithRetry sends a replayed payload, retrying once on failure. On a 429 it
