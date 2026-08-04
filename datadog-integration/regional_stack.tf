@@ -45,21 +45,20 @@ resource "null_resource" "regional_stacks_create_apply" {
     fi
 
     echo "Checking any existing stacks in the compartment...."
-    
+
     # The name of the stack to be created. Combined with the stack_digest to make it unique to this stack
     STACK_NAME="datadog-regional-stack-${terraform_data.stack_digest.id}"
 
     # Fetching the existing regional stacks associated with this parent stack
     STACK_IDS=($(oci --region ${each.key} resource-manager stack list --display-name $STACK_NAME --compartment-id ${module.compartment.id} --raw-output | jq -r '.data[]."id"'))
     STACK_ID=''
-    
+
+    VARIABLES_JSON='{"tenancy_ocid": "${var.tenancy_ocid}", "region": "${each.key}", "compartment_ocid": "${module.compartment.id}", "datadog_site": "${var.datadog_site}", "api_key_secret_id": "${module.kms[0].api_key_secret_id}", "home_region": "${local.home_region_name}", "region_key": "${local.subscribed_regions_map[each.key].region_key}", "subnet_ocid": "${lookup(local.region_to_subnet_ocid_map, each.key, "")}", "defined_tags": ${jsonencode(jsonencode(local.defined_tags))}, "enable_regional_vaults": "${var.enable_regional_vaults}"}'
+
     if [[ -z "$STACK_IDS" ]]; then
       echo "No stack found in the compartment by the name $STACK_NAME in region ${each.key}. Creating..."
       STACK_ID=$(oci resource-manager stack create --compartment-id ${module.compartment.id} --display-name $STACK_NAME \
-      --config-source ${path.module}/modules/regional-stacks/dd_regional_stack.zip  --variables '{"tenancy_ocid": "${var.tenancy_ocid}", "region": "${each.key}", \
-      "compartment_ocid": "${module.compartment.id}", "datadog_site": "${var.datadog_site}", "api_key_secret_id": "${module.kms[0].api_key_secret_id}", \
-      "home_region": "${local.home_region_name}", "region_key": "${local.subscribed_regions_map[each.key].region_key}", \
-      "subnet_ocid": "${lookup(local.region_to_subnet_ocid_map, each.key, "")}", "defined_tags": ${jsonencode(jsonencode(local.defined_tags))}, "enable_regional_vaults": ${var.enable_regional_vaults}}' \
+      --config-source ${path.module}/modules/regional-stacks/dd_regional_stack.zip  --variables "$VARIABLES_JSON" \
       ${local.stack_create_defined_tags_flag} \
       --wait-for-state ACTIVE \
       --max-wait-seconds 120 \
@@ -69,6 +68,14 @@ resource "null_resource" "regional_stacks_create_apply" {
     else
       echo "Found stacks..... $${STACK_IDS[@]}"
       STACK_ID="$${STACK_IDS[@]:0:1}"
+      echo "Refreshing config source and variables for existing stack $STACK_ID in region ${each.key}..."
+      if ! UPDATE_OUTPUT=$(oci resource-manager stack update --stack-id "$STACK_ID" --force \
+      --config-source ${path.module}/modules/regional-stacks/dd_regional_stack.zip --variables "$VARIABLES_JSON" \
+      ${local.stack_create_defined_tags_flag} \
+      --region ${each.key} 2>&1); then
+        echo "ERROR: Failed to update stack $STACK_ID in region ${each.key}: $UPDATE_OUTPUT"
+        exit 1
+      fi
     fi
   
 
