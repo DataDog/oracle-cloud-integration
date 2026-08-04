@@ -22,8 +22,8 @@ module "regional_deployment_af_johannesburg_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "af-johannesburg-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_af_johannesburg_1) > 0 ? data.oci_limits_resource_availability.vault_quota_af_johannesburg_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_af_johannesburg_1) > 0 ? data.external.vault_state_af_johannesburg_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "af-johannesburg-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "af-johannesburg-1") ? tonumber(data.external.vault_quota["af-johannesburg-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["af-johannesburg-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -51,8 +51,8 @@ module "regional_deployment_ap_batam_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "ap-batam-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_ap_batam_1) > 0 ? data.oci_limits_resource_availability.vault_quota_ap_batam_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_ap_batam_1) > 0 ? data.external.vault_state_ap_batam_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "ap-batam-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "ap-batam-1") ? tonumber(data.external.vault_quota["ap-batam-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["ap-batam-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -80,8 +80,8 @@ module "regional_deployment_ap_chuncheon_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "ap-chuncheon-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_ap_chuncheon_1) > 0 ? data.oci_limits_resource_availability.vault_quota_ap_chuncheon_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_ap_chuncheon_1) > 0 ? data.external.vault_state_ap_chuncheon_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "ap-chuncheon-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "ap-chuncheon-1") ? tonumber(data.external.vault_quota["ap-chuncheon-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["ap-chuncheon-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -109,8 +109,8 @@ module "regional_deployment_ap_hyderabad_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "ap-hyderabad-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_ap_hyderabad_1) > 0 ? data.oci_limits_resource_availability.vault_quota_ap_hyderabad_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_ap_hyderabad_1) > 0 ? data.external.vault_state_ap_hyderabad_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "ap-hyderabad-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "ap-hyderabad-1") ? tonumber(data.external.vault_quota["ap-hyderabad-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["ap-hyderabad-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -138,8 +138,8 @@ module "regional_deployment_ap_melbourne_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "ap-melbourne-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_ap_melbourne_1) > 0 ? data.oci_limits_resource_availability.vault_quota_ap_melbourne_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_ap_melbourne_1) > 0 ? data.external.vault_state_ap_melbourne_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "ap-melbourne-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "ap-melbourne-1") ? tonumber(data.external.vault_quota["ap-melbourne-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["ap-melbourne-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -167,8 +167,8 @@ module "regional_deployment_ap_mumbai_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "ap-mumbai-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_ap_mumbai_1) > 0 ? data.oci_limits_resource_availability.vault_quota_ap_mumbai_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_ap_mumbai_1) > 0 ? data.external.vault_state_ap_mumbai_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "ap-mumbai-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "ap-mumbai-1") ? tonumber(data.external.vault_quota["ap-mumbai-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["ap-mumbai-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -196,8 +196,8 @@ module "regional_deployment_ap_osaka_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "ap-osaka-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_ap_osaka_1) > 0 ? data.oci_limits_resource_availability.vault_quota_ap_osaka_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_ap_osaka_1) > 0 ? data.external.vault_state_ap_osaka_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "ap-osaka-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "ap-osaka-1") ? tonumber(data.external.vault_quota["ap-osaka-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["ap-osaka-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -225,8 +225,8 @@ module "regional_deployment_ap_seoul_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "ap-seoul-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_ap_seoul_1) > 0 ? data.oci_limits_resource_availability.vault_quota_ap_seoul_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_ap_seoul_1) > 0 ? data.external.vault_state_ap_seoul_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "ap-seoul-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "ap-seoul-1") ? tonumber(data.external.vault_quota["ap-seoul-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["ap-seoul-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -254,8 +254,8 @@ module "regional_deployment_ap_singapore_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "ap-singapore-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_ap_singapore_1) > 0 ? data.oci_limits_resource_availability.vault_quota_ap_singapore_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_ap_singapore_1) > 0 ? data.external.vault_state_ap_singapore_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "ap-singapore-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "ap-singapore-1") ? tonumber(data.external.vault_quota["ap-singapore-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["ap-singapore-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -283,8 +283,8 @@ module "regional_deployment_ap_singapore_2" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "ap-singapore-2" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_ap_singapore_2) > 0 ? data.oci_limits_resource_availability.vault_quota_ap_singapore_2[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_ap_singapore_2) > 0 ? data.external.vault_state_ap_singapore_2[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "ap-singapore-2" != local.home_region_name && (contains(keys(data.external.vault_quota), "ap-singapore-2") ? tonumber(data.external.vault_quota["ap-singapore-2"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["ap-singapore-2"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -312,8 +312,8 @@ module "regional_deployment_ap_sydney_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "ap-sydney-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_ap_sydney_1) > 0 ? data.oci_limits_resource_availability.vault_quota_ap_sydney_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_ap_sydney_1) > 0 ? data.external.vault_state_ap_sydney_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "ap-sydney-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "ap-sydney-1") ? tonumber(data.external.vault_quota["ap-sydney-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["ap-sydney-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -341,8 +341,8 @@ module "regional_deployment_ap_tokyo_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "ap-tokyo-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_ap_tokyo_1) > 0 ? data.oci_limits_resource_availability.vault_quota_ap_tokyo_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_ap_tokyo_1) > 0 ? data.external.vault_state_ap_tokyo_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "ap-tokyo-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "ap-tokyo-1") ? tonumber(data.external.vault_quota["ap-tokyo-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["ap-tokyo-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -370,8 +370,8 @@ module "regional_deployment_ca_montreal_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "ca-montreal-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_ca_montreal_1) > 0 ? data.oci_limits_resource_availability.vault_quota_ca_montreal_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_ca_montreal_1) > 0 ? data.external.vault_state_ca_montreal_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "ca-montreal-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "ca-montreal-1") ? tonumber(data.external.vault_quota["ca-montreal-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["ca-montreal-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -399,8 +399,8 @@ module "regional_deployment_ca_toronto_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "ca-toronto-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_ca_toronto_1) > 0 ? data.oci_limits_resource_availability.vault_quota_ca_toronto_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_ca_toronto_1) > 0 ? data.external.vault_state_ca_toronto_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "ca-toronto-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "ca-toronto-1") ? tonumber(data.external.vault_quota["ca-toronto-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["ca-toronto-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -428,8 +428,8 @@ module "regional_deployment_eu_amsterdam_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "eu-amsterdam-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_eu_amsterdam_1) > 0 ? data.oci_limits_resource_availability.vault_quota_eu_amsterdam_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_eu_amsterdam_1) > 0 ? data.external.vault_state_eu_amsterdam_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "eu-amsterdam-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "eu-amsterdam-1") ? tonumber(data.external.vault_quota["eu-amsterdam-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["eu-amsterdam-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -457,8 +457,8 @@ module "regional_deployment_eu_frankfurt_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "eu-frankfurt-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_eu_frankfurt_1) > 0 ? data.oci_limits_resource_availability.vault_quota_eu_frankfurt_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_eu_frankfurt_1) > 0 ? data.external.vault_state_eu_frankfurt_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "eu-frankfurt-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "eu-frankfurt-1") ? tonumber(data.external.vault_quota["eu-frankfurt-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["eu-frankfurt-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -486,8 +486,8 @@ module "regional_deployment_eu_madrid_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "eu-madrid-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_eu_madrid_1) > 0 ? data.oci_limits_resource_availability.vault_quota_eu_madrid_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_eu_madrid_1) > 0 ? data.external.vault_state_eu_madrid_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "eu-madrid-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "eu-madrid-1") ? tonumber(data.external.vault_quota["eu-madrid-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["eu-madrid-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -515,8 +515,8 @@ module "regional_deployment_eu_marseille_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "eu-marseille-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_eu_marseille_1) > 0 ? data.oci_limits_resource_availability.vault_quota_eu_marseille_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_eu_marseille_1) > 0 ? data.external.vault_state_eu_marseille_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "eu-marseille-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "eu-marseille-1") ? tonumber(data.external.vault_quota["eu-marseille-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["eu-marseille-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -544,8 +544,8 @@ module "regional_deployment_eu_milan_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "eu-milan-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_eu_milan_1) > 0 ? data.oci_limits_resource_availability.vault_quota_eu_milan_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_eu_milan_1) > 0 ? data.external.vault_state_eu_milan_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "eu-milan-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "eu-milan-1") ? tonumber(data.external.vault_quota["eu-milan-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["eu-milan-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -573,8 +573,8 @@ module "regional_deployment_eu_paris_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "eu-paris-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_eu_paris_1) > 0 ? data.oci_limits_resource_availability.vault_quota_eu_paris_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_eu_paris_1) > 0 ? data.external.vault_state_eu_paris_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "eu-paris-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "eu-paris-1") ? tonumber(data.external.vault_quota["eu-paris-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["eu-paris-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -602,8 +602,8 @@ module "regional_deployment_eu_stockholm_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "eu-stockholm-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_eu_stockholm_1) > 0 ? data.oci_limits_resource_availability.vault_quota_eu_stockholm_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_eu_stockholm_1) > 0 ? data.external.vault_state_eu_stockholm_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "eu-stockholm-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "eu-stockholm-1") ? tonumber(data.external.vault_quota["eu-stockholm-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["eu-stockholm-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -631,8 +631,8 @@ module "regional_deployment_eu_zurich_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "eu-zurich-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_eu_zurich_1) > 0 ? data.oci_limits_resource_availability.vault_quota_eu_zurich_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_eu_zurich_1) > 0 ? data.external.vault_state_eu_zurich_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "eu-zurich-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "eu-zurich-1") ? tonumber(data.external.vault_quota["eu-zurich-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["eu-zurich-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -660,8 +660,8 @@ module "regional_deployment_il_jerusalem_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "il-jerusalem-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_il_jerusalem_1) > 0 ? data.oci_limits_resource_availability.vault_quota_il_jerusalem_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_il_jerusalem_1) > 0 ? data.external.vault_state_il_jerusalem_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "il-jerusalem-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "il-jerusalem-1") ? tonumber(data.external.vault_quota["il-jerusalem-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["il-jerusalem-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -689,8 +689,8 @@ module "regional_deployment_me_abudhabi_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "me-abudhabi-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_me_abudhabi_1) > 0 ? data.oci_limits_resource_availability.vault_quota_me_abudhabi_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_me_abudhabi_1) > 0 ? data.external.vault_state_me_abudhabi_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "me-abudhabi-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "me-abudhabi-1") ? tonumber(data.external.vault_quota["me-abudhabi-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["me-abudhabi-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -718,8 +718,8 @@ module "regional_deployment_me_dubai_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "me-dubai-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_me_dubai_1) > 0 ? data.oci_limits_resource_availability.vault_quota_me_dubai_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_me_dubai_1) > 0 ? data.external.vault_state_me_dubai_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "me-dubai-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "me-dubai-1") ? tonumber(data.external.vault_quota["me-dubai-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["me-dubai-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -747,8 +747,8 @@ module "regional_deployment_me_jeddah_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "me-jeddah-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_me_jeddah_1) > 0 ? data.oci_limits_resource_availability.vault_quota_me_jeddah_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_me_jeddah_1) > 0 ? data.external.vault_state_me_jeddah_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "me-jeddah-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "me-jeddah-1") ? tonumber(data.external.vault_quota["me-jeddah-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["me-jeddah-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -776,8 +776,8 @@ module "regional_deployment_me_riyadh_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "me-riyadh-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_me_riyadh_1) > 0 ? data.oci_limits_resource_availability.vault_quota_me_riyadh_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_me_riyadh_1) > 0 ? data.external.vault_state_me_riyadh_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "me-riyadh-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "me-riyadh-1") ? tonumber(data.external.vault_quota["me-riyadh-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["me-riyadh-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -805,8 +805,8 @@ module "regional_deployment_mx_monterrey_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "mx-monterrey-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_mx_monterrey_1) > 0 ? data.oci_limits_resource_availability.vault_quota_mx_monterrey_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_mx_monterrey_1) > 0 ? data.external.vault_state_mx_monterrey_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "mx-monterrey-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "mx-monterrey-1") ? tonumber(data.external.vault_quota["mx-monterrey-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["mx-monterrey-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -834,8 +834,8 @@ module "regional_deployment_mx_queretaro_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "mx-queretaro-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_mx_queretaro_1) > 0 ? data.oci_limits_resource_availability.vault_quota_mx_queretaro_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_mx_queretaro_1) > 0 ? data.external.vault_state_mx_queretaro_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "mx-queretaro-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "mx-queretaro-1") ? tonumber(data.external.vault_quota["mx-queretaro-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["mx-queretaro-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -863,8 +863,8 @@ module "regional_deployment_sa_bogota_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "sa-bogota-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_sa_bogota_1) > 0 ? data.oci_limits_resource_availability.vault_quota_sa_bogota_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_sa_bogota_1) > 0 ? data.external.vault_state_sa_bogota_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "sa-bogota-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "sa-bogota-1") ? tonumber(data.external.vault_quota["sa-bogota-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["sa-bogota-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -892,8 +892,8 @@ module "regional_deployment_sa_santiago_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "sa-santiago-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_sa_santiago_1) > 0 ? data.oci_limits_resource_availability.vault_quota_sa_santiago_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_sa_santiago_1) > 0 ? data.external.vault_state_sa_santiago_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "sa-santiago-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "sa-santiago-1") ? tonumber(data.external.vault_quota["sa-santiago-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["sa-santiago-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -921,8 +921,8 @@ module "regional_deployment_sa_saopaulo_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "sa-saopaulo-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_sa_saopaulo_1) > 0 ? data.oci_limits_resource_availability.vault_quota_sa_saopaulo_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_sa_saopaulo_1) > 0 ? data.external.vault_state_sa_saopaulo_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "sa-saopaulo-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "sa-saopaulo-1") ? tonumber(data.external.vault_quota["sa-saopaulo-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["sa-saopaulo-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -950,8 +950,8 @@ module "regional_deployment_sa_valparaiso_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "sa-valparaiso-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_sa_valparaiso_1) > 0 ? data.oci_limits_resource_availability.vault_quota_sa_valparaiso_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_sa_valparaiso_1) > 0 ? data.external.vault_state_sa_valparaiso_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "sa-valparaiso-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "sa-valparaiso-1") ? tonumber(data.external.vault_quota["sa-valparaiso-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["sa-valparaiso-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -979,8 +979,8 @@ module "regional_deployment_sa_vinhedo_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "sa-vinhedo-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_sa_vinhedo_1) > 0 ? data.oci_limits_resource_availability.vault_quota_sa_vinhedo_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_sa_vinhedo_1) > 0 ? data.external.vault_state_sa_vinhedo_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "sa-vinhedo-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "sa-vinhedo-1") ? tonumber(data.external.vault_quota["sa-vinhedo-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["sa-vinhedo-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -1008,8 +1008,8 @@ module "regional_deployment_uk_cardiff_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "uk-cardiff-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_uk_cardiff_1) > 0 ? data.oci_limits_resource_availability.vault_quota_uk_cardiff_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_uk_cardiff_1) > 0 ? data.external.vault_state_uk_cardiff_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "uk-cardiff-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "uk-cardiff-1") ? tonumber(data.external.vault_quota["uk-cardiff-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["uk-cardiff-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -1037,8 +1037,8 @@ module "regional_deployment_uk_london_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "uk-london-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_uk_london_1) > 0 ? data.oci_limits_resource_availability.vault_quota_uk_london_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_uk_london_1) > 0 ? data.external.vault_state_uk_london_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "uk-london-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "uk-london-1") ? tonumber(data.external.vault_quota["uk-london-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["uk-london-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -1066,8 +1066,8 @@ module "regional_deployment_us_ashburn_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "us-ashburn-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_us_ashburn_1) > 0 ? data.oci_limits_resource_availability.vault_quota_us_ashburn_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_us_ashburn_1) > 0 ? data.external.vault_state_us_ashburn_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "us-ashburn-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "us-ashburn-1") ? tonumber(data.external.vault_quota["us-ashburn-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["us-ashburn-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -1095,8 +1095,8 @@ module "regional_deployment_us_chicago_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "us-chicago-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_us_chicago_1) > 0 ? data.oci_limits_resource_availability.vault_quota_us_chicago_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_us_chicago_1) > 0 ? data.external.vault_state_us_chicago_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "us-chicago-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "us-chicago-1") ? tonumber(data.external.vault_quota["us-chicago-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["us-chicago-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -1124,8 +1124,8 @@ module "regional_deployment_us_phoenix_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "us-phoenix-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_us_phoenix_1) > 0 ? data.oci_limits_resource_availability.vault_quota_us_phoenix_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_us_phoenix_1) > 0 ? data.external.vault_state_us_phoenix_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "us-phoenix-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "us-phoenix-1") ? tonumber(data.external.vault_quota["us-phoenix-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["us-phoenix-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -1153,8 +1153,8 @@ module "regional_deployment_us_sanjose_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "us-sanjose-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_us_sanjose_1) > 0 ? data.oci_limits_resource_availability.vault_quota_us_sanjose_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_us_sanjose_1) > 0 ? data.external.vault_state_us_sanjose_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "us-sanjose-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "us-sanjose-1") ? tonumber(data.external.vault_quota["us-sanjose-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["us-sanjose-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -1182,8 +1182,8 @@ module "regional_deployment_eu_madrid_3" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "eu-madrid-3" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_eu_madrid_3) > 0 ? data.oci_limits_resource_availability.vault_quota_eu_madrid_3[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_eu_madrid_3) > 0 ? data.external.vault_state_eu_madrid_3[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "eu-madrid-3" != local.home_region_name && (contains(keys(data.external.vault_quota), "eu-madrid-3") ? tonumber(data.external.vault_quota["eu-madrid-3"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["eu-madrid-3"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
@@ -1211,8 +1211,8 @@ module "regional_deployment_eu_turin_1" {
   datadog_site                   = var.datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
-  create_regional_vault          = var.enable_regional_vaults && "eu-turin-1" != local.home_region_name && (length(data.oci_limits_resource_availability.vault_quota_eu_turin_1) > 0 ? data.oci_limits_resource_availability.vault_quota_eu_turin_1[0].available > 0 : false)
-  regional_vault_exists_in_state = length(data.external.vault_state_eu_turin_1) > 0 ? data.external.vault_state_eu_turin_1[0].result.vault_exists : "false"
+  create_regional_vault          = var.enable_regional_vaults && "eu-turin-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "eu-turin-1") ? tonumber(data.external.vault_quota["eu-turin-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["eu-turin-1"].result.vault_exists
   home_region                    = local.home_region_name
   tags                           = local.tags
   defined_tags                   = local.defined_tags
