@@ -128,7 +128,7 @@ resource "null_resource" "regional_stacks_create_apply" {
 # Using terraform_data only for destroy because other resource data or local variables cannot be referenced in destroy block. terraform_data allows that to refer from the self reference which is not 
 # present in null_resource. This is not used during create because terraform_data is destroyed on trigger.
 resource "terraform_data" "regional_stacks_destroy" {
-  depends_on = [null_resource.precheck_marker, terraform_data.regional_stack_zip, terraform_data.stack_digest]
+  depends_on = [null_resource.precheck_marker, terraform_data.regional_stack_zip, terraform_data.stack_digest, module.kms]
   for_each   = local.target_regions_for_stacks
   input = {
     compartment       = module.compartment.id
