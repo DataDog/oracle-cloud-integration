@@ -42,7 +42,6 @@ resource "null_resource" "wait_for_vault_dns" {
   triggers   = { vault_id = oci_kms_vault.datadog_vault[0].id }
   provisioner "local-exec" {
     command = <<-EOT
-      export OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING=True
       for i in $(seq 1 30); do
         RESULT=$(timeout 15 oci kms management key list \
           --endpoint "${oci_kms_vault.datadog_vault[0].management_endpoint}" \
