@@ -28,12 +28,29 @@ variable "tags" {
 
 variable "home_region" {
   type        = string
-  description = "The name of the home region"
+  description = "The name of the home region, used as the vault region fallback when this region cannot create its own vault"
 }
 
 variable "api_key_secret_id" {
   type        = string
-  description = "The secret ID for the API key"
+  description = "The secret ID of the home-region API key, used as a fallback when this region cannot create its own vault (e.g. vault quota exhausted)"
+}
+
+variable "datadog_api_key" {
+  type        = string
+  description = "The Datadog API key, seeded into this region's own vault secret"
+  sensitive   = true
+}
+
+variable "create_regional_vault" {
+  type        = bool
+  description = "Whether this region has spare Vault quota to create its own vault; if false, falls back to the home-region vault"
+}
+
+variable "regional_vault_exists_in_state" {
+  type        = string
+  description = "\"true\" if this region's own vault already exists in state (computed by the caller); keeps create_regional_vault sticky so a later quota dip can't destroy an already-created vault"
+  default     = "false"
 }
 
 variable "region_key" {

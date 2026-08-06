@@ -106,3 +106,9 @@ variable "defined_tags" {
   description = "Defined tags to apply to all created resources. One entry per line in the format namespace.key:value (e.g. CostCenter.Environment:prod). Leave blank unless your tenancy has mandatory tag defaults."
   default     = ""
 }
+
+variable "enable_regional_vaults" {
+  type        = bool
+  description = "Create a regional Vault, Key, and Secret in each subscribed region so that region's forwarder reads its API key locally instead of crossing to the home region. Existing customers must explicitly set this to true to opt in; the default is false to preserve prior behavior."
+  default     = false
+}

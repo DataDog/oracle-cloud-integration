@@ -40,3 +40,18 @@ data "oci_core_vcn" "dd_vcn" {
   count  = var.subnet_ocid == "" ? 1 : 0
   vcn_id = module.vcn[0].vcn_id
 }
+
+# Check if this region's own vault already exists in state. This module is
+# deployed as its own root module per region, so `terraform state list` here
+# only ever contains this region's resources. Used to make create_regional_vault
+# sticky: once created, the regional vault must not be destroyed just because
+# live quota later drops to 0 (the vault itself consumes a quota unit).
+data "external" "check_regional_vault_in_state" {
+  program = ["bash", "-c", <<-EOT
+    STATE=$(terraform state list 2>/dev/null)
+    VAULT_EXISTS="false"
+    echo "$STATE" | grep -q "oci_kms_vault\.datadog_vault" && VAULT_EXISTS="true"
+    echo "{\"vault_exists\": \"$VAULT_EXISTS\"}"
+  EOT
+  ]
+}

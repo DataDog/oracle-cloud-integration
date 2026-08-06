@@ -57,3 +57,9 @@ variable "subnet_ocid" {
     error_message = "If provided, subnet_ocid must be a valid subnet OCID starting with: ocid1.subnet.oc[0-9]."
   }
 }
+
+variable "enable_regional_vaults" {
+  type        = bool
+  description = "Create a regional Vault, Key, and Secret in this region. When false the forwarder falls back to the home-region vault."
+  default     = false
+}

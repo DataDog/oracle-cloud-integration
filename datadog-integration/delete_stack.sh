@@ -24,17 +24,25 @@ echo "Found... stack... Ids: ${STACK_IDS[@]}"
 for STACK_ID in "${STACK_IDS[@]}"; do
   echo "Running...destroy...job...for...stack...: $STACK_ID"
 
-  JOB_ID=$(oci --region "$REGION" resource-manager job create-destroy-job \
+  JOB_JSON=$(oci --region "$REGION" resource-manager job create-destroy-job \
     --stack-id "$STACK_ID" "${DEFINED_TAGS_ARG[@]}" --wait-for-state SUCCEEDED --wait-for-state FAILED \
     --execution-plan-strategy AUTO_APPROVED \
-    --query "data.id" --raw-output)
-  
-  if [[ -z "$JOB_ID" ]]; then
+    --query "data.{id:id,state:\"lifecycle-state\"}")
+
+  JOB_ID=$(echo "$JOB_JSON" | jq -r '.id')
+  JOB_STATE=$(echo "$JOB_JSON" | jq -r '.state')
+
+  if [[ -z "$JOB_ID" || "$JOB_ID" == "null" ]]; then
     echo "Destroy job not successfully completed."
     exit 1
   fi
 
-  echo "Waiting....for.....destroy....job....($JOB_ID)....to....complete..."
+  echo "Destroy....job....($JOB_ID)....finished....with....state....$JOB_STATE"
+
+  if [[ "$JOB_STATE" != "SUCCEEDED" ]]; then
+    echo "Destroy job $JOB_ID did not succeed (state: $JOB_STATE). Leaving stack $STACK_ID in place for retry."
+    exit 1
+  fi
 
   echo "Deleting....stack: $STACK_ID"
   oci --region "$REGION" resource-manager stack delete --stack-id "$STACK_ID" --force
