@@ -31,7 +31,8 @@ module "regional_deployment_af_johannesburg_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -60,7 +61,8 @@ module "regional_deployment_ap_batam_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -89,7 +91,8 @@ module "regional_deployment_ap_chuncheon_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -118,7 +121,8 @@ module "regional_deployment_ap_hyderabad_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -147,7 +151,8 @@ module "regional_deployment_ap_melbourne_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -176,7 +181,8 @@ module "regional_deployment_ap_mumbai_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -205,7 +211,8 @@ module "regional_deployment_ap_osaka_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -234,7 +241,8 @@ module "regional_deployment_ap_seoul_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -263,7 +271,8 @@ module "regional_deployment_ap_singapore_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -292,7 +301,8 @@ module "regional_deployment_ap_singapore_2" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -321,7 +331,8 @@ module "regional_deployment_ap_sydney_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -350,7 +361,8 @@ module "regional_deployment_ap_tokyo_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -379,7 +391,8 @@ module "regional_deployment_ca_montreal_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -408,7 +421,8 @@ module "regional_deployment_ca_toronto_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -437,7 +451,8 @@ module "regional_deployment_eu_amsterdam_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -466,7 +481,8 @@ module "regional_deployment_eu_frankfurt_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -495,7 +511,8 @@ module "regional_deployment_eu_madrid_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -524,7 +541,8 @@ module "regional_deployment_eu_marseille_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -553,7 +571,8 @@ module "regional_deployment_eu_milan_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -582,7 +601,8 @@ module "regional_deployment_eu_paris_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -611,7 +631,8 @@ module "regional_deployment_eu_stockholm_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -640,7 +661,8 @@ module "regional_deployment_eu_zurich_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -669,7 +691,8 @@ module "regional_deployment_il_jerusalem_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -698,7 +721,8 @@ module "regional_deployment_me_abudhabi_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -727,7 +751,8 @@ module "regional_deployment_me_dubai_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -756,7 +781,8 @@ module "regional_deployment_me_jeddah_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -785,7 +811,8 @@ module "regional_deployment_me_riyadh_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -814,7 +841,8 @@ module "regional_deployment_mx_monterrey_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -843,7 +871,8 @@ module "regional_deployment_mx_queretaro_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -872,7 +901,8 @@ module "regional_deployment_sa_bogota_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -901,7 +931,8 @@ module "regional_deployment_sa_santiago_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -930,7 +961,8 @@ module "regional_deployment_sa_saopaulo_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -959,7 +991,8 @@ module "regional_deployment_sa_valparaiso_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -988,7 +1021,8 @@ module "regional_deployment_sa_vinhedo_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -1017,7 +1051,8 @@ module "regional_deployment_uk_cardiff_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -1046,7 +1081,8 @@ module "regional_deployment_uk_london_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -1075,7 +1111,8 @@ module "regional_deployment_us_ashburn_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -1104,7 +1141,8 @@ module "regional_deployment_us_chicago_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -1133,7 +1171,8 @@ module "regional_deployment_us_phoenix_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -1162,7 +1201,8 @@ module "regional_deployment_us_sanjose_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -1191,7 +1231,8 @@ module "regional_deployment_eu_madrid_3" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
 
@@ -1220,6 +1261,7 @@ module "regional_deployment_eu_turin_1" {
   depends_on = [
     terraform_data.prechecks_complete,
     module.compartment,
-    module.auth
+    module.auth,
+    module.kms
   ]
 }
