@@ -38,7 +38,6 @@ data "external" "vault_quota" {
   } : {}
 
   program = ["bash", "-c", <<-EOT
-    export OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING=True
     available=$(oci limits resource-availability get \
       --service-name kms \
       --limit-name virtual-vault-count \
