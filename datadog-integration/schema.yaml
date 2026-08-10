@@ -30,6 +30,9 @@ variableGroups:
       - ${choose_user}
       - ${existing_group_id}
       - ${existing_user_id}
+  - title: "(Optional) Enable multi-region vaults
+    variables:
+      - ${enable_regional_vaults}
   - title: "(Optional) Advanced configuration"
     variables:
       - ${show_advanced_options}
@@ -37,7 +40,6 @@ variableGroups:
       - ${domain_id}
       - ${user_email}
       - ${defined_tags}
-      - ${enable_regional_vaults}
 
 variables:
   choose_subnet:
