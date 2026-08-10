@@ -30,7 +30,7 @@ variableGroups:
       - ${choose_user}
       - ${existing_group_id}
       - ${existing_user_id}
-  - title: "(Optional) Enable multi-region vaults
+  - title: "(Optional) Enable multi-region vaults"
     variables:
       - ${enable_regional_vaults}
   - title: "(Optional) Advanced configuration"
@@ -200,7 +200,6 @@ variables:
       Create a regional Vault, Key, and Secret in each subscribed region so that region's forwarder functions read its Datadog API key locally instead of crossing to the home region.
     required: false
     default: false
-    visible: ${show_advanced_options}
 
   defined_tags:
     title: Resource tags
