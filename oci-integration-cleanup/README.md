@@ -56,13 +56,13 @@ recreate managed connectors, buckets, event rules, or streams.
 
 ### 1. Validate the invocation
 
-`integration_cleanup.py` calls `oci_cleanup/cli.py`. Dry-run mode requires only
+`integration_cleanup.py` calls `oci_cleanup/cli.py`, which manages the arguments,
+and is the main runner for the cleanup program. Dry-run mode requires only
 the tenancy OCID. Execute mode additionally requires:
 
 - `--confirm-tenancy-id` to exactly match `--tenancy-id`.
-- `--state-file` to persist progress safely.
-- A configured OCI CLI identity with permission to inspect and delete the
-  Quickstart resources.
+- `--state-file` a desired path to a state file to persist progress in the case of script failures.
+- A configured OCI CLI identity with permission to inspect and delete resources.
 
 `oci_cleanup/manifest.py` rejects an existing state file if it belongs to a
 different tenancy.
@@ -94,7 +94,7 @@ and unsupported resources are reported for manual remediation.
 
 ### 4. Clean each region
 
-`oci_cleanup/engine.py` processes regions with the configured
+`oci_cleanup/engine.py` processes regions in parallel with the configured
 `--region-workers` value. `oci_cleanup/region.py` applies this order inside each
 region:
 
