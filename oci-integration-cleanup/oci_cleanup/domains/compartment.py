@@ -21,6 +21,28 @@ from ..resources import data_items, is_owned, lifecycle_state, resource_id, reso
 class CompartmentMixin:
     """Inspect residuals and safely delete the target compartment."""
 
+    def _safe_list(
+        self,
+        context: CleanupContext,
+        region: str,
+        service_args: list[str],
+        error_key: str,
+        error_prefix: str = "Inventory failed",
+    ) -> list[dict[str, Any]]:
+        try:
+            resources = self._list_region(region, service_args)
+            return [dict(resource, _region=region) for resource in resources]
+        except Exception as error:
+            return [
+                {
+                    "id": f"inventory-error:{region}:{error_key}",
+                    "display-name": f"{error_prefix}: {error}",
+                    "resource-type": "InventoryError",
+                    "compartment-id": context.compartment_id,
+                    "_region": region,
+                }
+            ]
+
     def compartment_residuals(
         self, context: CleanupContext
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -174,56 +196,40 @@ class CompartmentMixin:
                 ],
             ]
             for service_args in service_lists:
-                try:
-                    for resource in self._list_region(region, service_args):
-                        if lifecycle_state(resource) not in {
-                            "DELETED",
-                            "DELETING",
-                            "TERMINATED",
-                            "TERMINATING",
-                        }:
-                            copy = dict(resource)
-                            copy["_region"] = region
-                            residuals.append(copy)
-                except Exception as error:
-                    residuals.append(
-                        {
-                            "id": f"inventory-error:{region}:{'-'.join(service_args[:3])}",
-                            "display-name": f"Inventory failed: {error}",
-                            "resource-type": "InventoryError",
-                            "compartment-id": context.compartment_id,
-                            "_region": region,
-                        }
-                    )
-
-            try:
-                if not namespace:
-                    continue
-                for bucket in self._list_region(
+                for resource in self._safe_list(
+                    context,
                     region,
-                    [
-                        "os",
-                        "bucket",
-                        "list",
-                        "--compartment-id",
-                        context.compartment_id,
-                        "--namespace-name",
-                        namespace,
-                    ],
+                    service_args,
+                    "-".join(service_args[:3]),
                 ):
-                    copy = dict(bucket)
-                    copy["_region"] = region
-                    residuals.append(copy)
-            except Exception as error:
-                residuals.append(
-                    {
-                        "id": f"inventory-error:{region}:object-storage",
-                        "display-name": f"Object Storage inventory failed: {error}",
-                        "resource-type": "InventoryError",
-                        "compartment-id": context.compartment_id,
-                        "_region": region,
-                    }
+                    if lifecycle_state(resource) not in {
+                        "DELETED",
+                        "DELETING",
+                        "TERMINATED",
+                        "TERMINATING",
+                    }:
+                        residuals.append(resource)
+
+            if not namespace:
+                continue
+            bucket_args = [
+                "os",
+                "bucket",
+                "list",
+                "--compartment-id",
+                context.compartment_id,
+                "--namespace-name",
+                namespace,
+            ]
+            residuals.extend(
+                self._safe_list(
+                    context,
+                    region,
+                    bucket_args,
+                    "object-storage",
+                    "Object Storage inventory failed",
                 )
+            )
         unique: dict[str, dict[str, Any]] = {}
         for resource in residuals:
             identifier = resource_id(resource)
