@@ -121,6 +121,46 @@ Digest matches `terraform_data.stack_digest.id` from parent apply (check RM job 
 
 ---
 
+## Destroy — full state-loss remediation
+
+Use `integration_cleanup.py` when the parent or child Terraform state is
+missing, corrupted, or no longer describes the resources that were created.
+The script discovers OCI resources by the `ownedby=datadog` tag and stronger
+checks for untaggable resources, and removes them in dependency order. Disable
+or remove the integration in Datadog separately before execute mode so the
+control plane cannot recreate managed resources.
+
+Always run a dry-run first:
+
+```bash
+python3 oci-integration-cleanup/integration_cleanup.py \
+  --tenancy-id "$TENANCY_OCID"
+```
+
+Execute only after reviewing the JSON inventory:
+
+```bash
+python3 oci-integration-cleanup/integration_cleanup.py \
+  --tenancy-id "$TENANCY_OCID" \
+  --confirm-tenancy-id "$TENANCY_OCID" \
+  --state-file /tmp/datadog-cleanup-state.json \
+  --execute
+```
+
+Add `--compartment-id` if discovery is ambiguous. Add
+`--delete-compartment` only when the auto-created compartment should also be
+removed; the script refuses if any child, unowned, unknown, or pending KMS
+resource remains.
+
+Use the same execute command and state file to resume. OCI KMS deletion has a
+minimum seven-day delay, so final compartment cleanup usually requires a later
+run.
+
+Use `delete_stack.sh` instead when the problem is limited to known regional
+stacks whose Resource Manager state is still intact.
+
+---
+
 ## Common failures
 
 | Symptom | Likely cause |
