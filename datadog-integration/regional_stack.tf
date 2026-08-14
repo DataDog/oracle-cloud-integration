@@ -59,6 +59,7 @@ resource "null_resource" "regional_stacks_create_apply" {
       echo "No stack found in the compartment by the name $STACK_NAME in region ${each.key}. Creating..."
       STACK_ID=$(oci resource-manager stack create --compartment-id ${module.compartment.id} --display-name $STACK_NAME \
       --config-source ${path.module}/modules/regional-stacks/dd_regional_stack.zip  --variables "$VARIABLES_JSON" \
+      --freeform-tags '${jsonencode(local.tags)}' \
       ${local.stack_create_defined_tags_flag} \
       --wait-for-state ACTIVE \
       --max-wait-seconds 120 \
@@ -71,6 +72,7 @@ resource "null_resource" "regional_stacks_create_apply" {
       echo "Refreshing config source and variables for existing stack $STACK_ID in region ${each.key}..."
       if ! UPDATE_OUTPUT=$(oci resource-manager stack update --stack-id "$STACK_ID" --force \
       --config-source ${path.module}/modules/regional-stacks/dd_regional_stack.zip --variables "$VARIABLES_JSON" \
+      --freeform-tags '${jsonencode(local.tags)}' \
       ${local.stack_create_defined_tags_flag} \
       --region ${each.key} 2>&1); then
         echo "ERROR: Failed to update stack $STACK_ID in region ${each.key}: $UPDATE_OUTPUT"
