@@ -1,7 +1,10 @@
 """Responsibility: coordinate the complete cleanup sequence for the assembled engine.
 
-Based off the number of workers supplied, the engine will orchestrate the cleanup of the
-regions in parallel by calling the cleanup region function detailed in region.py.
+Safety boundary: withholds IAM and container teardown whenever regional or confirmation failures remain.
+Cleanup sequence role: drives discovery, confirmations, regional work, IAM, tags, stacks, and compartment cleanup.
+
+``EngineMixin.run`` is the stage orchestrator, including concurrent regional jobs
+and the fail-closed transition to tenancy-wide teardown.
 """
 
 from __future__ import annotations
@@ -51,6 +54,45 @@ class EngineMixin:
                 }
                 for future in as_completed(futures):
                     future.result()
+
+        if self.failures:
+            # Keep IAM and credentials so failed child-stack destroy jobs can be
+            # retried and declined extra resources remain usable. This is safer
+            # than partially removing authorization.
+            self.planned.append(
+                {
+                    "id": "home-identity",
+                    "description": (
+                        "Preserve IAM because cleanup has unresolved failures"
+                    ),
+                    "status": "blocked",
+                }
+            )
+        else:
+            self.cleanup_home_identity(context)
+            if not self.failures:
+                self.cleanup_tags(context)
+
+        if not self.failures:
+            self.cleanup_parent_stack(context)
+            self.delete_compartment(context)
+        else:
+            if self.args.parent_stack_id:
+                self.planned.append(
+                    {
+                        "id": "parent-stack",
+                        "description": "Preserve parent stack because cleanup has failures",
+                        "status": "blocked",
+                    }
+                )
+            if self.args.delete_compartment:
+                self.planned.append(
+                    {
+                        "id": "compartment",
+                        "description": "Preserve compartment because cleanup has failures",
+                        "status": "blocked",
+                    }
+                )
 
         summary = {
             "mode": "execute" if self.execute else "dry-run",

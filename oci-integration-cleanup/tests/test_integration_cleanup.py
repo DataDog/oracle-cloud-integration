@@ -683,6 +683,56 @@ class CleanupTestCase(unittest.TestCase):
             self.assertEqual(value, cleaner.failures[0][key])
             self.assertEqual(value, cleaner.planned[0][key])
 
+    def test_dynamic_group_requires_name_description_rule_and_policy_reference(self):
+        oci = FakeOci()
+        connector_ocid = "ocid1.dynamicresourcegroup.oc1..connector"
+        function_ocid = "ocid1.dynamicresourcegroup.oc1..function"
+        oci.add_list(
+            "identity-domains dynamic-resource-groups list",
+            [
+                {
+                    "id": "connector-scim",
+                    "ocid": connector_ocid,
+                    "display-name": cleanup.CONNECTOR_GROUP_NAME,
+                    "description": cleanup.CONNECTOR_GROUP_DESCRIPTION,
+                    "matching-rule": (
+                        "All {resource.type = 'serviceconnector', "
+                        f"resource.compartment.id = '{COMPARTMENT}'}}"
+                    ),
+                },
+                {
+                    "id": "function-scim",
+                    "ocid": function_ocid,
+                    "display-name": cleanup.FUNCTION_GROUP_NAME,
+                    "description": "wrong description",
+                    "matching-rule": (
+                        "All {resource.type = 'fnfunc', "
+                        f"resource.compartment.id = '{COMPARTMENT}'}}"
+                    ),
+                },
+            ],
+        )
+        cleaner = self.make_cleaner(oci=oci)
+        policy = owned(
+            {
+                "id": "policy",
+                "name": cleanup.DYNAMIC_POLICY_NAME,
+                "compartment-id": TENANCY,
+                "statements": [
+                    f"Allow dynamic-group id {connector_ocid} to read metrics in tenancy",
+                    f"Allow dynamic-group id {function_ocid} to use fn-function in tenancy",
+                ],
+            }
+        )
+        validated = cleaner._validated_dynamic_groups(
+            context(domains=[{"url": "https://identity.example"}]), [policy]
+        )
+        self.assertEqual(1, len(validated))
+        self.assertEqual(cleanup.CONNECTOR_GROUP_NAME, cleanup.resource_name(validated[0][1]))
+        self.assertTrue(
+            any("manual review required" in failure for failure in cleaner.failures)
+        )
+
     def test_functions_cleanup_preserves_customer_application(self):
         oci = FakeOci()
         oci.add_list(
@@ -1385,6 +1435,141 @@ class CleanupTestCase(unittest.TestCase):
         self.assertEqual("DELETED", event_delete[-1])
         self.assertEqual("DELETED", stream_delete[-1])
 
+    def test_identity_cleanup_deletes_keys_only_for_tagged_user(self):
+        oci = FakeOci()
+        oci.add_list(
+            "iam policy list",
+            [],
+        )
+        oci.add_list("identity-domains dynamic-resource-groups list", [])
+        tagged_user = owned({"id": "scim-user", "display-name": cleanup.USER_NAME})
+        untagged_user = {"id": "existing-user", "display-name": cleanup.USER_NAME}
+        oci.add_list("identity-domains users list", [tagged_user, untagged_user])
+        oci.add_list(
+            "identity-domains groups list",
+            [owned({"id": "scim-group", "display-name": cleanup.GROUP_NAME})],
+        )
+        oci.add_list(
+            "identity-domains api-keys list",
+            [{"id": "key-1"}, {"id": "key-2"}],
+        )
+        cleaner = self.make_cleaner(oci=oci)
+        cleaner.cleanup_home_identity(
+            context(domains=[{"url": "https://identity.example"}])
+        )
+        action_ids = {action["id"] for action in cleaner.planned}
+        self.assertIn("api-key:key-1", action_ids)
+        self.assertIn("api-key:key-2", action_ids)
+        self.assertIn("identity-user:scim-user", action_ids)
+        self.assertNotIn("identity-user:existing-user", action_ids)
+        api_key_calls = [
+            " ".join(call)
+            for call in oci.list_calls
+            if "api-keys" in " ".join(call)
+        ]
+        self.assertEqual(1, len(api_key_calls))
+        self.assertIn('user.value eq "scim-user"', api_key_calls[0])
+
+    def test_failed_regional_destroy_preserves_stack_and_records_failure(self):
+        oci = FakeOci()
+        oci.add_run(
+            "create-destroy-job",
+            {"data": {"id": "job", "lifecycle-state": "FAILED"}},
+        )
+        cleaner = self.make_cleaner(execute=True, oci=oci)
+        result = cleaner.destroy_regional_stack(
+            HOME_REGION,
+            {"id": "stack", "display-name": "datadog-regional-stack-test"},
+        )
+        self.assertFalse(result)
+        self.assertFalse(
+            any("stack delete" in " ".join(call) for call in oci.run_calls)
+        )
+        self.assertEqual(
+            "failed",
+            cleaner.manifest.data["actions"][
+                f"regional-stack:{HOME_REGION}:stack"
+            ]["status"],
+        )
+
+    def test_successful_regional_destroy_waits_for_stack_deleted(self):
+        oci = FakeOci()
+        oci.add_run(
+            "create-destroy-job",
+            {"data": {"id": "job", "lifecycle-state": "SUCCEEDED"}},
+        )
+        cleaner = self.make_cleaner(execute=True, oci=oci)
+
+        result = cleaner.destroy_regional_stack(
+            HOME_REGION,
+            {"id": "stack", "display-name": "datadog-regional-stack-test"},
+        )
+
+        self.assertTrue(result)
+        stack_delete = next(
+            call
+            for call in oci.run_calls
+            if "stack" in call and "delete" in call
+        )
+        self.assertEqual("DELETED", stack_delete[-1])
+
+    def test_compartment_deletion_refuses_residual_or_child_resources(self):
+        oci = FakeOci()
+        oci.add_list(
+            "iam compartment list",
+            [{"id": "child", "name": "customer-child", "lifecycle-state": "ACTIVE"}],
+        )
+        oci.add_run(
+            "query all resources where compartmentId",
+            {
+                "data": {
+                    "items": [
+                        {
+                            "identifier": "customer-resource",
+                            "display-name": "customer",
+                            "resource-type": "Instance",
+                            "compartment-id": COMPARTMENT,
+                        }
+                    ]
+                }
+            },
+        )
+        args = argparse.Namespace(delete_compartment=True)
+        cleaner = self.make_cleaner(execute=True, oci=oci, args=args)
+        tagged_compartment = owned(
+            {
+                "id": COMPARTMENT,
+                "name": cleanup.AUTO_COMPARTMENT_NAME,
+                "description": cleanup.AUTO_COMPARTMENT_DESCRIPTION,
+            }
+        )
+        cleaner.delete_compartment(context(compartment=tagged_compartment))
+        self.assertTrue(
+            any("Compartment preserved" in failure for failure in cleaner.failures)
+        )
+        self.assertFalse(
+            any(action["id"].startswith("compartment:") for action in cleaner.planned)
+        )
+
+    def test_dry_run_compartment_deletion_is_conditional(self):
+        args = argparse.Namespace(delete_compartment=True)
+        cleaner = self.make_cleaner(args=args)
+        tagged_compartment = owned(
+            {
+                "id": COMPARTMENT,
+                "name": cleanup.AUTO_COMPARTMENT_NAME,
+                "description": cleanup.AUTO_COMPARTMENT_DESCRIPTION,
+            }
+        )
+        cleaner.delete_compartment(context(compartment=tagged_compartment))
+        action = next(
+            action
+            for action in cleaner.planned
+            if action["id"] == f"compartment:{COMPARTMENT}"
+        )
+        self.assertTrue(action["conditional"])
+        self.assertEqual([], cleaner.failures)
+
     def test_kms_actions_use_minimum_buffered_deletion_times(self):
         before = dt.datetime.now(dt.timezone.utc)
         oci = FakeOci()
@@ -1551,6 +1736,26 @@ class CleanupTestCase(unittest.TestCase):
         self.assertEqual("vault", cleaner.failures[0]["resource_id"])
         self.assertEqual(HOME_REGION, cleaner.failures[0]["region"])
         self.assertIn("no management endpoint", cleaner.failures[0]["message"])
+
+    def test_cleanup_region_dependency_order(self):
+        cleaner = self.make_cleaner()
+        calls = []
+        methods = [
+            "cleanup_regional_stacks",
+            "cleanup_connectors_events_streams",
+            "cleanup_buckets",
+            "cleanup_functions",
+            "cleanup_network",
+            "cleanup_kms",
+        ]
+        for method in methods:
+            setattr(
+                cleaner,
+                method,
+                lambda _context, _region, method=method: calls.append(method),
+            )
+        cleaner.cleanup_region(context(), HOME_REGION)
+        self.assertEqual(methods, calls)
 
     def test_run_cleans_regions_concurrently(self):
         cleaner = self.make_cleaner(
