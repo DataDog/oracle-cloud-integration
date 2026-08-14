@@ -1370,6 +1370,57 @@ class CleanupTestCase(unittest.TestCase):
         self.assertEqual("DELETED", event_delete[-1])
         self.assertEqual("DELETED", stream_delete[-1])
 
+    def test_kms_actions_use_minimum_buffered_deletion_times(self):
+        oci = FakeOci()
+        oci.add_list(
+            "vault secret list",
+            [
+                owned(
+                    {
+                        "id": "secret",
+                        "secret-name": cleanup.SECRET_NAME,
+                        "name": cleanup.SECRET_NAME,
+                        "compartment-id": COMPARTMENT,
+                    }
+                )
+            ],
+        )
+        oci.add_list(
+            "kms management vault list",
+            [
+                owned(
+                    {
+                        "id": "vault",
+                        "display-name": cleanup.VAULT_NAME,
+                        "compartment-id": COMPARTMENT,
+                        "management-endpoint": "https://kms.example",
+                    }
+                )
+            ],
+        )
+        oci.add_list(
+            "kms management key list",
+            [
+                owned(
+                    {
+                        "id": "key",
+                        "display-name": cleanup.KEY_NAME,
+                        "compartment-id": COMPARTMENT,
+                    }
+                )
+            ],
+        )
+        cleaner = self.make_cleaner(oci=oci)
+        cleaner.cleanup_kms(context(), HOME_REGION)
+        times_by_kind = {
+            action["id"].split(":", 1)[0]: action.get("deletion_time")
+            for action in cleaner.planned
+            if action["id"].startswith(("secret:", "kms-key:", "kms-vault:"))
+        }
+        self.assertNotEqual(times_by_kind["secret"], times_by_kind["kms-key"])
+        self.assertEqual(times_by_kind["kms-key"], times_by_kind["kms-vault"])
+        self.assertTrue(cleaner.kms_pending)
+
     def test_run_cleans_regions_concurrently(self):
         cleaner = self.make_cleaner(
             args=SimpleNamespace(region_workers=2)

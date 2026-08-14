@@ -26,6 +26,7 @@ from oci_cleanup import __all__ as package_api
 from oci_cleanup.base import CleanupBase
 from oci_cleanup.discovery import DiscoveryMixin
 from oci_cleanup.domains.extras import ExtrasMixin
+from oci_cleanup.domains.kms import KmsMixin
 from oci_cleanup.domains.network import NetworkMixin
 from oci_cleanup.domains.services import ServicesMixin
 from oci_cleanup.engine import EngineMixin
@@ -41,9 +42,10 @@ class QuickstartCleanup(
     RegionMixin,
     ServicesMixin,
     NetworkMixin,
+    KmsMixin,
     CleanupBase,
 ):
-    """Remove Quickstart forwarding services, storage, and networking."""
+    """Remove Quickstart resources and schedule KMS deletion."""
 
 
 def _parse_bool(value: str) -> bool:
