@@ -40,15 +40,36 @@ class CompartmentMixin:
         children = [
             child
             for child in children
-            if str(
-                child.get("lifecycle-state")
-                or child.get("lifecycle_state")
-                or "ACTIVE"
-            ).upper()
-            not in {"DELETED", "DELETING"}
+            if lifecycle_state(child) not in {"DELETED", "DELETING"}
         ]
 
         residuals: list[dict[str, Any]] = []
+        namespace = ""
+        try:
+            namespace_payload = self.oci.run(
+                [
+                    "--region",
+                    context.home_region,
+                    "os",
+                    "ns",
+                    "get",
+                ],
+                attempts=2,
+            )
+            namespace = str(namespace_payload.get("data", ""))
+            if not namespace:
+                raise CleanupError("Object Storage namespace was empty")
+        except Exception as error:
+            residuals.append(
+                {
+                    "id": "inventory-error:object-storage-namespace",
+                    "display-name": f"Object Storage namespace lookup failed: {error}",
+                    "resource-type": "InventoryError",
+                    "compartment-id": context.compartment_id,
+                    "_region": context.home_region,
+                }
+            )
+
         for region in context.regions:
             payload = self.oci.run(
                 [
@@ -176,12 +197,8 @@ class CompartmentMixin:
                     )
 
             try:
-                namespace_payload = self.oci.run(
-                    ["--region", region, "os", "ns", "get"], attempts=2
-                )
-                namespace = str(namespace_payload.get("data", ""))
                 if not namespace:
-                    raise CleanupError("Object Storage namespace was empty")
+                    continue
                 for bucket in self._list_region(
                     region,
                     [
