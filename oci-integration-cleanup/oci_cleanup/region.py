@@ -18,6 +18,8 @@ class RegionMixin:
         self.cleanup_functions(context, region)
         LOGGER.info("[%s] Checking Quickstart networking", region)
         self.cleanup_network(context, region)
+        LOGGER.info("[%s] Checking KMS resources", region)
+        self.cleanup_kms(context, region)
 
 
     def _cleanup_region_safely(
