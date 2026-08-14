@@ -24,7 +24,7 @@ from ..constants import (
     USER_POLICY_NAME,
 )
 from ..models import CleanupContext
-from ..resources import exact_owned, is_owned, resource_id, resource_name
+from ..resources import exact_owned, resource_id, resource_name
 
 
 class IdentityMixin:
@@ -172,12 +172,12 @@ class IdentityMixin:
         users = [
             (endpoint, user)
             for endpoint, user in self._identity_resources(context, "users")
-            if resource_name(user) == USER_NAME and is_owned(user)
+            if exact_owned(user, expected_names={USER_NAME})
         ]
         groups = [
             (endpoint, group)
             for endpoint, group in self._identity_resources(context, "groups")
-            if resource_name(group) == GROUP_NAME and is_owned(group)
+            if exact_owned(group, expected_names={GROUP_NAME})
         ]
         if len(users) > 1 or len(groups) > 1:
             self.failures.append(

@@ -15,7 +15,7 @@ from typing import Any
 from ..constants import LOGGER, REGIONAL_STACK_PREFIX
 from ..errors import CleanupError, raw_error_message
 from ..models import CleanupContext
-from ..resources import resource_id, resource_name
+from ..resources import lifecycle_state, resource_id, resource_name
 
 
 class StacksMixin:
@@ -63,12 +63,7 @@ class StacksMixin:
                 attempts=2,
             )
             job = result.get("data", result)
-            state = str(
-                job.get("lifecycle-state")
-                or job.get("lifecycle_state")
-                or job.get("state")
-                or ""
-            ).upper()
+            state = lifecycle_state(job)
             if state != "SUCCEEDED":
                 raise CleanupError(
                     f"Regional destroy job for {stack_id} ended in {state or 'UNKNOWN'}"
