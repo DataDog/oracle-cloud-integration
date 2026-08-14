@@ -67,6 +67,14 @@ def resource_type(resource: dict[str, Any]) -> str:
     )
 
 
+def resource_management_endpoint(resource: dict[str, Any]) -> str:
+    return str(
+        resource.get("management-endpoint")
+        or resource.get("management_endpoint")
+        or ""
+    )
+
+
 def lifecycle_state(resource: dict[str, Any]) -> str:
     return str(
         resource.get("lifecycle-state")

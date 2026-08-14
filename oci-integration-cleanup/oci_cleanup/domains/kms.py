@@ -20,7 +20,12 @@ from ..constants import (
     VAULT_NAME,
 )
 from ..models import CleanupContext
-from ..resources import exact_owned, lifecycle_state, resource_id
+from ..resources import (
+    exact_owned,
+    lifecycle_state,
+    resource_id,
+    resource_management_endpoint,
+)
 
 
 class KmsMixin:
@@ -106,11 +111,7 @@ class KmsMixin:
                 self.kms_pending = True
                 continue
             vault_id = resource_id(vault)
-            endpoint = str(
-                vault.get("management-endpoint")
-                or vault.get("management_endpoint")
-                or ""
-            )
+            endpoint = resource_management_endpoint(vault)
             if not endpoint:
                 self.failures.append(
                     f"Owned vault {vault_id} has no management endpoint"

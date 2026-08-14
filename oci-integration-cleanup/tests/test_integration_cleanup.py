@@ -16,7 +16,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 import integration_cleanup as cleanup
 import oci_cleanup
-from oci_cleanup.resources import resource_field
+from oci_cleanup.resources import resource_field, resource_management_endpoint
 
 
 TENANCY = "ocid1.tenancy.oc1..test"
@@ -129,6 +129,20 @@ def extra_candidate(
 
 
 class CleanupTestCase(unittest.TestCase):
+    def test_resource_management_endpoint_normalizes_oci_field_names(self):
+        self.assertEqual(
+            "https://hyphen.example",
+            resource_management_endpoint(
+                {"management-endpoint": "https://hyphen.example"}
+            ),
+        )
+        self.assertEqual(
+            "https://underscore.example",
+            resource_management_endpoint(
+                {"management_endpoint": "https://underscore.example"}
+            ),
+        )
+
     def test_facade_reexports_public_package_api(self):
         self.assertEqual(
             set(cleanup.__all__),
