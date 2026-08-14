@@ -9,6 +9,10 @@ The tool removes OCI resources only. Disable or remove the OCI integration in
 Datadog before running execute mode; otherwise the Datadog control plane can
 recreate managed connectors, buckets, event rules, or streams.
 
+Development is split across a stacked PR series. This README describes the
+completed tool; intermediate PRs contain only the modules enabled at that layer
+of the stack.
+
 ## Files
 
 - `integration_cleanup.py` is the executable entry point and stable public

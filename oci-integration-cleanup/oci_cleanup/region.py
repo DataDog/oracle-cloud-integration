@@ -25,8 +25,7 @@ class RegionMixin:
             self.manifest.record_error(
                 message,
                 raw_error=raw_error_message(error),
+                persist=self.execute,
             )
-            if self.execute:
-                self.manifest.save()
 
 

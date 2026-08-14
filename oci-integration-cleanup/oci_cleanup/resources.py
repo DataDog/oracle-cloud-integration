@@ -47,6 +47,14 @@ def resource_compartment(resource: dict[str, Any]) -> str:
     )
 
 
+def resource_type(resource: dict[str, Any]) -> str:
+    return str(
+        resource.get("resource-type")
+        or resource.get("resource_type")
+        or ""
+    )
+
+
 def lifecycle_state(resource: dict[str, Any]) -> str:
     return str(
         resource.get("lifecycle-state")

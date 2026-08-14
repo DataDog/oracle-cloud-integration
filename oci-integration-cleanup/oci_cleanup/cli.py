@@ -78,10 +78,6 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
             )
         if not args.state_file:
             parser.error("--state-file is required in execute mode")
-    elif args.delete_compartment:
-        # It is useful to show the compartment action in dry-run, but keep the
-        # opt-in explicit in both modes.
-        pass
     if not args.state_file:
         args.state_file = pathlib.Path(
             f"datadog-cleanup-{args.tenancy_id.rsplit('.', 1)[-1][:12]}.json"

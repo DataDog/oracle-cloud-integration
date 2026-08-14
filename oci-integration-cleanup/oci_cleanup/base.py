@@ -47,20 +47,6 @@ class CleanupBase:
         self.approved_extra_ids: set[str] = set()
         self._accessible_compartment_ids: Optional[list[str]] = None
 
-    def _read_action(
-        self, action_id: str, description: str, function: Callable[[], Any]
-    ) -> Any:
-        try:
-            return function()
-        except Exception as error:
-            message = f"{description}: {error}"
-            self.manifest.record_error(
-                message,
-                action_id,
-                raw_error=raw_error_message(error),
-            )
-            raise
-
     def action(
         self,
         action_id: str,
@@ -99,8 +85,13 @@ class CleanupBase:
             return True
 
         LOGGER.info("Executing: %s", description)
-        self.manifest.record_action(action_id, description, "running", **(details or {}))
-        self.manifest.save()
+        self.manifest.record_action(
+            action_id,
+            description,
+            "running",
+            persist=True,
+            **(details or {}),
+        )
         try:
             if function:
                 result = function()
@@ -115,9 +106,9 @@ class CleanupBase:
                 description,
                 "completed",
                 result=result if isinstance(result, (dict, list, str, int)) else None,
+                persist=True,
                 **(details or {}),
             )
-            self.manifest.save()
             entry["status"] = "completed"
             LOGGER.info("Completed: %s", description)
             return True
@@ -137,8 +128,8 @@ class CleanupBase:
                 message,
                 action_id,
                 raw_error=raw_error,
+                persist=True,
             )
-            self.manifest.save()
             entry["status"] = "failed"
             entry["error"] = str(error)
             LOGGER.error("Failed: %s: %s", description, error)

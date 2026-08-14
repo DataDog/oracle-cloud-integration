@@ -15,8 +15,22 @@ import subprocess
 import time
 from typing import Any, Optional
 
-from .errors import CommandError
+from .errors import CommandError, _oci_payload
 from .resources import data_items
+
+
+def _is_not_found(stderr: str, stdout: str) -> bool:
+    payload = _oci_payload(stderr) or _oci_payload(stdout)
+    code = str(payload.get("code") or "")
+    status = int(payload.get("status") or 0)
+    message = str(payload.get("message") or "").lower()
+    return (
+        code in {"NotAuthorizedOrNotFound", "NotFound"}
+        or status == 404
+        or "does not exist" in message
+        or " is deleted" in message
+    )
+
 
 class OciCli:
     def __init__(self, binary: str = "oci", profile: Optional[str] = None):
@@ -48,15 +62,26 @@ class OciCli:
             )
             if process.returncode == 0:
                 output = process.stdout.strip()
-                return json.loads(output) if output else {}
+                if not output:
+                    return {}
+                try:
+                    return json.loads(output)
+                except json.JSONDecodeError as error:
+                    last_error = CommandError(
+                        command,
+                        process.returncode,
+                        (
+                            "OCI CLI returned malformed JSON despite exit code 0: "
+                            f"{error}: {output}"
+                        ),
+                    )
+                    if attempt < attempts:
+                        time.sleep(min(2**attempt, 5))
+                        continue
+                    raise last_error
             stderr = process.stderr.strip()
             stdout = process.stdout.strip()
-            if allow_not_found and (
-                "NotAuthorizedOrNotFound" in stderr
-                or "404" in stderr
-                or "does not exist" in stderr.lower()
-                or " is DELETED" in stderr
-            ):
+            if allow_not_found and _is_not_found(stderr, stdout):
                 return {}
             last_error = CommandError(
                 command,

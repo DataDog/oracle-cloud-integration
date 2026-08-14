@@ -75,6 +75,7 @@ class Manifest:
         action_id: str,
         description: str,
         status: str,
+        persist: bool = False,
         **details: Any,
     ) -> None:
         with self.lock:
@@ -84,12 +85,15 @@ class Manifest:
                 "updated_at": utc_now(),
                 **details,
             }
+            if persist:
+                self.save()
 
     def record_error(
         self,
         message: str,
         action_id: Optional[str] = None,
         raw_error: Optional[str] = None,
+        persist: bool = False,
     ) -> None:
         with self.lock:
             error = {"message": message, "time": utc_now()}
@@ -98,4 +102,6 @@ class Manifest:
             if raw_error and raw_error != message:
                 error["raw_error"] = raw_error
             self.data["errors"].append(error)
+            if persist:
+                self.save()
 

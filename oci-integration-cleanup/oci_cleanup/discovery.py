@@ -22,6 +22,7 @@ from .resources import (
     resource_compartment,
     resource_id,
     resource_name,
+    resource_type,
 )
 
 
@@ -130,11 +131,7 @@ class DiscoveryMixin:
             resource
             for resource in tagged
             if resource_name(resource) == AUTO_COMPARTMENT_NAME
-            and "compartment" in str(
-                resource.get("resource-type")
-                or resource.get("resource_type")
-                or ""
-            ).lower()
+            and "compartment" in resource_type(resource).lower()
             and is_owned(resource)
         ]
         compartment_candidates.update(
@@ -144,16 +141,12 @@ class DiscoveryMixin:
         # policies and the compartment resource itself are excluded as signals.
         for resource in tagged:
             compartment_id = resource_compartment(resource)
-            resource_type = str(
-                resource.get("resource-type")
-                or resource.get("resource_type")
-                or ""
-            ).lower()
+            kind = resource_type(resource).lower()
             if (
                 compartment_id
                 and compartment_id != self.args.tenancy_id
-                and "policy" not in resource_type
-                and "compartment" not in resource_type
+                and "policy" not in kind
+                and "compartment" not in kind
             ):
                 compartment_candidates.add(compartment_id)
 
@@ -236,8 +229,7 @@ class DiscoveryMixin:
             {
                 "id": resource_id(resource),
                 "name": resource_name(resource),
-                "type": resource.get("resource-type")
-                or resource.get("resource_type"),
+                "type": resource_type(resource),
                 "compartment_id": resource_compartment(resource),
                 "region": resource.get("_region"),
             }

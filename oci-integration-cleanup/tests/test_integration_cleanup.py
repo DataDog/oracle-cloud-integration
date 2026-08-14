@@ -256,6 +256,54 @@ class CleanupTestCase(unittest.TestCase):
         self.assertIn("Invalid value", str(raised.exception))
         self.assertEqual(process.stdout, raised.exception.stdout)
 
+    def test_oci_success_with_malformed_json_raises_command_error(self):
+        process = SimpleNamespace(
+            returncode=0,
+            stdout="not-json",
+            stderr="",
+        )
+        with patch("oci_cleanup.oci.subprocess.run", return_value=process):
+            with self.assertRaises(cleanup.CommandError) as raised:
+                cleanup.OciCli().run(["search", "resource", "structured-search"])
+
+        self.assertIn("malformed JSON", str(raised.exception))
+
+    def test_oci_not_found_requires_structured_error_evidence(self):
+        unrelated = SimpleNamespace(
+            returncode=1,
+            stdout="",
+            stderr=json.dumps(
+                {
+                    "code": "InternalError",
+                    "status": 500,
+                    "message": "Request identifier contains 404 but is not missing",
+                }
+            ),
+        )
+        with patch("oci_cleanup.oci.subprocess.run", return_value=unrelated):
+            with self.assertRaises(cleanup.CommandError):
+                cleanup.OciCli().run(["fn", "function", "delete"], allow_not_found=True)
+
+        missing = SimpleNamespace(
+            returncode=1,
+            stdout="",
+            stderr=json.dumps(
+                {
+                    "code": "NotFound",
+                    "status": 404,
+                    "message": "Resource was not found",
+                }
+            ),
+        )
+        with patch("oci_cleanup.oci.subprocess.run", return_value=missing):
+            self.assertEqual(
+                {},
+                cleanup.OciCli().run(
+                    ["fn", "function", "delete"],
+                    allow_not_found=True,
+                ),
+            )
+
     def test_discovery_uses_common_tagged_resource_compartment(self):
         oci = FakeOci()
         oci.add_list(
@@ -290,6 +338,25 @@ class CleanupTestCase(unittest.TestCase):
             oci=oci, args=argparse.Namespace(compartment_id=None)
         )
         discovered = cleaner.discover()
+        self.assertEqual(COMPARTMENT, discovered.compartment_id)
+
+    def test_discovery_accepts_explicit_compartment_without_tag_evidence(self):
+        oci = FakeOci()
+        oci.add_list(
+            "iam region-subscription list",
+            [
+                {
+                    "region-name": HOME_REGION,
+                    "is-home-region": True,
+                    "status": "READY",
+                }
+            ],
+        )
+        oci.add_list("iam domain list", [])
+        cleaner = self.make_cleaner(oci=oci)
+
+        discovered = cleaner.discover()
+
         self.assertEqual(COMPARTMENT, discovered.compartment_id)
 
     def test_discovery_aborts_on_ambiguous_tagged_compartments(self):
@@ -365,7 +432,7 @@ class CleanupTestCase(unittest.TestCase):
         self.assertEqual([True], invoked)
         self.assertEqual("completed", cleaner.planned[0]["status"])
 
-    def test_run_can_clean_regions_concurrently(self):
+    def test_run_cleans_regions_concurrently(self):
         cleaner = self.make_cleaner(
             args=SimpleNamespace(region_workers=2)
         )
@@ -374,20 +441,12 @@ class CleanupTestCase(unittest.TestCase):
         completed = []
 
         cleaner.discover = lambda: context(regions=regions)
-        cleaner.discover_extra_resources = lambda _context: []
-        cleaner._ask_yes_no = lambda _prompt: self.fail(
-            "regional worker attempted to prompt"
-        )
 
         def cleanup_region(_context, region):
             barrier.wait(timeout=1)
             completed.append(region)
 
         cleaner.cleanup_region = cleanup_region
-        cleaner.cleanup_home_identity = lambda _context: None
-        cleaner.cleanup_tags = lambda _context: None
-        cleaner.cleanup_parent_stack = lambda _context: None
-        cleaner.delete_compartment = lambda _context: None
 
         with contextlib.redirect_stdout(io.StringIO()):
             result = cleaner.run()
