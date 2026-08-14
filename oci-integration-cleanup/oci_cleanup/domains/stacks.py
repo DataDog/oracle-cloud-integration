@@ -15,19 +15,30 @@ from typing import Any
 from ..constants import LOGGER, REGIONAL_STACK_PREFIX
 from ..errors import CleanupError, raw_error_message
 from ..models import CleanupContext
-from ..resources import lifecycle_state, resource_id, resource_name
+from ..resources import (
+    exact_owned,
+    is_owned,
+    lifecycle_state,
+    resource_id,
+    resource_name,
+)
 
 
 class StacksMixin:
     """Destroy validated regional and parent Resource Manager stacks."""
 
-    def destroy_regional_stack(
-        self, region: str, stack: dict[str, Any]
+    def _destroy_stack(
+        self,
+        region: str,
+        stack: dict[str, Any],
+        *,
+        action_prefix: str,
+        stack_kind: str,
     ) -> bool:
         stack_id = resource_id(stack)
         name = resource_name(stack)
-        action_id = f"regional-stack:{region}:{stack_id}"
-        description = f"Destroy and delete regional stack {name} ({stack_id})"
+        action_id = f"{action_prefix}:{region}:{stack_id}"
+        description = f"Destroy and delete {stack_kind} stack {name} ({stack_id})"
         if self.manifest.completed(action_id):
             return True
         self.planned.append(
@@ -66,7 +77,8 @@ class StacksMixin:
             state = lifecycle_state(job)
             if state != "SUCCEEDED":
                 raise CleanupError(
-                    f"Regional destroy job for {stack_id} ended in {state or 'UNKNOWN'}"
+                    f"{stack_kind.capitalize()} destroy job for {stack_id} "
+                    f"ended in {state or 'UNKNOWN'}"
                 )
             self.oci.run(
                 [
@@ -113,6 +125,16 @@ class StacksMixin:
             self.manifest.save()
             return False
 
+    def destroy_regional_stack(
+        self, region: str, stack: dict[str, Any]
+    ) -> bool:
+        return self._destroy_stack(
+            region,
+            stack,
+            action_prefix="regional-stack",
+            stack_kind="regional",
+        )
+
     def cleanup_regional_stacks(
         self, context: CleanupContext, region: str
     ) -> None:
@@ -127,7 +149,12 @@ class StacksMixin:
             ],
         )
         for stack in stacks:
-            if resource_name(stack).startswith(REGIONAL_STACK_PREFIX):
+            name = resource_name(stack)
+            if name.startswith(REGIONAL_STACK_PREFIX) and exact_owned(
+                stack,
+                expected_names={name},
+                compartment_id=context.compartment_id,
+            ):
                 self.destroy_regional_stack(region, stack)
 
 
@@ -135,10 +162,31 @@ class StacksMixin:
         if not self.args.parent_stack_id:
             return
         LOGGER.info("Checking explicitly supplied parent Resource Manager stack")
-        stack = {
-            "id": self.args.parent_stack_id,
-            "display-name": "explicit parent stack",
-        }
-        self.destroy_regional_stack(context.home_region, stack)
+        result = self.oci.run(
+            [
+                "--region",
+                context.home_region,
+                "resource-manager",
+                "stack",
+                "get",
+                "--stack-id",
+                self.args.parent_stack_id,
+            ],
+            attempts=2,
+        )
+        stack = result.get("data", result)
+        if not is_owned(stack):
+            LOGGER.warning(
+                "Preserving explicitly supplied parent stack %s because it "
+                "does not have the ownedby=datadog tag",
+                self.args.parent_stack_id,
+            )
+            return
+        self._destroy_stack(
+            context.home_region,
+            stack,
+            action_prefix="parent-stack",
+            stack_kind="parent",
+        )
 
 

@@ -1513,6 +1513,93 @@ class CleanupTestCase(unittest.TestCase):
         )
         self.assertEqual("DELETED", stack_delete[-1])
 
+    def test_regional_stack_cleanup_requires_exact_ownership(self):
+        oci = FakeOci()
+        oci.add_list(
+            "resource-manager stack list",
+            [
+                owned(
+                    {
+                        "id": "owned-stack",
+                        "display-name": "datadog-regional-stack-owned",
+                        "compartment-id": COMPARTMENT,
+                    }
+                ),
+                {
+                    "id": "untagged-stack",
+                    "display-name": "datadog-regional-stack-customer",
+                    "compartment-id": COMPARTMENT,
+                },
+                owned(
+                    {
+                        "id": "wrong-name",
+                        "display-name": "customer-stack",
+                        "compartment-id": COMPARTMENT,
+                    }
+                ),
+                owned(
+                    {
+                        "id": "wrong-compartment",
+                        "display-name": "datadog-regional-stack-other",
+                        "compartment-id": "customer-compartment",
+                    }
+                ),
+            ],
+        )
+        cleaner = self.make_cleaner(oci=oci)
+
+        cleaner.cleanup_regional_stacks(context(), HOME_REGION)
+
+        self.assertEqual(
+            [f"regional-stack:{HOME_REGION}:owned-stack"],
+            [action["id"] for action in cleaner.planned],
+        )
+
+    def test_parent_stack_cleanup_requires_ownership_and_distinct_action_id(self):
+        oci = FakeOci()
+        oci.add_run(
+            "resource-manager stack get",
+            {
+                "data": owned(
+                    {
+                        "id": "parent-stack",
+                        "display-name": "Datadog Forwarding Infrastructure",
+                    }
+                )
+            },
+        )
+        cleaner = self.make_cleaner(
+            oci=oci,
+            args=argparse.Namespace(parent_stack_id="parent-stack"),
+        )
+
+        cleaner.cleanup_parent_stack(context())
+
+        self.assertEqual(
+            [f"parent-stack:{HOME_REGION}:parent-stack"],
+            [action["id"] for action in cleaner.planned],
+        )
+
+    def test_parent_stack_cleanup_preserves_unowned_stack(self):
+        oci = FakeOci()
+        oci.add_run(
+            "resource-manager stack get",
+            {
+                "data": {
+                    "id": "customer-stack",
+                    "display-name": "Customer Infrastructure",
+                }
+            },
+        )
+        cleaner = self.make_cleaner(
+            oci=oci,
+            args=argparse.Namespace(parent_stack_id="customer-stack"),
+        )
+
+        cleaner.cleanup_parent_stack(context())
+
+        self.assertEqual([], cleaner.planned)
+
     def test_compartment_deletion_refuses_residual_or_child_resources(self):
         oci = FakeOci()
         oci.add_list(
