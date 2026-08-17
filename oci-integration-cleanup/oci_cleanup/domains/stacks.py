@@ -188,5 +188,3 @@ class StacksMixin:
             action_prefix="parent-stack",
             stack_kind="parent",
         )
-
-
