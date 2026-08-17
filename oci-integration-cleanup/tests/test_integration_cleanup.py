@@ -668,6 +668,173 @@ class CleanupTestCase(unittest.TestCase):
             self.assertEqual(value, cleaner.failures[0][key])
             self.assertEqual(value, cleaner.planned[0][key])
 
+    def test_functions_cleanup_preserves_customer_application(self):
+        oci = FakeOci()
+        oci.add_list(
+            "fn application list",
+            [
+                owned(
+                    {
+                        "id": "dd-app",
+                        "display-name": cleanup.FUNCTION_APP_NAME,
+                        "compartment-id": COMPARTMENT,
+                    }
+                ),
+                {
+                    "id": "customer-app",
+                    "display-name": cleanup.FUNCTION_APP_NAME,
+                    "compartment-id": COMPARTMENT,
+                },
+            ],
+        )
+        oci.add_list(
+            "fn function list",
+            [
+                owned(
+                    {
+                        "id": "logs",
+                        "display-name": "dd-logs-forwarder",
+                    }
+                ),
+                {
+                    "id": "events",
+                    "display-name": "dd-events-forwarder",
+                    "defined-tags": {
+                        "DatadogManaged": {"marker": "true"}
+                    },
+                },
+                {
+                    "id": "events-suffixed",
+                    "display-name": "dd-events-forwarder-309",
+                    "defined-tags": {
+                        "DatadogManaged": {"marker": "true"}
+                    },
+                },
+                {
+                    "id": "ocid1.fnfunc.oc1..search-owned",
+                    "display-name": "dd-metrics-forwarder",
+                },
+                {"id": "untagged-metrics", "display-name": "dd-metrics-forwarder"},
+                {
+                    "id": "deleting-logs",
+                    "display-name": "dd-logs-forwarder",
+                    "lifecycle-state": "DELETING",
+                },
+            ],
+        )
+        cleaner = self.make_cleaner(oci=oci)
+        cleaner.cleanup_functions(
+            context(
+                tagged_resources=[
+                    {
+                        "identifier": "ocid1.fnfunc.oc1..search-owned",
+                        "display-name": "dd-metrics-forwarder",
+                        "compartment-id": COMPARTMENT,
+                        "_region": HOME_REGION,
+                    }
+                ],
+                managed_resources=[
+                    {
+                        "identifier": "events",
+                        "display-name": "dd-events-forwarder",
+                        "compartment-id": COMPARTMENT,
+                        "defined-tags": {
+                            "DatadogManaged": {"marker": "true"}
+                        },
+                        "_region": HOME_REGION,
+                    },
+                    {
+                        "identifier": "events-suffixed",
+                        "display-name": "dd-events-forwarder-309",
+                        "compartment-id": COMPARTMENT,
+                        "defined-tags": {
+                            "DatadogManaged": {"marker": "true"}
+                        },
+                        "_region": HOME_REGION,
+                    }
+                ]
+            ),
+            HOME_REGION,
+        )
+        action_ids = {action["id"] for action in cleaner.planned}
+        self.assertIn(f"function:{HOME_REGION}:logs", action_ids)
+        self.assertIn(f"function:{HOME_REGION}:events", action_ids)
+        self.assertIn(f"function:{HOME_REGION}:events-suffixed", action_ids)
+        self.assertIn(
+            f"function:{HOME_REGION}:ocid1.fnfunc.oc1..search-owned",
+            action_ids,
+        )
+        self.assertIn(
+            f"function:{HOME_REGION}:untagged-metrics",
+            action_ids,
+        )
+        self.assertNotIn(f"function:{HOME_REGION}:deleting-logs", action_ids)
+        self.assertIn(f"function-app:{HOME_REGION}:dd-app", action_ids)
+        self.assertFalse(any("customer-app" in action_id for action_id in action_ids))
+
+    def test_discovers_unknown_function_inside_owned_application(self):
+        oci = FakeOci()
+        oci.add_list(
+            "fn application list",
+            [
+                owned(
+                    {
+                        "id": "dd-app",
+                        "display-name": cleanup.FUNCTION_APP_NAME,
+                        "compartment-id": COMPARTMENT,
+                    }
+                )
+            ],
+        )
+        oci.add_list(
+            "fn function list",
+            [
+                {"id": "known", "display-name": "dd-logs-forwarder"},
+                {"id": "extra", "display-name": "customer-function"},
+                {
+                    "id": "deleting-extra",
+                    "display-name": "customer-function",
+                    "lifecycle-state": "DELETING",
+                },
+            ],
+        )
+
+        candidates = self.make_cleaner(oci=oci)._discover_function_extras(
+            context(), HOME_REGION
+        )
+
+        self.assertEqual(["extra"], [candidate.resource_id for candidate in candidates])
+        self.assertIn("fn function delete", " ".join(candidates[0].command or ()))
+
+    def test_declined_extra_function_blocks_application_deletion(self):
+        oci = FakeOci()
+        oci.add_list(
+            "fn application list",
+            [
+                owned(
+                    {
+                        "id": "dd-app",
+                        "display-name": cleanup.FUNCTION_APP_NAME,
+                        "compartment-id": COMPARTMENT,
+                    }
+                )
+            ],
+        )
+        oci.add_list("fn function list", [])
+        cleaner = self.make_cleaner(oci=oci)
+        cleaner.extra_candidates = [
+            extra_candidate(container_id="dd-app")
+        ]
+
+        cleaner.cleanup_functions(context(), HOME_REGION)
+
+        application = next(
+            action
+            for action in cleaner.planned
+            if action["id"] == f"function-app:{HOME_REGION}:dd-app"
+        )
+        self.assertEqual("blocked", application["status"])
+
     def test_discovers_secondary_and_primary_compute_vnic_actions(self):
         oci = FakeOci()
         oci.add_run(
@@ -845,6 +1012,67 @@ class CleanupTestCase(unittest.TestCase):
         self.assertTrue(candidate.requires_compute_confirmation)
         self.assertIn("terminate", candidate.command or ())
 
+    def test_bucket_cleanup_deletes_only_proven_backfill_buckets(self):
+        oci = FakeOci()
+        oci.add_run("os ns get", {"data": "test-namespace"})
+        oci.add_list(
+            "os bucket list",
+            [
+                {
+                    "name": "dd-events-backfill",
+                    "defined-tags": {
+                        "DatadogManaged": {"marker": "true"}
+                    },
+                },
+                owned({"name": "dd-logs-backfill"}),
+                owned({"name": "dd-customer-data"}),
+                {"name": "dd-metrics-backfill"},
+            ],
+        )
+        cleaner = self.make_cleaner(oci=oci)
+        cleaner.cleanup_buckets(context(), HOME_REGION)
+
+        action_ids = {action["id"] for action in cleaner.planned}
+        self.assertIn(
+            f"bucket:{HOME_REGION}:dd-events-backfill",
+            action_ids,
+        )
+        self.assertIn(
+            f"bucket:{HOME_REGION}:dd-logs-backfill",
+            action_ids,
+        )
+        self.assertNotIn(
+            f"bucket:{HOME_REGION}:dd-customer-data",
+            action_ids,
+        )
+        self.assertNotIn(
+            f"bucket:{HOME_REGION}:dd-metrics-backfill",
+            action_ids,
+        )
+
+    def test_bucket_cleanup_reconciles_marker_proven_bucket_outside_compartment(self):
+        oci = FakeOci()
+        oci.add_run("os ns get", {"data": "test-namespace"})
+        oci.add_list("os bucket list", [])
+        bucket = {
+            "identifier": "ocid1.bucket.oc1..datadog",
+            "display-name": "dd-events-backfill",
+            "compartment-id": "ocid1.compartment.oc1..workload",
+            "definedTags": {"DatadogManaged": {"marker": "true"}},
+            "_region": HOME_REGION,
+        }
+
+        cleaner = self.make_cleaner(oci=oci)
+        cleaner.cleanup_buckets(
+            context(managed_resources=[bucket]),
+            HOME_REGION,
+        )
+
+        action_ids = {action["id"] for action in cleaner.planned}
+        self.assertIn(
+            f"bucket:{HOME_REGION}:dd-events-backfill",
+            action_ids,
+        )
     def test_compartment_inventory_failure_is_not_cached(self):
         cleaner = self.make_cleaner()
         transient_error = cleanup.CommandError(
@@ -1074,6 +1302,73 @@ class CleanupTestCase(unittest.TestCase):
             '"network-entity-id":"nat-gateway"',
             commands[update_index],
         )
+
+    def test_connector_delete_waits_for_work_request_success(self):
+        oci = FakeOci()
+        oci.add_list(
+            "sch service-connector list",
+            [
+                owned(
+                    {
+                        "id": "connector",
+                        "display-name": "Datadog connector",
+                    }
+                )
+            ],
+        )
+        oci.add_list("events rule list", [])
+        oci.add_list("streaming admin stream list", [])
+        cleaner = self.make_cleaner(oci=oci, execute=True)
+
+        cleaner.cleanup_connectors_events_streams(context(), HOME_REGION)
+
+        delete = next(
+            call
+            for call in oci.run_calls
+            if "service-connector" in call and "delete" in call
+        )
+        self.assertIn("SUCCEEDED", delete)
+        self.assertIn("FAILED", delete)
+        self.assertNotIn("DELETED", delete)
+
+    def test_marker_proven_event_rule_outside_target_compartment_is_deleted(self):
+        oci = FakeOci()
+        oci.add_list("sch service-connector list", [])
+        oci.add_list("events rule list", [])
+        oci.add_list("streaming admin stream list", [])
+        rule = {
+            "identifier": "ocid1.eventrule.oc1..datadog",
+            "display-name": "Datadog event forwarding",
+            "compartment-id": "ocid1.compartment.oc1..workload",
+            "definedTags": {"DatadogManaged": {"marker": "true"}},
+            "_region": HOME_REGION,
+        }
+        stream = {
+            "identifier": "ocid1.stream.oc1..datadog",
+            "display-name": "Datadog event stream",
+            "compartment-id": "ocid1.compartment.oc1..workload",
+            "definedTags": {"DatadogManaged": {"marker": "true"}},
+            "_region": HOME_REGION,
+        }
+        cleaner = self.make_cleaner(oci=oci, execute=True)
+        cleaner.cleanup_connectors_events_streams(
+            context(managed_resources=[rule, stream]), HOME_REGION
+        )
+        self.assertTrue(
+            any(
+                action["id"]
+                == f"event-rule:{HOME_REGION}:ocid1.eventrule.oc1..datadog"
+                for action in cleaner.planned
+            )
+        )
+        event_delete = next(
+            call for call in oci.run_calls if "events" in call and "delete" in call
+        )
+        stream_delete = next(
+            call for call in oci.run_calls if "streaming" in call and "delete" in call
+        )
+        self.assertEqual("DELETED", event_delete[-1])
+        self.assertEqual("DELETED", stream_delete[-1])
 
     def test_run_cleans_regions_concurrently(self):
         cleaner = self.make_cleaner(

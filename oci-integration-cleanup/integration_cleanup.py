@@ -27,6 +27,7 @@ from oci_cleanup.base import CleanupBase
 from oci_cleanup.discovery import DiscoveryMixin
 from oci_cleanup.domains.extras import ExtrasMixin
 from oci_cleanup.domains.network import NetworkMixin
+from oci_cleanup.domains.services import ServicesMixin
 from oci_cleanup.engine import EngineMixin
 from oci_cleanup.region import RegionMixin
 
@@ -38,10 +39,11 @@ class QuickstartCleanup(
     DiscoveryMixin,
     ExtrasMixin,
     RegionMixin,
+    ServicesMixin,
     NetworkMixin,
     CleanupBase,
 ):
-    """Discover and remove Quickstart networking resources."""
+    """Remove Quickstart forwarding services, storage, and networking."""
 
 
 def _parse_bool(value: str) -> bool:

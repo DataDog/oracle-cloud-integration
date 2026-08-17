@@ -83,6 +83,102 @@ class ExtrasMixin:
             details=details or {},
         )
 
+    def _discover_function_extras(
+        self, context: CleanupContext, region: str
+    ) -> list[ExtraResourceCandidate]:
+        candidates: list[ExtraResourceCandidate] = []
+        for application, functions in self._owned_function_applications(
+            context, region
+        ):
+            application_id = resource_id(application)
+            for function in functions:
+                function_id = resource_id(function)
+                marker_proven = defined_marker(function) or self._is_managed_function(
+                    context, region, function_id
+                )
+                if marker_proven or resource_name(function) in FUNCTION_NAMES:
+                    continue
+                candidates.append(
+                    self._extra_candidate(
+                        kind="function",
+                        resource=function,
+                        region=region,
+                        container_id=application_id,
+                        container_name=FUNCTION_APP_NAME,
+                        impact=(
+                            "Deleting it is required before the owned Functions "
+                            "application can be deleted."
+                        ),
+                        command=[
+                            "--region",
+                            region,
+                            "fn",
+                            "function",
+                            "delete",
+                            "--function-id",
+                            function_id,
+                            "--force",
+                            "--wait-for-state",
+                            "DELETED",
+                        ],
+                    )
+                )
+        return candidates
+
+    @staticmethod
+    def _is_managed_function(
+        context: CleanupContext, region: str, function_id: str
+    ) -> bool:
+        return any(
+            resource.get("_region") == region
+            and resource_compartment(resource) == context.compartment_id
+            and resource_id(resource) == function_id
+            and function_id.startswith("ocid1.fnfunc.")
+            for resource in context.managed_resources
+        )
+
+    def _owned_function_applications(
+        self, context: CleanupContext, region: str
+    ) -> list[tuple[dict[str, Any], list[dict[str, Any]]]]:
+        applications = self._list_region(
+            region,
+            [
+                "fn",
+                "application",
+                "list",
+                "--compartment-id",
+                context.compartment_id,
+            ],
+        )
+        discovered = []
+        for application in applications:
+            if not exact_owned(
+                application,
+                expected_names={FUNCTION_APP_NAME},
+                compartment_id=context.compartment_id,
+            ):
+                continue
+            functions = self._list_region(
+                region,
+                [
+                    "fn",
+                    "function",
+                    "list",
+                    "--application-id",
+                    resource_id(application),
+                ],
+            )
+            discovered.append(
+                (
+                    application,
+                    [
+                        function
+                        for function in functions
+                        if not is_deleted_or_deleting(function)
+                    ],
+                )
+            )
+        return discovered
 
     def _compute_compartment_ids(self, context: CleanupContext) -> list[str]:
         if self._accessible_compartment_ids is not None:
@@ -560,7 +656,10 @@ class ExtrasMixin:
         LOGGER.info("Discovering extra resources inside owned Datadog containers")
         candidates: dict[str, ExtraResourceCandidate] = {}
         for region in context.regions:
-            discovered = self._discover_network_extras(context, region)
+            discovered = [
+                *self._discover_function_extras(context, region),
+                *self._discover_network_extras(context, region),
+            ]
             for candidate in discovered:
                 candidates[candidate.candidate_id] = candidate
         return sorted(
