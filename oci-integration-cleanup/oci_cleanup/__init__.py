@@ -3,8 +3,8 @@
 Safety boundary: exposes validated primitives and the assembled engine without adding side effects.
 Cleanup sequence role: serves imports for the compatibility facade and maintainers.
 
-The exports collect constants, resource classifiers, state models, the OCI
-adapter, and ``QuickstartCleanup`` so consumers need not depend on module layout.
+The exports collect constants, resource classifiers, state models, and the OCI
+adapter so consumers need not depend on module layout.
 """
 
 from __future__ import annotations
@@ -58,8 +58,6 @@ from .resources import (
 from .manifest import Manifest
 from .oci import OciCli
 from .models import CleanupContext, ExtraResourceCandidate
-from .engine import QuickstartCleanup
-from .cli import main, parse_args
 
 __all__ = [
     "OWNER_KEY",
@@ -109,7 +107,4 @@ __all__ = [
     "OciCli",
     "CleanupContext",
     "ExtraResourceCandidate",
-    "QuickstartCleanup",
-    "parse_args",
-    "main",
 ]

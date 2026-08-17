@@ -112,7 +112,10 @@ class CleanupTestCase(unittest.TestCase):
         self.addCleanup(self.tempdir.cleanup)
 
     def test_facade_reexports_public_package_api(self):
-        self.assertEqual(set(oci_cleanup.__all__), set(cleanup.__all__))
+        self.assertEqual(
+            set(cleanup.__all__),
+            {*oci_cleanup.__all__, "QuickstartCleanup", "parse_args", "main"},
+        )
         for name in oci_cleanup.__all__:
             self.assertIs(getattr(oci_cleanup, name), getattr(cleanup, name))
 

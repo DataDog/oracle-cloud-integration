@@ -1,4 +1,8 @@
-"""Assemble the cleanup engine and coordinate regional discovery."""
+"""Responsibility: coordinate the complete cleanup sequence for the assembled engine.
+
+Based off the number of workers supplied, the engine will orchestrate the cleanup of the
+regions in parallel by calling the cleanup region function detailed in region.py.
+"""
 
 from __future__ import annotations
 
@@ -6,9 +10,6 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .constants import LOGGER
-from .base import CleanupBase
-from .discovery import DiscoveryMixin
-from .region import RegionMixin
 
 
 class EngineMixin:
@@ -69,12 +70,4 @@ class EngineMixin:
             len(self.planned),
         )
         return 1 if self.failures else 0
-
-class QuickstartCleanup(
-    EngineMixin,
-    DiscoveryMixin,
-    RegionMixin,
-    CleanupBase,
-):
-    """Discover one Datadog OCI Quickstart installation."""
 

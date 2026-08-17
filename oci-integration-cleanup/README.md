@@ -16,11 +16,9 @@ of the stack.
 ## Files
 
 - `integration_cleanup.py` is the executable entry point and stable public
-  import facade.
-- `oci_cleanup/cli.py` parses arguments, enforces tenancy confirmation, loads
-  the state file, and constructs the cleanup engine.
-- `oci_cleanup/engine.py` assembles the mixins and controls the complete
-  cleanup sequence.
+  import facade. It parses arguments, enforces tenancy confirmation, loads the
+  state file, and assembles the `QuickstartCleanup` engine from focused mixins.
+- `oci_cleanup/engine.py` controls the complete cleanup sequence.
 - `oci_cleanup/discovery.py` discovers subscribed regions, the home region,
   identity domains, the target compartment, ownership tags, and managed
   resources.
@@ -60,9 +58,9 @@ of the stack.
 
 ### 1. Validate the invocation
 
-`integration_cleanup.py` calls `oci_cleanup/cli.py`, which manages the arguments,
-and is the main runner for the cleanup program. Dry-run mode requires only
-the tenancy OCID. Execute mode additionally requires:
+`integration_cleanup.py` manages the arguments and is the main runner for the
+cleanup program. Dry-run mode requires only the tenancy OCID. Execute mode
+additionally requires:
 
 - `--confirm-tenancy-id` to exactly match `--tenancy-id`.
 - `--state-file` a desired path to a state file to persist progress in the case of script failures.
