@@ -56,10 +56,26 @@ of the stack.
 
 ## Cleanup flow
 
+The runtime call chain is:
+
+1. `integration_cleanup.py` parses the command line, assembles
+   `QuickstartCleanup`, and calls its `run()` method.
+2. `oci_cleanup/engine.py` provides `EngineMixin.run()`, the top-level
+   orchestrator.
+3. The engine delegates installation discovery to
+   `oci_cleanup/discovery.py`, then blocker discovery and approval to
+   `oci_cleanup/domains/extras.py`.
+4. The engine starts the regional workers. Each worker delegates the ordered
+   regional cleanup sequence to `oci_cleanup/region.py`.
+5. After every region finishes, the engine either preserves tenancy-wide
+   resources because failures remain or proceeds with final teardown.
+
 ### 1. Validate the invocation
 
 `integration_cleanup.py` manages the arguments and is the main runner for the
-cleanup program. Dry-run mode requires only the tenancy OCID. Execute mode
+cleanup program. It assembles the focused cleanup mixins into
+`QuickstartCleanup`, constructs the OCI and manifest adapters, and calls
+`EngineMixin.run()`. Dry-run mode requires only the tenancy OCID. Execute mode
 additionally requires:
 
 - `--confirm-tenancy-id` to exactly match `--tenancy-id`.
@@ -71,8 +87,9 @@ different tenancy.
 
 ### 2. Discover and validate ownership
 
-`oci_cleanup/discovery.py` lists READY region subscriptions, resolves the home
-region, and searches every region for:
+`EngineMixin.run()` first delegates to `oci_cleanup/discovery.py`, which lists
+READY region subscriptions, resolves the home region, and searches every region
+for:
 
 - The freeform tag `ownedby=datadog`.
 - The defined tag `DatadogManaged.marker=true`.
@@ -84,7 +101,8 @@ not conflict with tagged resource evidence.
 
 ### 3. Find nested blockers and request approval
 
-Before regional deletion begins, `oci_cleanup/domains/extras.py` inspects
+After installation discovery, the engine delegates to
+`oci_cleanup/domains/extras.py`. Before regional deletion begins, it inspects
 Datadog-owned function applications and networking containers for unexpected
 functions, VNICs, subnets, route tables, or gateways.
 
@@ -96,12 +114,14 @@ and unsupported resources are reported for manual remediation.
 
 ### 4. Clean each region
 
-`oci_cleanup/engine.py` processes regions in parallel with the configured
-`--region-workers` value. `oci_cleanup/region.py` applies this order inside each
-region:
+The engine processes regions in parallel with the configured
+`--region-workers` value. Every worker calls `oci_cleanup/region.py`, which
+applies this order inside its region:
 
 1. `domains/stacks.py` starts a Resource Manager destroy job for a validated
-   regional stack and deletes the stack only after the job succeeds.
+   regional stack and deletes the stack record only after the job succeeds.
+   This runs first so Resource Manager can use its Terraform state before the
+   service-specific cleanup removes any orphaned resources.
 2. `domains/services.py` removes service connectors, event rules, streams,
    backfill buckets, functions, and function applications.
 3. `domains/network.py` detaches approved VNICs, removes subnets, strips gateway
@@ -128,6 +148,10 @@ When regional cleanup succeeds:
 4. `domains/compartment.py` deletes the compartment only when
    `--delete-compartment` was supplied and no residual resources, child
    compartments, or pending KMS resources remain.
+
+The parent stack remains near the end because all regional child stacks and
+regional resources must be settled first. Optional compartment deletion remains
+the final destructive step.
 
 OCI secrets require a delayed deletion, and KMS keys and vaults require at
 least a seven-day delay. The state file preserves their scheduled timestamps,
