@@ -26,6 +26,7 @@ from oci_cleanup import __all__ as package_api
 from oci_cleanup.base import CleanupBase
 from oci_cleanup.discovery import DiscoveryMixin
 from oci_cleanup.domains.extras import ExtrasMixin
+from oci_cleanup.domains.network import NetworkMixin
 from oci_cleanup.engine import EngineMixin
 from oci_cleanup.region import RegionMixin
 
@@ -37,9 +38,10 @@ class QuickstartCleanup(
     DiscoveryMixin,
     ExtrasMixin,
     RegionMixin,
+    NetworkMixin,
     CleanupBase,
 ):
-    """Discover unexpected resources in one OCI Quickstart installation."""
+    """Discover and remove Quickstart networking resources."""
 
 
 def _parse_bool(value: str) -> bool:
