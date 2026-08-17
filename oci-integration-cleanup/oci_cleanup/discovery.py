@@ -13,11 +13,13 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-from .constants import AUTO_COMPARTMENT_NAME, LOGGER
+from .constants import AUTO_COMPARTMENT_NAME, FUNCTION_APP_NAME, LOGGER
 from .errors import CleanupError
 from .models import CleanupContext
 from .resources import (
     data_items,
+    exact_owned,
+    is_deleted_or_deleting,
     is_owned,
     resource_compartment,
     resource_id,
@@ -28,6 +30,61 @@ from .resources import (
 
 class DiscoveryMixin:
     """Discover and validate the cleanup context."""
+
+    @staticmethod
+    def _is_managed_function(
+        context: CleanupContext, region: str, function_id: str
+    ) -> bool:
+        return any(
+            resource.get("_region") == region
+            and resource_compartment(resource) == context.compartment_id
+            and resource_id(resource) == function_id
+            and function_id.startswith("ocid1.fnfunc.")
+            for resource in context.managed_resources
+        )
+
+    def _owned_function_applications(
+        self, context: CleanupContext, region: str
+    ) -> list[tuple[dict[str, Any], list[dict[str, Any]]]]:
+        applications = self._list_region(
+            region,
+            [
+                "fn",
+                "application",
+                "list",
+                "--compartment-id",
+                context.compartment_id,
+            ],
+        )
+        discovered = []
+        for application in applications:
+            if not exact_owned(
+                application,
+                expected_names={FUNCTION_APP_NAME},
+                compartment_id=context.compartment_id,
+            ):
+                continue
+            functions = self._list_region(
+                region,
+                [
+                    "fn",
+                    "function",
+                    "list",
+                    "--application-id",
+                    resource_id(application),
+                ],
+            )
+            discovered.append(
+                (
+                    application,
+                    [
+                        function
+                        for function in functions
+                        if not is_deleted_or_deleting(function)
+                    ],
+                )
+            )
+        return discovered
 
     def _discover_region_tags(
         self, region: str
