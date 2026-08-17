@@ -15,6 +15,18 @@ from typing import Any, Iterable, Optional
 
 from .constants import OWNER_KEY, OWNER_VALUE, TAG_NAME, TAG_NAMESPACE_NAME
 
+
+def resource_field(
+    resource: dict[str, Any], name: str, default: Any = None
+) -> Any:
+    """Read an OCI field from either hyphenated or normalized CLI output."""
+    aliases = (name, name.replace("-", "_"), name.replace("_", "-"))
+    for alias in dict.fromkeys(aliases):
+        if alias in resource and resource[alias] is not None:
+            return resource[alias]
+    return default
+
+
 def utc_now() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
 

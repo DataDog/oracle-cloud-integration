@@ -15,6 +15,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 import integration_cleanup as cleanup
 import oci_cleanup
+from oci_cleanup.resources import resource_field
 
 
 TENANCY = "ocid1.tenancy.oc1..test"
@@ -186,6 +187,19 @@ class CleanupTestCase(unittest.TestCase):
             )
         )
 
+    def test_resource_field_supports_hyphenated_and_normalized_names(self):
+        self.assertEqual(
+            "hyphenated",
+            resource_field({"subnet-id": "hyphenated"}, "subnet-id"),
+        )
+        self.assertEqual(
+            "normalized",
+            resource_field({"subnet_id": "normalized"}, "subnet-id"),
+        )
+        self.assertFalse(
+            resource_field({"is_primary": False}, "is-primary", True)
+        )
+
     def test_execute_requires_confirmation_and_manifest(self):
         common = [
             "--tenancy-id",
@@ -259,6 +273,141 @@ class CleanupTestCase(unittest.TestCase):
         self.assertIn("Invalid value", str(raised.exception))
         self.assertEqual(process.stdout, raised.exception.stdout)
 
+    def test_extra_resource_dry_run_reports_without_prompting(self):
+        cleaner = self.make_cleaner()
+        cleaner.discover_extra_resources = lambda _context: [extra_candidate()]
+        cleaner._ask_yes_no = lambda _prompt: self.fail("dry-run prompted")
+
+        cleaner.prepare_extra_resource_cleanup(context())
+
+        self.assertEqual("confirmation-required", cleaner.planned[0]["status"])
+        self.assertEqual(set(), cleaner.approved_extra_ids)
+        self.assertEqual([], cleaner.failures)
+
+    def test_extra_resource_prompt_accepts_only_y_or_n(self):
+        cleaner = self.make_cleaner(execute=True)
+        cleaner.discover_extra_resources = lambda _context: [extra_candidate()]
+
+        with patch("oci_cleanup.domains.extras.sys.stdin", TtyInput("maybe\ny\n")):
+            with contextlib.redirect_stderr(io.StringIO()) as stderr:
+                cleaner.prepare_extra_resource_cleanup(context())
+
+        self.assertIn("Please answer y or n.", stderr.getvalue())
+        self.assertEqual(
+            {"extra:function:us-ashburn-1:extra"},
+            cleaner.approved_extra_ids,
+        )
+        self.assertEqual("approved", cleaner.planned[0]["status"])
+
+    def test_extra_resource_non_tty_fails_closed(self):
+        cleaner = self.make_cleaner(execute=True)
+        cleaner.discover_extra_resources = lambda _context: [extra_candidate()]
+
+        with patch("oci_cleanup.domains.extras.sys.stdin", io.StringIO("y\n")):
+            cleaner.prepare_extra_resource_cleanup(context())
+
+        self.assertEqual(set(), cleaner.approved_extra_ids)
+        self.assertEqual("declined", cleaner.planned[0]["status"])
+        self.assertTrue(any("not approved" in failure for failure in cleaner.failures))
+
+    def test_extra_resource_manifest_approval_prompts_on_every_execute_run(self):
+        first = self.make_cleaner(execute=True)
+        first.discover_extra_resources = lambda _context: [extra_candidate()]
+        with patch("oci_cleanup.domains.extras.sys.stdin", TtyInput("y\n")):
+            first.prepare_extra_resource_cleanup(context())
+
+        resumed = self.make_cleaner(execute=True)
+        resumed.discover_extra_resources = lambda _context: [extra_candidate()]
+        prompts = []
+        resumed._ask_yes_no = lambda prompt: prompts.append(prompt) or False
+        resumed.prepare_extra_resource_cleanup(context())
+
+        self.assertEqual(1, len(prompts))
+        self.assertEqual(set(), resumed.approved_extra_ids)
+        self.assertEqual("declined", resumed.planned[0]["status"])
+        self.assertFalse(
+            resumed.manifest.data["extra_resource_approvals"][
+                "extra:function:us-ashburn-1:extra"
+            ]["approved"]
+        )
+
+    def test_unsupported_extra_reports_manual_remediation_without_prompt(self):
+        cleaner = self.make_cleaner(execute=True)
+        candidate = extra_candidate(
+            candidate_id="extra:unsupported-vnic:us-ashburn-1:vnic",
+            kind="unsupported-vnic",
+            resource_id="vnic",
+            command=None,
+        )
+        cleaner.discover_extra_resources = lambda _context: [candidate]
+        cleaner._ask_yes_no = lambda _prompt: self.fail(
+            "unsupported resource prompted for unsafe deletion"
+        )
+
+        cleaner.prepare_extra_resource_cleanup(context())
+
+        self.assertEqual("unsupported", cleaner.planned[0]["status"])
+        self.assertTrue(
+            any("cannot be safely deleted" in failure for failure in cleaner.failures)
+        )
+
+    def test_primary_vnic_requires_second_compute_confirmation(self):
+        candidate = extra_candidate(
+            candidate_id="extra:compute-instance:us-ashburn-1:instance",
+            kind="compute-instance",
+            resource_id="instance",
+            command=("compute", "instance", "terminate"),
+            requires_compute_confirmation=True,
+        )
+        declined = self.make_cleaner(execute=True)
+        declined.discover_extra_resources = lambda _context: [candidate]
+        with patch("oci_cleanup.domains.extras.sys.stdin", TtyInput("y\nn\n")):
+            with contextlib.redirect_stderr(io.StringIO()):
+                declined.prepare_extra_resource_cleanup(context())
+        self.assertEqual("declined", declined.planned[0]["status"])
+
+        approved = self.make_cleaner(execute=True)
+        approved.discover_extra_resources = lambda _context: [candidate]
+        with patch("oci_cleanup.domains.extras.sys.stdin", TtyInput("y\ny\n")):
+            with contextlib.redirect_stderr(io.StringIO()):
+                approved.prepare_extra_resource_cleanup(context())
+        self.assertEqual("approved", approved.planned[0]["status"])
+
+    def test_approved_network_extras_delete_in_dependency_order(self):
+        cleaner = self.make_cleaner(execute=True)
+        candidates = [
+            extra_candidate(
+                candidate_id=f"extra:{kind}:{HOME_REGION}:{kind}",
+                kind=kind,
+                resource_id=kind,
+                command=("delete", kind),
+            )
+            for kind in [
+                "service-gateway",
+                "route-table",
+                "subnet",
+                "secondary-vnic",
+            ]
+        ]
+        cleaner.extra_candidates = candidates
+        cleaner.approved_extra_ids = {
+            candidate.candidate_id for candidate in candidates
+        }
+
+        cleaner._delete_approved_extras(
+            region=HOME_REGION,
+            kinds={candidate.kind for candidate in candidates},
+        )
+
+        self.assertEqual(
+            [
+                "delete secondary-vnic",
+                "delete subnet",
+                "delete route-table",
+                "delete service-gateway",
+            ],
+            [" ".join(command) for command in cleaner.oci.run_calls],
+        )
     def test_oci_success_with_malformed_json_raises_command_error(self):
         process = SimpleNamespace(
             returncode=0,
@@ -434,6 +583,209 @@ class CleanupTestCase(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual([True], invoked)
         self.assertEqual("completed", cleaner.planned[0]["status"])
+
+    def test_discovers_secondary_and_primary_compute_vnic_actions(self):
+        oci = FakeOci()
+        oci.add_run(
+            "query Vnic resources",
+            {
+                "data": {
+                    "items": [
+                        {"identifier": "primary-vnic"},
+                        {"identifier": "secondary-vnic"},
+                    ]
+                }
+            },
+        )
+        vnics = iter(
+            [
+                {
+                    "data": {
+                        "id": "primary-vnic",
+                        "display-name": "primary",
+                        "subnet-id": "subnet",
+                        "compartment-id": "instance-compartment",
+                        "is-primary": True,
+                    }
+                },
+                {
+                    "data": {
+                        "id": "secondary-vnic",
+                        "display-name": "secondary",
+                        "subnet-id": "subnet",
+                        "compartment-id": "instance-compartment",
+                        "is-primary": False,
+                    }
+                },
+            ]
+        )
+        oci.add_run("network vnic get", lambda: next(vnics))
+        attachments = iter(
+            [
+                [{"id": "primary-attachment", "instance-id": "instance-a"}],
+                [{"id": "secondary-attachment", "instance-id": "instance-b"}],
+            ]
+        )
+        oci.add_list("compute vnic-attachment list", lambda: next(attachments))
+        instances = iter(
+            [
+                {"data": {"id": "instance-a", "display-name": "primary-instance"}},
+                {"data": {"id": "instance-b", "display-name": "secondary-instance"}},
+            ]
+        )
+        oci.add_run("compute instance get", lambda: next(instances))
+        subnet = {
+            "id": "subnet",
+            "display-name": cleanup.SUBNET_NAME,
+            "compartment-id": COMPARTMENT,
+        }
+
+        candidates = self.make_cleaner(oci=oci)._discover_vnic_extras(
+            context(), HOME_REGION, subnet
+        )
+        by_kind = {candidate.kind: candidate for candidate in candidates}
+
+        self.assertIn("compute-instance", by_kind)
+        self.assertIn("secondary-vnic", by_kind)
+        self.assertTrue(by_kind["compute-instance"].requires_compute_confirmation)
+        self.assertIn(
+            "--preserve-boot-volume",
+            by_kind["compute-instance"].command or (),
+        )
+        compute_command = by_kind["compute-instance"].command or ()
+        wait_state_index = compute_command.index("--wait-for-state") + 1
+        self.assertEqual("SUCCEEDED", compute_command[wait_state_index])
+        self.assertIn("detach-vnic", by_kind["secondary-vnic"].command or ())
+
+    def test_unidentified_vnic_becomes_confirmable_detach_candidate(self):
+        oci = FakeOci()
+        oci.add_run(
+            "query Vnic resources",
+            {"data": {"items": [{"identifier": "unidentified-vnic"}]}},
+        )
+        oci.add_run(
+            "network vnic get",
+            {
+                "data": {
+                    "id": "unidentified-vnic",
+                    "display-name": "untagged-vnic",
+                    "subnet-id": "subnet",
+                    "compartment-id": "instance-compartment",
+                    "is-primary": False,
+                }
+            },
+        )
+        oci.add_list("compute vnic-attachment list", [])
+        subnet = {
+            "id": "subnet",
+            "display-name": cleanup.SUBNET_NAME,
+            "compartment-id": COMPARTMENT,
+        }
+
+        candidates = self.make_cleaner(oci=oci)._discover_vnic_extras(
+            context(), HOME_REGION, subnet
+        )
+
+        self.assertEqual(1, len(candidates))
+        candidate = candidates[0]
+        self.assertEqual("unverified-secondary-vnic", candidate.kind)
+        self.assertIn("detach-vnic", candidate.command or ())
+        self.assertIn("instance-compartment", candidate.command or ())
+
+    def test_discovers_primary_vnic_attachment_in_another_compartment(self):
+        oci = FakeOci()
+        oci.add_run(
+            "query Vnic resources",
+            {"data": {"items": [{"identifier": "cross-compartment-vnic"}]}},
+        )
+        oci.add_run(
+            "network vnic get",
+            {
+                "data": {
+                    "id": "cross-compartment-vnic",
+                    "display-name": "cross-compartment-instance",
+                    "subnet-id": "subnet",
+                    "compartment-id": COMPARTMENT,
+                    "is-primary": True,
+                }
+            },
+        )
+        oci.add_list(
+            "iam compartment list",
+            [
+                {
+                    "id": "instance-compartment",
+                    "lifecycle-state": "ACTIVE",
+                }
+            ],
+        )
+        attachment_responses = iter(
+            [
+                [],
+                [
+                    {
+                        "id": "attachment",
+                        "instance-id": "cross-compartment-instance",
+                        "lifecycle-state": "ATTACHED",
+                    }
+                ],
+            ]
+        )
+        oci.add_list(
+            "compute vnic-attachment list",
+            lambda: next(attachment_responses),
+        )
+        oci.add_run(
+            "compute instance get",
+            {
+                "data": {
+                    "id": "cross-compartment-instance",
+                    "display-name": "instance",
+                    "compartment-id": "instance-compartment",
+                }
+            },
+        )
+        subnet = {
+            "id": "subnet",
+            "display-name": cleanup.SUBNET_NAME,
+            "compartment-id": COMPARTMENT,
+        }
+
+        candidates = self.make_cleaner(oci=oci)._discover_vnic_extras(
+            context(), HOME_REGION, subnet
+        )
+
+        self.assertEqual(1, len(candidates))
+        candidate = candidates[0]
+        self.assertEqual("compute-instance", candidate.kind)
+        self.assertTrue(candidate.requires_compute_confirmation)
+        self.assertIn("terminate", candidate.command or ())
+
+    def test_compartment_inventory_failure_is_not_cached(self):
+        cleaner = self.make_cleaner()
+        transient_error = cleanup.CommandError(
+            ["oci", "iam", "compartment", "list"],
+            1,
+            "ServiceUnavailable",
+        )
+        with patch.object(
+            cleaner,
+            "_list_region",
+            side_effect=[
+                transient_error,
+                [{"id": "instance-compartment", "lifecycle-state": "ACTIVE"}],
+            ],
+        ) as list_region:
+            with self.assertLogs(cleanup.LOGGER, level="WARNING"):
+                first = cleaner._compute_compartment_ids(context())
+            second = cleaner._compute_compartment_ids(context())
+
+        self.assertEqual([COMPARTMENT, TENANCY], first)
+        self.assertEqual(
+            ["instance-compartment", COMPARTMENT, TENANCY],
+            second,
+        )
+        self.assertEqual(2, list_region.call_count)
 
     def test_run_cleans_regions_concurrently(self):
         cleaner = self.make_cleaner(
