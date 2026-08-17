@@ -3,8 +3,8 @@
 Safety boundary: enforces exact names, ownership, compartment, and OCI minimum delays.
 Cleanup sequence role: runs at the end of each regional cleanup sequence.
 
-``KmsMixin`` schedules secret, master-key, and vault deletion. Stable deletion timestamps 
-are stored in the manifest so retries reuse the original schedule and preserve the required 
+``KmsMixin`` schedules secret, master-key, and vault deletion. Stable deletion timestamps
+are stored in the manifest so retries reuse the original schedule and preserve the required
 child-before-parent order.
 """
 
@@ -182,5 +182,3 @@ class KmsMixin:
                 details={"deletion_time": kms_deletion_time},
             )
             self.kms_pending = True
-
-
