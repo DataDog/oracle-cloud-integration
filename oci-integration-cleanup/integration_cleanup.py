@@ -23,6 +23,7 @@ from oci_cleanup import *  # noqa: F401,F403
 from oci_cleanup import __all__ as package_api
 from oci_cleanup.base import CleanupBase
 from oci_cleanup.discovery import DiscoveryMixin
+from oci_cleanup.domains.extras import ExtrasMixin
 from oci_cleanup.engine import EngineMixin
 from oci_cleanup.region import RegionMixin
 
@@ -32,10 +33,11 @@ __all__ = [*package_api, "QuickstartCleanup", "parse_args", "main"]
 class QuickstartCleanup(
     EngineMixin,
     DiscoveryMixin,
+    ExtrasMixin,
     RegionMixin,
     CleanupBase,
 ):
-    """Discover one Datadog OCI Quickstart installation."""
+    """Discover unexpected resources in one OCI Quickstart installation."""
 
 
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:

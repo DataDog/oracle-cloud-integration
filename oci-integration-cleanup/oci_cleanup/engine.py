@@ -25,6 +25,8 @@ class EngineMixin:
             "disable or remove the integration separately to prevent recreation"
         )
         context = self.discover()
+        self.prepare_extra_resource_cleanup(context)
+
         worker_count = min(self.args.region_workers, len(context.regions))
         LOGGER.info(
             "Cleaning %d region(s) with %d worker(s)",
