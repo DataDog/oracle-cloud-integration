@@ -1,6 +1,6 @@
 """Responsibility: discover, confirm, and delete unexpected nested resources.
 
-Safety boundary: fails closed for non-interactive input and persists explicit approvals.
+Safety boundary: fails closed for non-interactive input and keeps approvals in-session.
 Cleanup sequence role: runs after discovery and before concurrent regional cleanup.
 
 ``ExtrasMixin`` finds unexpected functions, VNIC attachments, and network dependents within 
@@ -38,7 +38,6 @@ from ..resources import (
     resource_field,
     resource_id,
     resource_name,
-    utc_now,
 )
 
 
@@ -594,7 +593,6 @@ class ExtrasMixin:
 
     def prepare_extra_resource_cleanup(self, context: CleanupContext) -> None:
         self.extra_candidates = self.discover_extra_resources(context)
-        approvals = self.manifest.data.setdefault("extra_resource_approvals", {})
         for candidate in self.extra_candidates:
             review = {
                 "id": f"review:{candidate.candidate_id}",
@@ -606,6 +604,10 @@ class ExtrasMixin:
                 "resource_id": candidate.resource_id,
                 "resource_type": candidate.kind,
                 "region": candidate.region,
+                "error_code": None,
+                "deletion_message": (
+                    f"Delete extra {candidate.kind} {candidate.resource_id}"
+                ),
                 "container_id": candidate.container_id,
                 "container_name": candidate.container_name,
                 "impact": candidate.impact,
@@ -626,10 +628,15 @@ class ExtrasMixin:
                     candidate.container_id,
                     candidate.impact,
                 )
-                self.failures.append(
+                message = (
                     f"Extra {candidate.kind} {candidate.resource_id} in "
-                    f"{candidate.container_name} cannot be safely deleted "
-                    "automatically"
+                    f"{candidate.container_name} cannot be safely deleted automatically"
+                )
+                self._record_failure(
+                    message,
+                    resource_id=candidate.resource_id,
+                    region=candidate.region,
+                    deletion_message=message,
                 )
                 continue
             if not self.execute:
@@ -660,28 +667,18 @@ class ExtrasMixin:
                 )
             if approved:
                 self.approved_extra_ids.add(candidate.candidate_id)
-                approvals[candidate.candidate_id] = {
-                    "approved": True,
-                    "approved_at": utc_now(),
-                    "resource_id": candidate.resource_id,
-                    "region": candidate.region,
-                    "kind": candidate.kind,
-                }
                 review["status"] = "approved"
-                self.manifest.save()
             else:
                 review["status"] = "declined"
-                approvals[candidate.candidate_id] = {
-                    "approved": False,
-                    "reviewed_at": utc_now(),
-                    "resource_id": candidate.resource_id,
-                    "region": candidate.region,
-                    "kind": candidate.kind,
-                }
-                self.manifest.save()
-                self.failures.append(
+                message = (
                     f"Extra {candidate.kind} {candidate.resource_id} was not "
                     "approved for deletion"
+                )
+                self._record_failure(
+                    message,
+                    resource_id=candidate.resource_id,
+                    region=candidate.region,
+                    deletion_message=message,
                 )
 
     def _candidate_is_approved(self, candidate: ExtraResourceCandidate) -> bool:
@@ -739,7 +736,6 @@ class ExtrasMixin:
                     "region": region,
                     "container_id": candidate.container_id,
                 },
-                retry_completed=True,
             ):
                 succeeded = False
         return succeeded

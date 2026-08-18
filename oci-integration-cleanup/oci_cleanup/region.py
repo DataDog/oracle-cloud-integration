@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from .constants import LOGGER
-from .errors import raw_error_message
 from .models import CleanupContext
 
 
@@ -21,11 +20,11 @@ class RegionMixin:
             self.cleanup_region(context, region)
         except Exception as error:
             message = f"Regional cleanup failed in {region}: {error}"
-            self.failures.append(message)
-            self.manifest.record_error(
+            self._record_failure(
                 message,
-                raw_error=raw_error_message(error),
-                persist=self.execute,
+                region=region,
+                error=error,
             )
+            LOGGER.error("%s", message)
 
 

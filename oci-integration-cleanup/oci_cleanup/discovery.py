@@ -219,24 +219,6 @@ class DiscoveryMixin:
             tagged_resources=tagged,
             managed_resources=managed,
         )
-        self.manifest.data["context"] = {
-            "home_region": home_region,
-            "regions": regions,
-            "compartment_id": compartment_id,
-            "auto_created_compartment": bool(compartment),
-        }
-        self.manifest.data["resources"] = [
-            {
-                "id": resource_id(resource),
-                "name": resource_name(resource),
-                "type": resource_type(resource),
-                "compartment_id": resource_compartment(resource),
-                "region": resource.get("_region"),
-            }
-            for resource in [*tagged, *managed]
-        ]
-        if self.execute:
-            self.manifest.save()
         return context
 
 

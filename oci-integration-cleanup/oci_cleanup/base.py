@@ -1,11 +1,11 @@
-"""Responsibility: shared engine state, action recording, and owned-list helpers.
+"""Responsibility: shared in-memory action state and owned-list helpers.
 
-Safety boundary: centralizes dry-run and manifest gates before any mutation.
+Safety boundary: centralizes the dry-run gate before any mutation.
 Cleanup sequence role: underpins every discovery and deletion stage.
 
-``CleanupBase.action`` is the single mutation checkpoint: it skips completed
-manifest actions, records dry runs, executes approved commands, and persists outcomes.
-Its list helpers also apply ownership and compartment checks before bulk deletion.
+``CleanupBase.action`` is the single mutation checkpoint: it records dry runs and
+executes approved commands. Its list helpers also apply ownership and compartment
+checks before bulk deletion.
 """
 
 from __future__ import annotations
@@ -14,8 +14,6 @@ import argparse
 from typing import Any, Callable, Optional
 
 from .constants import LOGGER
-from .errors import raw_error_message
-from .manifest import Manifest
 from .models import ExtraResourceCandidate
 from .oci import OciCli
 from .resources import (
@@ -34,14 +32,12 @@ class CleanupBase:
         self,
         args: argparse.Namespace,
         oci: OciCli,
-        manifest: Manifest,
     ):
         self.args = args
         self.oci = oci
-        self.manifest = manifest
         self.execute = args.execute
         self.planned: list[dict[str, Any]] = []
-        self.failures: list[str] = []
+        self.failures: list[dict[str, Any]] = []
         self.kms_pending = False
         self.extra_candidates: list[ExtraResourceCandidate] = []
         self.approved_extra_ids: set[str] = set()
@@ -54,86 +50,69 @@ class CleanupBase:
         command: Optional[list[str]] = None,
         function: Optional[Callable[[], Any]] = None,
         details: Optional[dict[str, Any]] = None,
-        retry_completed: bool = False,
     ) -> bool:
-        if self.manifest.completed(action_id) and not retry_completed:
-            LOGGER.info("Skipping completed action: %s", description)
-            self.planned.append(
-                {
-                    "id": action_id,
-                    "description": description,
-                    "status": "already-completed",
-                }
-            )
-            return True
-        if self.manifest.completed(action_id):
-            LOGGER.warning(
-                "Retrying completed action because OCI still lists the resource: %s",
-                description,
-            )
-
         entry = {
             "id": action_id,
             "description": description,
             "status": "planned" if not self.execute else "running",
+            "resource_id": "",
+            "region": "",
+            "error_code": None,
+            "deletion_message": description,
             **(details or {}),
         }
         self.planned.append(entry)
         if not self.execute:
             LOGGER.info("Planned: %s", description)
-            self.manifest.record_action(action_id, description, "planned", **(details or {}))
             return True
 
         LOGGER.info("Executing: %s", description)
-        self.manifest.record_action(
-            action_id,
-            description,
-            "running",
-            persist=True,
-            **(details or {}),
-        )
         try:
             if function:
-                result = function()
+                function()
             elif command:
-                result = self.oci.run(
-                    command, attempts=3, allow_not_found=True
-                )
-            else:
-                result = None
-            self.manifest.record_action(
-                action_id,
-                description,
-                "completed",
-                result=result if isinstance(result, (dict, list, str, int)) else None,
-                persist=True,
-                **(details or {}),
-            )
+                self.oci.run(command, attempts=3, allow_not_found=True)
             entry["status"] = "completed"
             LOGGER.info("Completed: %s", description)
             return True
         except Exception as error:
-            message = f"{description}: {error}"
-            raw_error = raw_error_message(error)
-            self.failures.append(message)
-            self.manifest.record_action(
-                action_id,
-                description,
-                "failed",
-                error=str(error),
-                raw_error=raw_error,
-                **(details or {}),
-            )
-            self.manifest.record_error(
-                message,
-                action_id,
-                raw_error=raw_error,
-                persist=True,
+            failure = self._record_failure(
+                f"{description}: {error}",
+                resource_id=str((details or {}).get("resource_id") or ""),
+                region=str((details or {}).get("region") or ""),
+                error=error,
             )
             entry["status"] = "failed"
             entry["error"] = str(error)
+            entry["error_code"] = failure["error_code"]
+            entry["deletion_message"] = failure["deletion_message"]
             LOGGER.error("Failed: %s: %s", description, error)
             return False
+
+    def _record_failure(
+        self,
+        message: str,
+        *,
+        resource_id: str = "",
+        region: str = "",
+        error: Optional[Exception] = None,
+        deletion_message: str = "",
+    ) -> dict[str, Any]:
+        """Record a consistently shaped failure for summaries and callers."""
+
+        failure = {
+            "message": message,
+            "resource_id": resource_id,
+            "region": region or str(getattr(error, "region", "") or ""),
+            "error_code": str(getattr(error, "code", "") or "") or None,
+            "deletion_message": (
+                deletion_message
+                or str(getattr(error, "service_message", "") or "")
+                or (str(error) if error else message)
+            ),
+        }
+        self.failures.append(failure)
+        return failure
 
 
     def _list_region(
@@ -152,7 +131,6 @@ class CleanupBase:
         command_builder: Callable[[dict[str, Any]], list[str]],
         compartment_id: str,
         allow_marker: bool = False,
-        retry_completed: bool = False,
     ) -> None:
         for resource in resources:
             name = resource_name(resource)
@@ -172,7 +150,6 @@ class CleanupBase:
                 f"{description} {name} ({identifier}) in {region}",
                 command=command_builder(resource),
                 details={"resource_id": identifier, "region": region},
-                retry_completed=retry_completed,
             )
 
 

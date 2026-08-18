@@ -60,12 +60,8 @@ class EngineMixin:
             "compartment_id": context.compartment_id,
             "actions": self.planned,
             "failures": self.failures,
-            "manifest": str(self.manifest.path) if self.execute else None,
         }
         print(json.dumps(summary, indent=2, sort_keys=True))
-        if self.execute:
-            self.manifest.data["last_summary"] = summary
-            self.manifest.save()
         LOGGER.info(
             "Cleanup finished with %d failure(s) and %d action(s)",
             len(self.failures),

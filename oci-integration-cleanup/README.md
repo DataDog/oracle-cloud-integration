@@ -16,8 +16,8 @@ of the stack.
 ## Files
 
 - `integration_cleanup.py` is the executable entry point and stable public
-  import facade. It parses arguments, enforces tenancy confirmation, loads the
-  state file, and assembles the `QuickstartCleanup` engine from focused mixins.
+  import facade. It parses arguments, enforces tenancy confirmation, and
+  assembles the `QuickstartCleanup` engine from focused mixins.
 - `oci_cleanup/engine.py` controls the complete cleanup sequence.
 - `oci_cleanup/discovery.py` discovers subscribed regions, the home region,
   identity domains, the target compartment, ownership tags, and managed
@@ -26,8 +26,6 @@ of the stack.
   and isolates one region's errors from other regional workers.
 - `oci_cleanup/base.py` provides the common dry-run and mutation gate used by
   every deletion action.
-- `oci_cleanup/manifest.py` stores resumable action state, approvals, deletion
-  timestamps, results, and full error diagnostics.
 - `oci_cleanup/oci.py` invokes the OCI CLI and normalizes paginated responses.
 - `oci_cleanup/errors.py` converts OCI failures into concise service,
   operation, region, and customer-action messages.
@@ -51,7 +49,7 @@ of the stack.
 - `oci_cleanup/domains/compartment.py` validates residual resources and
   optionally deletes a proven Quickstart-created compartment.
 - `tests/test_integration_cleanup.py` covers the public facade, safety gates,
-  ownership checks, dependency order, resumability, and service-specific
+  ownership checks, dependency order, stateless retries, and service-specific
   cleanup.
 
 ## Cleanup flow
@@ -74,16 +72,12 @@ The runtime call chain is:
 
 `integration_cleanup.py` manages the arguments and is the main runner for the
 cleanup program. It assembles the focused cleanup mixins into
-`QuickstartCleanup`, constructs the OCI and manifest adapters, and calls
+`QuickstartCleanup`, constructs the OCI adapter, and calls
 `EngineMixin.run()`. Dry-run mode requires only the tenancy OCID. Execute mode
 additionally requires:
 
 - `--confirm-tenancy-id` to exactly match `--tenancy-id`.
-- `--state-file` a desired path to a state file to persist progress in the case of script failures.
 - A configured OCI CLI identity with permission to inspect and delete resources.
-
-`oci_cleanup/manifest.py` rejects an existing state file if it belongs to a
-different tenancy.
 
 ### 2. Discover and validate ownership
 
@@ -154,18 +148,20 @@ regional resources must be settled first. Optional compartment deletion remains
 the final destructive step.
 
 OCI secrets require a delayed deletion, and KMS keys and vaults require at
-least a seven-day delay. The state file preserves their scheduled timestamps,
-so later runs reuse the same schedule.
+least a seven-day delay. Reruns rediscover current OCI state and submit
+idempotent deletion requests for resources that are still present.
 
-### 6. Resume safely
+### 6. Retry safely
 
-Every mutation passes through `oci_cleanup/base.py`. Successful actions are
-recorded in `oci_cleanup/manifest.py` and skipped on later runs unless OCI still
-lists the resource. Failed and blocked actions remain retryable.
+Every mutation passes through `oci_cleanup/base.py`. The cleanup is stateless:
+each run rediscovers live resources and attempts every applicable deletion.
+Command deletions treat a structured OCI not-found response as success, so an
+interrupted cleanup can be rerun safely.
 
-Customer-facing output contains a concise service and operation summary. The
-state file retains the complete OCI command output and request ID under
-`raw_error` for troubleshooting.
+Extra-resource approvals are session-local and are requested again on every
+execute run while the blocker remains live. The final JSON summary reports
+actions and failures, including resource OCID, region, OCI error code when
+available, and the deletion message.
 
 ## Usage
 
@@ -184,14 +180,14 @@ python3 oci-integration-cleanup/integration_cleanup.py \
   --tenancy-id "$TENANCY_OCID" \
   --compartment-id "$COMPARTMENT_OCID" \
   --confirm-tenancy-id "$TENANCY_OCID" \
-  --state-file ./datadog-cleanup-state.json \
   --region-workers 1 \
   --execute
 ```
 
-Use the same command and state file to resume. Add `--parent-stack-id` when the
-parent Resource Manager stack should be destroyed. Add `--delete-compartment`
-only when the proven Quickstart-created compartment should also be removed.
+Rerun the same command to retry remaining live resources. Add
+`--parent-stack-id` when the parent Resource Manager stack should be destroyed.
+Add `--delete-compartment` only when the proven Quickstart-created compartment
+should also be removed.
 
 Run the tests with:
 

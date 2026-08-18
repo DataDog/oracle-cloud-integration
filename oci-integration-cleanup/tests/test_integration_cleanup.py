@@ -4,7 +4,6 @@ import io
 import json
 import pathlib
 import sys
-import tempfile
 import threading
 import unittest
 from types import SimpleNamespace
@@ -29,6 +28,7 @@ class FakeOci:
         self.run_responses = {}
         self.list_calls = []
         self.run_calls = []
+        self.run_kwargs = []
 
     @staticmethod
     def _key(args):
@@ -53,6 +53,7 @@ class FakeOci:
     def run(self, args, **kwargs):
         key = self._key(args)
         self.run_calls.append(args)
+        self.run_kwargs.append(kwargs)
         for contains, response in self.run_responses.items():
             if contains in key:
                 if isinstance(response, Exception):
@@ -108,10 +109,6 @@ def extra_candidate(
 
 
 class CleanupTestCase(unittest.TestCase):
-    def setUp(self):
-        self.tempdir = tempfile.TemporaryDirectory()
-        self.addCleanup(self.tempdir.cleanup)
-
     def test_facade_reexports_public_package_api(self):
         self.assertEqual(
             set(cleanup.__all__),
@@ -121,8 +118,6 @@ class CleanupTestCase(unittest.TestCase):
             self.assertIs(getattr(oci_cleanup, name), getattr(cleanup, name))
 
     def make_cleaner(self, *, execute=False, oci=None, args=None):
-        manifest_path = pathlib.Path(self.tempdir.name) / "manifest.json"
-        manifest = cleanup.Manifest.load(manifest_path, TENANCY)
         default_args = SimpleNamespace(
             execute=execute,
             tenancy_id=TENANCY,
@@ -138,7 +133,6 @@ class CleanupTestCase(unittest.TestCase):
         return cleanup.QuickstartCleanup(
             args=default_args,
             oci=oci or FakeOci(),
-            manifest=manifest,
         )
 
     def test_owned_tag_supports_normal_and_identity_domain_shapes(self):
@@ -200,7 +194,7 @@ class CleanupTestCase(unittest.TestCase):
             resource_field({"is_primary": False}, "is-primary", True)
         )
 
-    def test_execute_requires_confirmation_and_manifest(self):
+    def test_execute_requires_exact_confirmation(self):
         common = [
             "--tenancy-id",
             TENANCY,
@@ -210,17 +204,26 @@ class CleanupTestCase(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 cleanup.parse_args(common)
             with self.assertRaises(SystemExit):
-                cleanup.parse_args([*common, "--confirm-tenancy-id", TENANCY])
+                cleanup.parse_args([*common, "--confirm-tenancy-id", "wrong-tenancy"])
         args = cleanup.parse_args(
             [
                 *common,
                 "--confirm-tenancy-id",
                 TENANCY,
-                "--state-file",
-                str(pathlib.Path(self.tempdir.name) / "state.json"),
             ]
         )
         self.assertTrue(args.execute)
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                cleanup.parse_args(
+                    [
+                        *common,
+                        "--confirm-tenancy-id",
+                        TENANCY,
+                        "--state-file",
+                        "removed.json",
+                    ]
+                )
 
     def test_dry_run_requires_only_tenancy(self):
         args = cleanup.parse_args(["--tenancy-id", TENANCY])
@@ -308,9 +311,11 @@ class CleanupTestCase(unittest.TestCase):
 
         self.assertEqual(set(), cleaner.approved_extra_ids)
         self.assertEqual("declined", cleaner.planned[0]["status"])
-        self.assertTrue(any("not approved" in failure for failure in cleaner.failures))
+        self.assertTrue(
+            any("not approved" in failure["message"] for failure in cleaner.failures)
+        )
 
-    def test_extra_resource_manifest_approval_prompts_on_every_execute_run(self):
+    def test_extra_resource_approval_is_session_local(self):
         first = self.make_cleaner(execute=True)
         first.discover_extra_resources = lambda _context: [extra_candidate()]
         with patch("oci_cleanup.domains.extras.sys.stdin", TtyInput("y\n")):
@@ -325,11 +330,6 @@ class CleanupTestCase(unittest.TestCase):
         self.assertEqual(1, len(prompts))
         self.assertEqual(set(), resumed.approved_extra_ids)
         self.assertEqual("declined", resumed.planned[0]["status"])
-        self.assertFalse(
-            resumed.manifest.data["extra_resource_approvals"][
-                "extra:function:us-ashburn-1:extra"
-            ]["approved"]
-        )
 
     def test_unsupported_extra_reports_manual_remediation_without_prompt(self):
         cleaner = self.make_cleaner(execute=True)
@@ -348,7 +348,10 @@ class CleanupTestCase(unittest.TestCase):
 
         self.assertEqual("unsupported", cleaner.planned[0]["status"])
         self.assertTrue(
-            any("cannot be safely deleted" in failure for failure in cleaner.failures)
+            any(
+                "cannot be safely deleted" in failure["message"]
+                for failure in cleaner.failures
+            )
         )
 
     def test_primary_vnic_requires_second_compute_confirmation(self):
@@ -555,34 +558,71 @@ class CleanupTestCase(unittest.TestCase):
         with self.assertRaises(cleanup.CleanupError):
             cleaner.discover()
 
-    def test_completed_manifest_action_is_not_repeated(self):
+    def test_execute_action_always_attempts_function(self):
         cleaner = self.make_cleaner(execute=True)
-        cleaner.manifest.record_action("delete:test", "Delete test", "completed")
-        invoked = []
-        result = cleaner.action(
-            "delete:test",
-            "Delete test",
-            function=lambda: invoked.append(True),
-        )
-        self.assertTrue(result)
-        self.assertEqual([], invoked)
-        self.assertEqual("already-completed", cleaner.planned[0]["status"])
-
-    def test_completed_action_retries_when_live_resource_still_exists(self):
-        cleaner = self.make_cleaner(execute=True)
-        cleaner.manifest.record_action("delete:test", "Delete test", "completed")
         invoked = []
 
-        result = cleaner.action(
-            "delete:test",
-            "Delete test",
-            function=lambda: invoked.append(True),
-            retry_completed=True,
+        for _ in range(2):
+            result = cleaner.action(
+                "delete:test",
+                "Delete test",
+                function=lambda: invoked.append(True),
+            )
+            self.assertTrue(result)
+
+        self.assertEqual([True, True], invoked)
+        self.assertEqual(["completed", "completed"], [
+            action["status"] for action in cleaner.planned
+        ])
+
+    def test_execute_action_commands_allow_missing_resources(self):
+        cleaner = self.make_cleaner(execute=True)
+
+        self.assertTrue(
+            cleaner.action(
+                "delete:test",
+                "Delete test",
+                command=["fn", "function", "delete"],
+            )
         )
 
-        self.assertTrue(result)
-        self.assertEqual([True], invoked)
-        self.assertEqual("completed", cleaner.planned[0]["status"])
+        self.assertEqual(
+            {"attempts": 3, "allow_not_found": True},
+            cleaner.oci.run_kwargs[0],
+        )
+
+    def test_failed_deletion_records_structured_oci_details(self):
+        cleaner = self.make_cleaner(execute=True)
+        error = cleanup.CommandError(
+            ["oci", "--region", HOME_REGION, "fn", "function", "delete"],
+            1,
+            json.dumps(
+                {
+                    "code": "Conflict",
+                    "status": 409,
+                    "message": "Function still has a dependency",
+                }
+            ),
+        )
+        cleaner.oci.add_run("fn function delete", error)
+
+        result = cleaner.action(
+            "delete:function",
+            "Delete function",
+            command=["fn", "function", "delete"],
+            details={"resource_id": "ocid1.fnfunc.oc1..test", "region": HOME_REGION},
+        )
+
+        self.assertFalse(result)
+        expected = {
+            "resource_id": "ocid1.fnfunc.oc1..test",
+            "region": HOME_REGION,
+            "error_code": "Conflict",
+            "deletion_message": "Function still has a dependency",
+        }
+        for key, value in expected.items():
+            self.assertEqual(value, cleaner.failures[0][key])
+            self.assertEqual(value, cleaner.planned[0][key])
 
     def test_discovers_secondary_and_primary_compute_vnic_actions(self):
         oci = FakeOci()

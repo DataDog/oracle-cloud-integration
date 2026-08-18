@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Responsibility: provide the cleanup command line and compatibility API.
 
-Safety boundary: requires exact tenancy confirmation and a state file in execute
-mode; resource validation and mutation remain in ``oci_cleanup`` modules.
+Safety boundary: requires exact tenancy confirmation in execute mode; resource
+validation and mutation remain in ``oci_cleanup`` modules.
 Cleanup sequence role: parses arguments, constructs the cleanup engine, and
 preserves the direct executable script path.
 
@@ -15,7 +15,6 @@ import argparse
 import json
 import logging
 import os
-import pathlib
 import sys
 from typing import Optional
 
@@ -63,11 +62,6 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--state-file",
-        type=pathlib.Path,
-        help="Execution manifest path (required for --execute)",
-    )
-    parser.add_argument(
         "--execute",
         action="store_true",
         help="Perform deletion. Without this flag the script is read-only.",
@@ -94,12 +88,6 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
             parser.error(
                 "--confirm-tenancy-id must exactly match --tenancy-id in execute mode"
             )
-        if not args.state_file:
-            parser.error("--state-file is required in execute mode")
-    if not args.state_file:
-        args.state_file = pathlib.Path(
-            f"datadog-cleanup-{args.tenancy_id.rsplit('.', 1)[-1][:12]}.json"
-        )
     return args
 
 
@@ -110,11 +98,9 @@ def main(argv: Optional[list[str]] = None) -> int:
             level=logging.INFO,
             format="%(asctime)s %(levelname)s %(message)s",
         )
-        manifest = Manifest.load(args.state_file, args.tenancy_id)
         cleanup = QuickstartCleanup(
             args=args,
             oci=OciCli(args.oci_bin, args.profile),
-            manifest=manifest,
         )
         return cleanup.run()
     except (CleanupError, json.JSONDecodeError) as error:
