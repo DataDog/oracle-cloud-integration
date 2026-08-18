@@ -12,9 +12,12 @@ Imports from this module remain a compatibility surface for callers and tests.
 from __future__ import annotations
 
 import argparse
+import configparser
 import json
 import logging
 import os
+import pathlib
+import shutil
 import sys
 from typing import Optional
 
@@ -48,6 +51,42 @@ def _parse_bool(value: str) -> bool:
     raise argparse.ArgumentTypeError("expected true or false")
 
 
+def _profile_tenancy(profile: Optional[str]) -> str:
+    environment_tenancy = os.getenv("OCI_CLI_TENANCY", "").strip()
+    if environment_tenancy:
+        return environment_tenancy
+
+    config_path = pathlib.Path(
+        os.getenv("OCI_CLI_CONFIG_FILE", "~/.oci/config")
+    ).expanduser()
+    profile_name = profile or os.getenv("OCI_CLI_PROFILE") or "DEFAULT"
+    config = configparser.ConfigParser(interpolation=None)
+    try:
+        if not config.read(config_path):
+            raise ValueError(f"OCI config file not found: {config_path}")
+        section = config[profile_name]
+    except (configparser.Error, KeyError) as error:
+        raise ValueError(
+            f"OCI profile {profile_name!r} was not found in {config_path}"
+        ) from error
+    tenancy_id = section.get("tenancy", "").strip()
+    if not tenancy_id:
+        raise ValueError(
+            f"OCI profile {profile_name!r} has no tenancy in {config_path}"
+        )
+    return tenancy_id
+
+
+def _resolve_oci_binary(binary: str) -> str:
+    resolved = shutil.which(binary)
+    if resolved is None:
+        raise CleanupError(
+            f"OCI CLI executable {binary!r} was not found; install it or "
+            "provide --oci-bin/OCI_BIN"
+        )
+    return resolved
+
+
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -55,9 +94,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
             "when Terraform state is unavailable."
         )
     )
-    parser.add_argument("--tenancy-id", required=True)
-    parser.add_argument("--compartment-id")
-    parser.add_argument("--domain-endpoint")
+    parser.add_argument("--compartment-ocid", dest="compartment_id")
     parser.add_argument("--parent-stack-id")
     parser.add_argument("--profile")
     parser.add_argument("--oci-bin", default=os.getenv("OCI_BIN", "oci"))
@@ -79,7 +116,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--confirm-tenancy-id",
-        help="Must exactly match --tenancy-id when --dry-run=false.",
+        help="Must exactly match the OCI profile tenancy when --dry-run=false.",
     )
     parser.add_argument(
         "--delete-compartment",
@@ -94,11 +131,16 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     if args.region_workers < 1:
         parser.error("--region-workers must be at least 1")
 
+    try:
+        args.tenancy_id = _profile_tenancy(args.profile)
+    except ValueError as error:
+        parser.error(str(error))
+
     args.execute = not args.dry_run
     if not args.dry_run:
         if args.confirm_tenancy_id != args.tenancy_id:
             parser.error(
-                "--confirm-tenancy-id must exactly match --tenancy-id when "
+                "--confirm-tenancy-id must exactly match the OCI profile tenancy when "
                 "--dry-run=false"
             )
     return args
@@ -113,7 +155,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         )
         cleanup = QuickstartCleanup(
             args=args,
-            oci=OciCli(args.oci_bin, args.profile),
+            oci=OciCli(_resolve_oci_binary(args.oci_bin), args.profile),
         )
         return cleanup.run()
     except (CleanupError, json.JSONDecodeError) as error:

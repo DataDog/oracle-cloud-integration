@@ -2,8 +2,10 @@ import argparse
 import contextlib
 import io
 import json
+import os
 import pathlib
 import sys
+import tempfile
 import threading
 import unittest
 from types import SimpleNamespace
@@ -20,6 +22,24 @@ from oci_cleanup.resources import resource_field
 TENANCY = "ocid1.tenancy.oc1..test"
 COMPARTMENT = "ocid1.compartment.oc1..datadog"
 HOME_REGION = "us-ashburn-1"
+
+
+def parse_cleanup_args(argv, *, config: str = ""):
+    with tempfile.TemporaryDirectory() as directory:
+        config_path = pathlib.Path(directory) / "config"
+        config_path.write_text(
+            config or f"[DEFAULT]\ntenancy={TENANCY}\n",
+            encoding="utf-8",
+        )
+        with patch.dict(
+            os.environ,
+            {
+                "OCI_CLI_CONFIG_FILE": str(config_path),
+                "OCI_CLI_PROFILE": "",
+                "OCI_CLI_TENANCY": "",
+            },
+        ):
+            return cleanup.parse_args(argv)
 
 
 class FakeOci:
@@ -122,7 +142,6 @@ class CleanupTestCase(unittest.TestCase):
             execute=execute,
             tenancy_id=TENANCY,
             compartment_id=COMPARTMENT,
-            domain_endpoint=None,
             delete_compartment=False,
             parent_stack_id=None,
             region_workers=1,
@@ -195,18 +214,15 @@ class CleanupTestCase(unittest.TestCase):
         )
 
     def test_execute_requires_exact_confirmation(self):
-        common = [
-            "--tenancy-id",
-            TENANCY,
-            "--dry-run",
-            "false",
-        ]
+        common = ["--dry-run", "false"]
         with contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit):
-                cleanup.parse_args(common)
+                parse_cleanup_args(common)
             with self.assertRaises(SystemExit):
-                cleanup.parse_args([*common, "--confirm-tenancy-id", "wrong-tenancy"])
-        args = cleanup.parse_args(
+                parse_cleanup_args(
+                    [*common, "--confirm-tenancy-id", "wrong-tenancy"]
+                )
+        args = parse_cleanup_args(
             [
                 *common,
                 "--confirm-tenancy-id",
@@ -217,7 +233,7 @@ class CleanupTestCase(unittest.TestCase):
         self.assertFalse(args.dry_run)
         with contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit):
-                cleanup.parse_args(
+                parse_cleanup_args(
                     [
                         *common,
                         "--confirm-tenancy-id",
@@ -227,44 +243,57 @@ class CleanupTestCase(unittest.TestCase):
                     ]
                 )
 
-    def test_dry_run_requires_only_tenancy(self):
-        args = cleanup.parse_args(["--tenancy-id", TENANCY])
+    def test_dry_run_uses_default_profile_tenancy(self):
+        args = parse_cleanup_args([])
         self.assertFalse(args.execute)
         self.assertTrue(args.dry_run)
+        self.assertEqual(TENANCY, args.tenancy_id)
         self.assertEqual(1, args.region_workers)
 
     def test_dry_run_accepts_explicit_true_and_rejects_other_values(self):
-        args = cleanup.parse_args(
-            ["--tenancy-id", TENANCY, "--dry-run", "true"]
-        )
+        args = parse_cleanup_args(["--dry-run", "true"])
         self.assertTrue(args.dry_run)
         self.assertFalse(args.execute)
         with contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit):
-                cleanup.parse_args(
-                    ["--tenancy-id", TENANCY, "--dry-run", "yes"]
-                )
+                parse_cleanup_args(["--dry-run", "yes"])
+
+    def test_named_profile_supplies_tenancy(self):
+        args = parse_cleanup_args(
+            ["--profile", "CUSTOMER"],
+            config=f"[CUSTOMER]\ntenancy={TENANCY}\n",
+        )
+        self.assertEqual(TENANCY, args.tenancy_id)
+
+    def test_compartment_ocid_sets_internal_compartment_id(self):
+        args = parse_cleanup_args(["--compartment-ocid", COMPARTMENT])
+        self.assertEqual(COMPARTMENT, args.compartment_id)
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                parse_cleanup_args(["--compartment-id", COMPARTMENT])
+
+    def test_missing_profile_tenancy_is_rejected(self):
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                parse_cleanup_args([], config="[DEFAULT]\nregion=us-ashburn-1\n")
 
     def test_region_workers_must_be_positive(self):
         with contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit):
-                cleanup.parse_args(
-                    [
-                        "--tenancy-id",
-                        TENANCY,
-                        "--region-workers",
-                        "0",
-                    ]
+                parse_cleanup_args(
+                    ["--region-workers", "0"]
                 )
-        args = cleanup.parse_args(
-            [
-                "--tenancy-id",
-                TENANCY,
-                "--region-workers",
-                "4",
-            ]
-        )
+        args = parse_cleanup_args(["--region-workers", "4"])
         self.assertEqual(4, args.region_workers)
+
+    def test_oci_binary_is_resolved_and_missing_binary_is_reported(self):
+        with patch.object(cleanup.shutil, "which", return_value="/opt/bin/oci"):
+            self.assertEqual("/opt/bin/oci", cleanup._resolve_oci_binary("oci"))
+
+        with patch.object(cleanup.shutil, "which", return_value=None):
+            with self.assertRaises(cleanup.CleanupError) as raised:
+                cleanup._resolve_oci_binary("missing-oci")
+        self.assertIn("--oci-bin/OCI_BIN", str(raised.exception))
 
     def test_dry_run_action_never_invokes_mutation(self):
         cleaner = self.make_cleaner()

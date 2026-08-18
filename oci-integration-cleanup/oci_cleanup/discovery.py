@@ -162,12 +162,12 @@ class DiscoveryMixin:
             compartment_id = next(iter(compartment_candidates))
         elif not compartment_candidates:
             raise CleanupError(
-                "Could not resolve the Datadog compartment. Supply --compartment-id."
+                "Could not resolve the Datadog compartment. Supply --compartment-ocid."
             )
         else:
             raise CleanupError(
                 f"Multiple candidate compartments found: "
-                f"{sorted(compartment_candidates)}. Supply --compartment-id."
+                f"{sorted(compartment_candidates)}. Supply --compartment-ocid."
             )
         LOGGER.info("Resolved target compartment %s", compartment_id)
 
@@ -189,25 +189,16 @@ class DiscoveryMixin:
                 self.args.tenancy_id,
             ]
         )
-        if self.args.domain_endpoint:
-            domains = [
-                {
-                    "url": self.args.domain_endpoint,
-                    "display-name": "explicit",
-                    "lifecycle-state": "ACTIVE",
-                }
-            ]
-        else:
-            domains = [
-                domain
-                for domain in domains
-                if str(
-                    domain.get("lifecycle-state")
-                    or domain.get("lifecycle_state")
-                    or "ACTIVE"
-                ).upper()
-                == "ACTIVE"
-            ]
+        domains = [
+            domain
+            for domain in domains
+            if str(
+                domain.get("lifecycle-state")
+                or domain.get("lifecycle_state")
+                or "ACTIVE"
+            ).upper()
+            == "ACTIVE"
+        ]
 
         context = CleanupContext(
             tenancy_id=self.args.tenancy_id,
