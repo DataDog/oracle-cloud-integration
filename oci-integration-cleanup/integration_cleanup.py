@@ -39,6 +39,15 @@ class QuickstartCleanup(
     """Discover unexpected resources in one OCI Quickstart installation."""
 
 
+def _parse_bool(value: str) -> bool:
+    normalized = value.lower()
+    if normalized == "true":
+        return True
+    if normalized == "false":
+        return False
+    raise argparse.ArgumentTypeError("expected true or false")
+
+
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -62,13 +71,15 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--execute",
-        action="store_true",
-        help="Perform deletion. Without this flag the script is read-only.",
+        "--dry-run",
+        type=_parse_bool,
+        default=True,
+        metavar="{true,false}",
+        help="Report planned deletion when true; perform deletion when false (default: true).",
     )
     parser.add_argument(
         "--confirm-tenancy-id",
-        help="Must exactly match --tenancy-id in execute mode.",
+        help="Must exactly match --tenancy-id when --dry-run=false.",
     )
     parser.add_argument(
         "--delete-compartment",
@@ -83,10 +94,12 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     if args.region_workers < 1:
         parser.error("--region-workers must be at least 1")
 
-    if args.execute:
+    args.execute = not args.dry_run
+    if not args.dry_run:
         if args.confirm_tenancy_id != args.tenancy_id:
             parser.error(
-                "--confirm-tenancy-id must exactly match --tenancy-id in execute mode"
+                "--confirm-tenancy-id must exactly match --tenancy-id when "
+                "--dry-run=false"
             )
     return args
 

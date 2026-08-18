@@ -6,7 +6,7 @@ no longer describes all installed resources. Use the normal Resource Manager
 destroy flow when its Terraform state is still usable.
 
 The tool removes OCI resources only. Disable or remove the OCI integration in
-Datadog before running execute mode; otherwise the Datadog control plane can
+Datadog before running with `--dry-run false`; otherwise the Datadog control plane can
 recreate managed connectors, buckets, event rules, or streams.
 
 Development is split across a stacked PR series. This README describes the
@@ -73,8 +73,8 @@ The runtime call chain is:
 `integration_cleanup.py` manages the arguments and is the main runner for the
 cleanup program. It assembles the focused cleanup mixins into
 `QuickstartCleanup`, constructs the OCI adapter, and calls
-`EngineMixin.run()`. Dry-run mode requires only the tenancy OCID. Execute mode
-additionally requires:
+`EngineMixin.run()`. The default `--dry-run true` mode requires only the tenancy
+OCID. Setting `--dry-run false` additionally requires:
 
 - `--confirm-tenancy-id` to exactly match `--tenancy-id`.
 - A configured OCI CLI identity with permission to inspect and delete resources.
@@ -100,7 +100,7 @@ After installation discovery, the engine delegates to
 Datadog-owned function applications and networking containers for unexpected
 functions, VNICs, subnets, route tables, or gateways.
 
-Dry-run mode reports these resources without prompting. Execute mode asks for
+Dry-run mode reports these resources without prompting. `--dry-run false` asks for
 `y` or `n` before deleting each supported extra resource. Primary VNIC cleanup
 requires a second confirmation because it terminates the owning Compute
 instance while preserving its boot volume. Non-interactive input fails closed,
@@ -181,7 +181,7 @@ python3 oci-integration-cleanup/integration_cleanup.py \
   --compartment-id "$COMPARTMENT_OCID" \
   --confirm-tenancy-id "$TENANCY_OCID" \
   --region-workers 1 \
-  --execute
+  --dry-run false
 ```
 
 Rerun the same command to retry remaining live resources. Add

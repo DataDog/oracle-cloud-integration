@@ -198,7 +198,8 @@ class CleanupTestCase(unittest.TestCase):
         common = [
             "--tenancy-id",
             TENANCY,
-            "--execute",
+            "--dry-run",
+            "false",
         ]
         with contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit):
@@ -213,6 +214,7 @@ class CleanupTestCase(unittest.TestCase):
             ]
         )
         self.assertTrue(args.execute)
+        self.assertFalse(args.dry_run)
         with contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit):
                 cleanup.parse_args(
@@ -228,7 +230,20 @@ class CleanupTestCase(unittest.TestCase):
     def test_dry_run_requires_only_tenancy(self):
         args = cleanup.parse_args(["--tenancy-id", TENANCY])
         self.assertFalse(args.execute)
+        self.assertTrue(args.dry_run)
         self.assertEqual(1, args.region_workers)
+
+    def test_dry_run_accepts_explicit_true_and_rejects_other_values(self):
+        args = cleanup.parse_args(
+            ["--tenancy-id", TENANCY, "--dry-run", "true"]
+        )
+        self.assertTrue(args.dry_run)
+        self.assertFalse(args.execute)
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                cleanup.parse_args(
+                    ["--tenancy-id", TENANCY, "--dry-run", "yes"]
+                )
 
     def test_region_workers_must_be_positive(self):
         with contextlib.redirect_stderr(io.StringIO()):
