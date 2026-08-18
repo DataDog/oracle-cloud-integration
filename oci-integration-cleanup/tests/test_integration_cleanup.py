@@ -900,7 +900,7 @@ class CleanupTestCase(unittest.TestCase):
             cleanup.SUBNET_VNIC_RETRY_INTERVAL_SECONDS
         )
 
-    def test_blocked_subnet_updates_manifest_and_stops_network_dependents(self):
+    def test_blocked_subnet_records_stateless_failures_and_stops_dependents(self):
         oci = FakeOci()
         oci.add_list(
             "network vcn list",
@@ -929,11 +929,6 @@ class CleanupTestCase(unittest.TestCase):
             ],
         )
         cleaner = self.make_cleaner(execute=True, oci=oci)
-        cleaner.manifest.record_action(
-            f"subnet:{HOME_REGION}:blocked-subnet",
-            "Old completed subnet deletion",
-            "completed",
-        )
         cleaner.extra_candidates = [
             extra_candidate(
                 candidate_id=f"extra:unsupported-vnic:{HOME_REGION}:vnic",
@@ -946,10 +941,16 @@ class CleanupTestCase(unittest.TestCase):
 
         cleaner.cleanup_network(context(), HOME_REGION)
 
-        subnet_action = cleaner.manifest.data["actions"][
-            f"subnet:{HOME_REGION}:blocked-subnet"
-        ]
+        subnet_action = next(
+            action
+            for action in cleaner.planned
+            if action["id"] == f"subnet:{HOME_REGION}:blocked-subnet"
+        )
         self.assertEqual("blocked", subnet_action["status"])
+        self.assertEqual("blocked-subnet", subnet_action["resource_id"])
+        self.assertEqual(HOME_REGION, subnet_action["region"])
+        self.assertIsNone(subnet_action["error_code"])
+        self.assertIn("Preserve Quickstart subnet", subnet_action["deletion_message"])
         self.assertFalse(
             any(
                 "network route-table list" in " ".join(call)
@@ -962,6 +963,25 @@ class CleanupTestCase(unittest.TestCase):
                 and action["status"] == "blocked"
                 for action in cleaner.planned
             )
+        )
+        self.assertEqual(2, len(cleaner.failures))
+        subnet_failure, dependents_failure = cleaner.failures
+        self.assertEqual(
+            {
+                "message": subnet_action["description"],
+                "resource_id": "blocked-subnet",
+                "region": HOME_REGION,
+                "error_code": None,
+                "deletion_message": subnet_action["description"],
+            },
+            subnet_failure,
+        )
+        self.assertEqual("", dependents_failure["resource_id"])
+        self.assertEqual(HOME_REGION, dependents_failure["region"])
+        self.assertIsNone(dependents_failure["error_code"])
+        self.assertIn(
+            "Preserve route tables, gateways, and VCN",
+            dependents_failure["deletion_message"],
         )
 
     def test_network_deletes_route_tables_before_owned_gateways(self):
