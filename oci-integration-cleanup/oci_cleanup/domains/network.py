@@ -380,5 +380,3 @@ class NetworkMixin:
                     round(remaining),
                 )
                 time.sleep(delay)
-
-
