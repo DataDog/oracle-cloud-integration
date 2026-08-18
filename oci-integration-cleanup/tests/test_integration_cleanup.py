@@ -1,5 +1,6 @@
 import argparse
 import contextlib
+import datetime as dt
 import io
 import json
 import os
@@ -1385,6 +1386,7 @@ class CleanupTestCase(unittest.TestCase):
         self.assertEqual("DELETED", stream_delete[-1])
 
     def test_kms_actions_use_minimum_buffered_deletion_times(self):
+        before = dt.datetime.now(dt.timezone.utc)
         oci = FakeOci()
         oci.add_list(
             "vault secret list",
@@ -1395,6 +1397,7 @@ class CleanupTestCase(unittest.TestCase):
                         "secret-name": cleanup.SECRET_NAME,
                         "name": cleanup.SECRET_NAME,
                         "compartment-id": COMPARTMENT,
+                        "lifecycle-state": "ACTIVE",
                     }
                 )
             ],
@@ -1408,6 +1411,7 @@ class CleanupTestCase(unittest.TestCase):
                         "display-name": cleanup.VAULT_NAME,
                         "compartment-id": COMPARTMENT,
                         "management-endpoint": "https://kms.example",
+                        "lifecycle-state": "ACTIVE",
                     }
                 )
             ],
@@ -1420,6 +1424,7 @@ class CleanupTestCase(unittest.TestCase):
                         "id": "key",
                         "display-name": cleanup.KEY_NAME,
                         "compartment-id": COMPARTMENT,
+                        "lifecycle-state": "ENABLED",
                     }
                 )
             ],
@@ -1431,9 +1436,121 @@ class CleanupTestCase(unittest.TestCase):
             for action in cleaner.planned
             if action["id"].startswith(("secret:", "kms-key:", "kms-vault:"))
         }
+        secret_time = dt.datetime.fromisoformat(
+            times_by_kind["secret"].replace("Z", "+00:00")
+        )
+        kms_time = dt.datetime.fromisoformat(
+            times_by_kind["kms-key"].replace("Z", "+00:00")
+        )
+        self.assertGreaterEqual(
+            secret_time,
+            (before + cleanup.SECRET_DELETION_DELAY).replace(microsecond=0),
+        )
+        self.assertGreaterEqual(
+            kms_time,
+            (before + cleanup.KMS_DELETION_DELAY).replace(microsecond=0),
+        )
         self.assertNotEqual(times_by_kind["secret"], times_by_kind["kms-key"])
         self.assertEqual(times_by_kind["kms-key"], times_by_kind["kms-vault"])
+        action_ids = [action["id"] for action in cleaner.planned]
+        self.assertLess(
+            action_ids.index(f"kms-key:{HOME_REGION}:key"),
+            action_ids.index(f"kms-vault:{HOME_REGION}:vault"),
+        )
         self.assertTrue(cleaner.kms_pending)
+
+    def test_kms_pending_resources_are_skipped_on_stateless_rerun(self):
+        oci = FakeOci()
+        oci.add_list(
+            "vault secret list",
+            [
+                owned(
+                    {
+                        "id": "secret",
+                        "secret-name": cleanup.SECRET_NAME,
+                        "compartment-id": COMPARTMENT,
+                        "lifecycle-state": "PENDING_DELETION",
+                    }
+                )
+            ],
+        )
+        oci.add_list(
+            "kms management vault list",
+            [
+                owned(
+                    {
+                        "id": "vault",
+                        "display-name": cleanup.VAULT_NAME,
+                        "compartment-id": COMPARTMENT,
+                        "management-endpoint": "https://kms.example",
+                        "lifecycle-state": "ACTIVE",
+                    }
+                )
+            ],
+        )
+        oci.add_list(
+            "kms management key list",
+            [
+                owned(
+                    {
+                        "id": "key",
+                        "display-name": cleanup.KEY_NAME,
+                        "compartment-id": COMPARTMENT,
+                        "lifecycle-state": "PENDING_DELETION",
+                    }
+                )
+            ],
+        )
+        cleaner = self.make_cleaner(oci=oci)
+
+        with patch.object(
+            cleaner,
+            "_deletion_time",
+            side_effect=[
+                "2026-08-19T12:00:00Z",
+                "2026-08-25T12:00:00Z",
+                "2026-08-19T13:00:00Z",
+                "2026-08-25T13:00:00Z",
+            ],
+        ):
+            cleaner.cleanup_kms(context(), HOME_REGION)
+            cleaner.cleanup_kms(context(), HOME_REGION)
+
+        self.assertEqual(
+            [
+                f"kms-vault:{HOME_REGION}:vault",
+                f"kms-vault:{HOME_REGION}:vault",
+            ],
+            [action["id"] for action in cleaner.planned],
+        )
+        self.assertEqual(
+            ["2026-08-25T12:00:00Z", "2026-08-25T13:00:00Z"],
+            [action["deletion_time"] for action in cleaner.planned],
+        )
+        self.assertTrue(cleaner.kms_pending)
+
+    def test_kms_missing_vault_endpoint_records_structured_failure(self):
+        oci = FakeOci()
+        oci.add_list(
+            "kms management vault list",
+            [
+                owned(
+                    {
+                        "id": "vault",
+                        "display-name": cleanup.VAULT_NAME,
+                        "compartment-id": COMPARTMENT,
+                        "lifecycle-state": "ACTIVE",
+                    }
+                )
+            ],
+        )
+        cleaner = self.make_cleaner(oci=oci)
+
+        cleaner.cleanup_kms(context(), HOME_REGION)
+
+        self.assertEqual("vault", cleaner.failures[0]["resource_id"])
+        self.assertEqual(HOME_REGION, cleaner.failures[0]["region"])
+        self.assertIn("no management endpoint", cleaner.failures[0]["message"])
 
     def test_run_cleans_regions_concurrently(self):
         cleaner = self.make_cleaner(
