@@ -4,21 +4,23 @@ Safety boundary: preserves failed stacks for retry and only accepts constrained 
 Cleanup sequence role: handles regional stacks before orphan services and the parent near the end.
 
 ``StacksMixin`` validates region-prefixed child stacks and the selected parent stack,
-starts Resource Manager destroy jobs, and checks terminal job status. A stack is
-recorded complete only after a successful destroy, leaving failures resumable.
+reconciles Resource Manager destroy jobs, and deletes a stack record only after
+OCI reports a successful destroy.
 """
 
 from __future__ import annotations
 
+import datetime as dt
 from typing import Any
 
 from ..constants import LOGGER, REGIONAL_STACK_PREFIX
-from ..errors import CleanupError, raw_error_message
+from ..errors import CleanupError
 from ..models import CleanupContext
 from ..resources import (
     exact_owned,
     is_owned,
     lifecycle_state,
+    resource_field,
     resource_id,
     resource_name,
 )
@@ -26,6 +28,86 @@ from ..resources import (
 
 class StacksMixin:
     """Destroy validated regional and parent Resource Manager stacks."""
+
+    @staticmethod
+    def _job_time(job: dict[str, Any]) -> tuple[int, Any]:
+        value = str(resource_field(job, "time-created", "") or "")
+        if not value:
+            return (0, "")
+        try:
+            parsed = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=dt.timezone.utc)
+            return (2, parsed.timestamp())
+        except ValueError:
+            return (1, value)
+
+    @staticmethod
+    def _job_failure(job: dict[str, Any]) -> tuple[str | None, str]:
+        details = resource_field(job, "failure-details", {})
+        if not isinstance(details, dict):
+            return None, str(details or "")
+        code = str(
+            resource_field(job, "error-code", "")
+            or resource_field(details, "code", "")
+            or ""
+        )
+        message = str(
+            resource_field(details, "message", "")
+            or resource_field(job, "failure-message", "")
+            or ""
+        )
+        return code or None, message
+
+    def _wait_for_destroy_job(
+        self,
+        region: str,
+        job_id: str,
+    ) -> dict[str, Any]:
+        result = self.oci.run(
+            [
+                "--region",
+                region,
+                "resource-manager",
+                "job",
+                "get",
+                "--job-id",
+                job_id,
+                "--wait-for-state",
+                "SUCCEEDED",
+                "--wait-for-state",
+                "FAILED",
+                "--wait-for-state",
+                "CANCELED",
+            ],
+            attempts=2,
+        )
+        return result.get("data", result)
+
+    def _create_destroy_job(
+        self,
+        region: str,
+        stack_id: str,
+    ) -> dict[str, Any]:
+        result = self.oci.run(
+            [
+                "--region",
+                region,
+                "resource-manager",
+                "job",
+                "create-destroy-job",
+                "--stack-id",
+                stack_id,
+                "--execution-plan-strategy",
+                "AUTO_APPROVED",
+                "--wait-for-state",
+                "SUCCEEDED",
+                "--wait-for-state",
+                "FAILED",
+            ],
+            attempts=2,
+        )
+        return result.get("data", result)
 
     def _destroy_stack(
         self,
@@ -39,47 +121,69 @@ class StacksMixin:
         name = resource_name(stack)
         action_id = f"{action_prefix}:{region}:{stack_id}"
         description = f"Destroy and delete {stack_kind} stack {name} ({stack_id})"
-        if self.manifest.completed(action_id):
-            return True
-        self.planned.append(
-            {
-                "id": action_id,
-                "description": description,
-                "status": "planned" if not self.execute else "running",
-            }
-        )
+        action = {
+            "id": action_id,
+            "description": description,
+            "status": "planned" if not self.execute else "running",
+            "resource_id": stack_id,
+            "region": region,
+            "error_code": None,
+            "deletion_message": description,
+        }
+        self.planned.append(action)
         if not self.execute:
-            self.manifest.record_action(action_id, description, "planned")
             return True
 
-        self.manifest.record_action(action_id, description, "running")
-        self.manifest.save()
         try:
-            result = self.oci.run(
-                [
-                    "--region",
+            destroy_jobs = [
+                job
+                for job in self._list_region(
                     region,
-                    "resource-manager",
-                    "job",
-                    "create-destroy-job",
-                    "--stack-id",
-                    stack_id,
-                    "--execution-plan-strategy",
-                    "AUTO_APPROVED",
-                    "--wait-for-state",
-                    "SUCCEEDED",
-                    "--wait-for-state",
-                    "FAILED",
-                ],
-                attempts=2,
-            )
-            job = result.get("data", result)
-            state = lifecycle_state(job)
-            if state != "SUCCEEDED":
-                raise CleanupError(
-                    f"{stack_kind.capitalize()} destroy job for {stack_id} "
-                    f"ended in {state or 'UNKNOWN'}"
+                    [
+                        "resource-manager",
+                        "job",
+                        "list",
+                        "--stack-id",
+                        stack_id,
+                    ],
                 )
+                if str(resource_field(job, "operation", "")).upper() == "DESTROY"
+            ]
+            newest = max(destroy_jobs, key=self._job_time) if destroy_jobs else None
+            state = lifecycle_state(newest or {})
+            if newest and state in {"ACCEPTED", "IN_PROGRESS"}:
+                job_id = resource_id(newest)
+                if not job_id:
+                    raise CleanupError(
+                        f"Newest {stack_kind} destroy job for {stack_id} has no OCID"
+                    )
+                job = self._wait_for_destroy_job(region, job_id)
+                if lifecycle_state(job) in {"FAILED", "CANCELED", "CANCELLED"}:
+                    job = self._create_destroy_job(region, stack_id)
+            elif newest and state == "SUCCEEDED":
+                job = newest
+            elif newest is None or state in {"FAILED", "CANCELED", "CANCELLED"}:
+                job = self._create_destroy_job(region, stack_id)
+            else:
+                job = newest
+
+            final_state = lifecycle_state(job)
+            if final_state != "SUCCEEDED":
+                error_code, deletion_message = self._job_failure(job)
+                failure = self._record_failure(
+                    f"{stack_kind.capitalize()} destroy job for {stack_id} "
+                    f"ended in {final_state or 'UNKNOWN'}",
+                    resource_id=stack_id,
+                    region=region,
+                    error_code=error_code,
+                    deletion_message=deletion_message,
+                )
+                action["status"] = "failed"
+                action["error"] = failure["message"]
+                action["error_code"] = failure["error_code"]
+                action["deletion_message"] = failure["deletion_message"]
+                return False
+
             self.oci.run(
                 [
                     "--region",
@@ -96,33 +200,22 @@ class StacksMixin:
                 attempts=2,
                 allow_not_found=True,
             )
-            self.manifest.record_action(
-                action_id,
-                description,
-                "completed",
-                destroy_job_id=resource_id(job),
-            )
-            self.manifest.save()
+            action["status"] = "completed"
+            action["destroy_job_id"] = resource_id(job)
             return True
         except Exception as error:
             # Preserve the stack and its state. Direct orphan cleanup can still
             # proceed, but the failure remains visible and prevents IAM teardown.
-            message = f"{description}: {error}"
-            raw_error = raw_error_message(error)
-            self.failures.append(message)
-            self.manifest.record_action(
-                action_id,
-                description,
-                "failed",
-                error=str(error),
-                raw_error=raw_error,
+            failure = self._record_failure(
+                f"{description}: {error}",
+                resource_id=stack_id,
+                region=region,
+                error=error,
             )
-            self.manifest.record_error(
-                message,
-                action_id,
-                raw_error=raw_error,
-            )
-            self.manifest.save()
+            action["status"] = "failed"
+            action["error"] = str(error)
+            action["error_code"] = failure["error_code"]
+            action["deletion_message"] = failure["deletion_message"]
             return False
 
     def destroy_regional_stack(
@@ -173,8 +266,15 @@ class StacksMixin:
                 self.args.parent_stack_id,
             ],
             attempts=2,
+            allow_not_found=True,
         )
         stack = result.get("data", result)
+        if not resource_id(stack):
+            LOGGER.info(
+                "Parent Resource Manager stack %s is already absent",
+                self.args.parent_stack_id,
+            )
+            return
         if not is_owned(stack):
             LOGGER.warning(
                 "Preserving explicitly supplied parent stack %s because it "

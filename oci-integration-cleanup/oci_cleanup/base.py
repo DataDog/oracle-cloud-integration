@@ -96,6 +96,7 @@ class CleanupBase:
         resource_id: str = "",
         region: str = "",
         error: Optional[Exception] = None,
+        error_code: Optional[str] = None,
         deletion_message: str = "",
     ) -> dict[str, Any]:
         """Record a consistently shaped failure for summaries and callers."""
@@ -104,7 +105,9 @@ class CleanupBase:
             "message": message,
             "resource_id": resource_id,
             "region": region or str(getattr(error, "region", "") or ""),
-            "error_code": str(getattr(error, "code", "") or "") or None,
+            "error_code": (
+                str(error_code or getattr(error, "code", "") or "") or None
+            ),
             "deletion_message": (
                 deletion_message
                 or str(getattr(error, "service_message", "") or "")
