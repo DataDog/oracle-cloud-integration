@@ -183,10 +183,16 @@ class ServicesMixin:
                     ],
                 )
             elif not identifier.startswith(SUPPORTED_MANAGED_RESOURCE_PREFIXES):
-                self.failures.append(
+                message = (
                     "DatadogManaged.marker is attached to unsupported resource "
                     f"{identifier or resource_name(resource)} in {region}; "
                     "manual review required"
+                )
+                self._record_failure(
+                    message,
+                    resource_id=identifier,
+                    region=region,
+                    deletion_message=message,
                 )
 
     def cleanup_buckets(self, context: CleanupContext, region: str) -> None:
@@ -335,10 +341,14 @@ class ServicesMixin:
                 and identifier.startswith("ocid1.fnfunc.")
                 and identifier not in handled_function_ids
             ):
-                self.failures.append(
+                message = (
                     "Marker-proven Datadog function was not found under the "
                     f"owned {FUNCTION_APP_NAME} application: {identifier} in "
                     f"{region}; manual review required"
                 )
-
-
+                self._record_failure(
+                    message,
+                    resource_id=identifier,
+                    region=region,
+                    deletion_message=message,
+                )
