@@ -42,21 +42,22 @@ class NetworkMixin:
             "Preserve route tables, gateways, and VCN because "
             f"{reason}"
         )
+        failure = self._record_failure(
+            description,
+            region=region,
+            deletion_message=description,
+        )
         self.planned.append(
             {
                 "id": f"network-dependents:{region}",
                 "description": description,
                 "status": "blocked",
+                "resource_id": "",
+                "region": region,
+                "error_code": failure["error_code"],
+                "deletion_message": failure["deletion_message"],
             }
         )
-        self.manifest.record_action(
-            f"network-dependents:{region}",
-            description,
-            "blocked",
-            region=region,
-        )
-        if self.execute:
-            self.manifest.save()
 
     def cleanup_network(self, context: CleanupContext, region: str) -> None:
         network_extra_kinds = {
@@ -172,22 +173,23 @@ class NetworkMixin:
                     "attached resource was not approved or requires manual "
                     "remediation"
                 )
+                failure = self._record_failure(
+                    description,
+                    resource_id=subnet_id,
+                    region=region,
+                    deletion_message=description,
+                )
                 self.planned.append(
                     {
                         "id": action_id,
                         "description": description,
                         "status": "blocked",
+                        "resource_id": subnet_id,
+                        "region": region,
+                        "error_code": failure["error_code"],
+                        "deletion_message": failure["deletion_message"],
                     }
                 )
-                self.manifest.record_action(
-                    action_id,
-                    description,
-                    "blocked",
-                    resource_id=subnet_id,
-                    region=region,
-                )
-                if self.execute:
-                    self.manifest.save()
                 network_dependencies_blocked = True
                 continue
             deleted = self.action(
@@ -197,7 +199,6 @@ class NetworkMixin:
                     region, subnet_id
                 ),
                 details={"resource_id": subnet_id, "region": region},
-                retry_completed=True,
             )
             if not deleted:
                 network_dependencies_blocked = True
@@ -257,7 +258,6 @@ class NetworkMixin:
                             json.dumps(retained_rules, separators=(",", ":")),
                             "--force",
                         ],
-                        retry_completed=True,
                     )
                 continue
             if not is_owned(route_table):
@@ -275,7 +275,6 @@ class NetworkMixin:
                     identifier,
                     "--force",
                 ],
-                retry_completed=True,
             )
 
         self._delete_owned_list(
@@ -297,7 +296,6 @@ class NetworkMixin:
                 "TERMINATED",
             ],
             compartment_id=context.compartment_id,
-            retry_completed=True,
         )
 
         self._delete_owned_list(
@@ -319,7 +317,6 @@ class NetworkMixin:
                 "TERMINATED",
             ],
             compartment_id=context.compartment_id,
-            retry_completed=True,
         )
 
         self._delete_owned_list(
@@ -341,7 +338,6 @@ class NetworkMixin:
                 "TERMINATED",
             ],
             compartment_id=context.compartment_id,
-            retry_completed=True,
         )
 
     def _delete_subnet_after_vnic_detach(
