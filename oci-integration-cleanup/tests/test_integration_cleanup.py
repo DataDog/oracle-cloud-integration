@@ -1693,7 +1693,7 @@ class CleanupTestCase(unittest.TestCase):
         ]
         self.assertEqual(1, len(creates))
 
-    def test_regional_stack_cleanup_requires_exact_ownership(self):
+    def test_regional_stack_cleanup_plans_confirmation_for_untagged_match(self):
         oci = FakeOci()
         oci.add_list(
             "resource-manager stack list",
@@ -1727,13 +1727,70 @@ class CleanupTestCase(unittest.TestCase):
             ],
         )
         cleaner = self.make_cleaner(oci=oci)
+        cleaner._ask_yes_no = lambda _prompt: self.fail("dry-run prompted")
 
         cleaner.cleanup_regional_stacks(context(), HOME_REGION)
 
         self.assertEqual(
-            [f"regional-stack:{HOME_REGION}:owned-stack"],
+            [
+                f"regional-stack:{HOME_REGION}:owned-stack",
+                f"regional-stack:{HOME_REGION}:untagged-stack",
+            ],
             [action["id"] for action in cleaner.planned],
         )
+        self.assertNotIn("requires_confirmation", cleaner.planned[0])
+        self.assertTrue(cleaner.planned[1]["requires_confirmation"])
+
+    def test_regional_stack_cleanup_prompts_for_untagged_match(self):
+        oci = FakeOci()
+        oci.add_list(
+            "resource-manager stack list",
+            [
+                {
+                    "id": "untagged-stack",
+                    "display-name": "datadog-regional-stack-test",
+                    "compartment-id": COMPARTMENT,
+                }
+            ],
+        )
+        cleaner = self.make_cleaner(execute=True, oci=oci)
+        prompts = []
+        destroyed = []
+        cleaner._ask_yes_no = lambda prompt: prompts.append(prompt) or True
+        cleaner.destroy_regional_stack = (
+            lambda region, stack: destroyed.append((region, stack["id"]))
+        )
+
+        cleaner.cleanup_regional_stacks(context(), HOME_REGION)
+
+        self.assertEqual(
+            [(HOME_REGION, "untagged-stack")],
+            destroyed,
+        )
+        self.assertIn("datadog-regional-stack-test", prompts[0])
+
+    def test_declined_untagged_regional_stack_blocks_final_teardown(self):
+        oci = FakeOci()
+        oci.add_list(
+            "resource-manager stack list",
+            [
+                {
+                    "id": "untagged-stack",
+                    "display-name": "datadog-regional-stack-test",
+                    "compartment-id": COMPARTMENT,
+                }
+            ],
+        )
+        cleaner = self.make_cleaner(execute=True, oci=oci)
+        cleaner._ask_yes_no = lambda _prompt: False
+        cleaner.destroy_regional_stack = lambda _region, _stack: self.fail(
+            "declined stack was destroyed"
+        )
+
+        cleaner.cleanup_regional_stacks(context(), HOME_REGION)
+
+        self.assertEqual("untagged-stack", cleaner.failures[0]["resource_id"])
+        self.assertIn("not approved", cleaner.failures[0]["message"])
 
     def test_parent_stack_cleanup_requires_ownership_and_distinct_action_id(self):
         oci = FakeOci()
@@ -1818,7 +1875,7 @@ class CleanupTestCase(unittest.TestCase):
             any("create-destroy-job" in call for call in oci.run_calls)
         )
 
-    def test_parent_stack_cleanup_preserves_unowned_stack(self):
+    def test_parent_stack_cleanup_plans_confirmation_for_untagged_stack(self):
         oci = FakeOci()
         oci.add_run(
             "resource-manager stack get",
@@ -1833,10 +1890,48 @@ class CleanupTestCase(unittest.TestCase):
             oci=oci,
             args=argparse.Namespace(parent_stack_id="customer-stack"),
         )
+        cleaner._ask_yes_no = lambda _prompt: self.fail("dry-run prompted")
 
         cleaner.cleanup_parent_stack(context())
 
-        self.assertEqual([], cleaner.planned)
+        self.assertEqual(
+            [f"parent-stack:{HOME_REGION}:customer-stack"],
+            [action["id"] for action in cleaner.planned],
+        )
+        self.assertTrue(cleaner.planned[0]["requires_confirmation"])
+
+    def test_parent_stack_cleanup_prompts_for_untagged_stack(self):
+        oci = FakeOci()
+        oci.add_run(
+            "resource-manager stack get",
+            {
+                "data": {
+                    "id": "parent-stack",
+                    "display-name": "Datadog Forwarding Infrastructure",
+                }
+            },
+        )
+        cleaner = self.make_cleaner(
+            execute=True,
+            oci=oci,
+            args=argparse.Namespace(parent_stack_id="parent-stack"),
+        )
+        prompts = []
+        destroyed = []
+        cleaner._ask_yes_no = lambda prompt: prompts.append(prompt) or True
+        cleaner._destroy_stack = (
+            lambda region, stack, **kwargs: destroyed.append(
+                (region, stack["id"], kwargs["stack_kind"])
+            )
+        )
+
+        cleaner.cleanup_parent_stack(context())
+
+        self.assertEqual(
+            [(HOME_REGION, "parent-stack", "parent")],
+            destroyed,
+        )
+        self.assertIn("Datadog Forwarding Infrastructure", prompts[0])
 
     def test_compartment_deletion_refuses_residual_or_child_resources(self):
         oci = FakeOci()

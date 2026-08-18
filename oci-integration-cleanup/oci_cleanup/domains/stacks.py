@@ -20,6 +20,7 @@ from ..resources import (
     exact_owned,
     is_owned,
     lifecycle_state,
+    resource_compartment,
     resource_field,
     resource_id,
     resource_name,
@@ -116,6 +117,7 @@ class StacksMixin:
         *,
         action_prefix: str,
         stack_kind: str,
+        requires_confirmation: bool = False,
     ) -> bool:
         stack_id = resource_id(stack)
         name = resource_name(stack)
@@ -130,6 +132,9 @@ class StacksMixin:
             "error_code": None,
             "deletion_message": description,
         }
+        if requires_confirmation:
+            action["requires_confirmation"] = True
+            action["confirmation_reason"] = "missing ownedby=datadog tag"
         self.planned.append(action)
         if not self.execute:
             return True
@@ -243,13 +248,41 @@ class StacksMixin:
         )
         for stack in stacks:
             name = resource_name(stack)
-            if name.startswith(REGIONAL_STACK_PREFIX) and exact_owned(
+            if not name.startswith(REGIONAL_STACK_PREFIX):
+                continue
+            if resource_compartment(stack) != context.compartment_id:
+                continue
+            if exact_owned(
                 stack,
                 expected_names={name},
                 compartment_id=context.compartment_id,
             ):
                 self.destroy_regional_stack(region, stack)
-
+                continue
+            if not self.execute:
+                self._destroy_stack(
+                    region,
+                    stack,
+                    action_prefix="regional-stack",
+                    stack_kind="regional",
+                    requires_confirmation=True,
+                )
+                continue
+            LOGGER.warning(
+                "Regional stack %s (%s) in %s has the expected Datadog name "
+                "but no ownedby=datadog tag",
+                name,
+                resource_id(stack),
+                region,
+            )
+            if self._ask_yes_no(f"Delete this untagged regional stack {name}?"):
+                self.destroy_regional_stack(region, stack)
+            else:
+                self._record_failure(
+                    "Untagged regional stack deletion was not approved",
+                    resource_id=resource_id(stack),
+                    region=region,
+                )
 
     def cleanup_parent_stack(self, context: CleanupContext) -> None:
         if not self.args.parent_stack_id:
@@ -276,12 +309,29 @@ class StacksMixin:
             )
             return
         if not is_owned(stack):
+            name = resource_name(stack) or self.args.parent_stack_id
+            if not self.execute:
+                self._destroy_stack(
+                    context.home_region,
+                    stack,
+                    action_prefix="parent-stack",
+                    stack_kind="parent",
+                    requires_confirmation=True,
+                )
+                return
             LOGGER.warning(
-                "Preserving explicitly supplied parent stack %s because it "
-                "does not have the ownedby=datadog tag",
+                "Explicitly supplied parent stack %s (%s) has no "
+                "ownedby=datadog tag",
+                name,
                 self.args.parent_stack_id,
             )
-            return
+            if not self._ask_yes_no(f"Delete this untagged parent stack {name}?"):
+                self._record_failure(
+                    "Untagged parent stack deletion was not approved",
+                    resource_id=resource_id(stack),
+                    region=context.home_region,
+                )
+                return
         self._destroy_stack(
             context.home_region,
             stack,
