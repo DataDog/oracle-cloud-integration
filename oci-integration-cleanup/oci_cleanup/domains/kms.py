@@ -3,9 +3,9 @@
 Safety boundary: enforces exact names, ownership, compartment, and OCI minimum delays.
 Cleanup sequence role: runs at the end of each regional cleanup sequence.
 
-``KmsMixin`` schedules secret, master-key, and vault deletion. Stable deletion timestamps
-are stored in the manifest so retries reuse the original schedule and preserve the required
-child-before-parent order.
+``KmsMixin`` schedules active secrets, master keys, and vaults with timestamps computed
+for the current run. Resources already pending deletion are left to OCI, while active
+children are always scheduled before their parent vault.
 """
 
 from __future__ import annotations
@@ -29,27 +29,21 @@ from ..resources import (
 
 
 class KmsMixin:
-    """Schedule deletion of Quickstart secrets, keys, and vaults."""
+    """Schedule active Quickstart secrets, keys, and vaults for deletion."""
 
-    def _deletion_time(self, manifest_key: str, delay: dt.timedelta) -> str:
-        with self.manifest.lock:
-            existing = self.manifest.data["context"].get(manifest_key)
-            if existing:
-                return str(existing)
-            value = (
-                dt.datetime.now(dt.timezone.utc)
-                + delay
-            ).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-            self.manifest.data["context"][manifest_key] = value
-            return value
+    @staticmethod
+    def _deletion_time(delay: dt.timedelta) -> str:
+        """Return a fresh OCI deletion timestamp valid for this cleanup run."""
+
+        return (
+            dt.datetime.now(dt.timezone.utc) + delay
+        ).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
     def cleanup_kms(self, context: CleanupContext, region: str) -> None:
-        secret_deletion_time = self._deletion_time(
-            "secret_deletion_time", SECRET_DELETION_DELAY
-        )
-        kms_deletion_time = self._deletion_time(
-            "kms_deletion_time", KMS_DELETION_DELAY
-        )
+        """Schedule active owned KMS resources using run-local timestamps."""
+
+        secret_deletion_time = self._deletion_time(SECRET_DELETION_DELAY)
+        kms_deletion_time = self._deletion_time(KMS_DELETION_DELAY)
         secrets = self._list_region(
             region,
             [
@@ -70,6 +64,8 @@ class KmsMixin:
             if lifecycle_state(secret) == "PENDING_DELETION":
                 self.kms_pending = True
                 continue
+            if lifecycle_state(secret) != "ACTIVE":
+                continue
             identifier = resource_id(secret)
             self.action(
                 f"secret:{region}:{identifier}",
@@ -85,7 +81,11 @@ class KmsMixin:
                     "--time-of-deletion",
                     secret_deletion_time,
                 ],
-                details={"deletion_time": secret_deletion_time},
+                details={
+                    "deletion_time": secret_deletion_time,
+                    "resource_id": identifier,
+                    "region": region,
+                },
             )
             self.kms_pending = True
 
@@ -110,11 +110,15 @@ class KmsMixin:
             if lifecycle_state(vault) == "PENDING_DELETION":
                 self.kms_pending = True
                 continue
+            if lifecycle_state(vault) != "ACTIVE":
+                continue
             vault_id = resource_id(vault)
             endpoint = resource_management_endpoint(vault)
             if not endpoint:
-                self.failures.append(
-                    f"Owned vault {vault_id} has no management endpoint"
+                self._record_failure(
+                    f"Owned vault {vault_id} in {region} has no management endpoint",
+                    resource_id=vault_id,
+                    region=region,
                 )
                 continue
             keys = self.oci.list(
@@ -141,6 +145,8 @@ class KmsMixin:
                 if lifecycle_state(key) == "PENDING_DELETION":
                     self.kms_pending = True
                     continue
+                if lifecycle_state(key) not in {"ACTIVE", "ENABLED"}:
+                    continue
                 key_id = resource_id(key)
                 self.action(
                     f"kms-key:{region}:{key_id}",
@@ -159,7 +165,11 @@ class KmsMixin:
                         "--time-of-deletion",
                         kms_deletion_time,
                     ],
-                    details={"deletion_time": kms_deletion_time},
+                    details={
+                        "deletion_time": kms_deletion_time,
+                        "resource_id": key_id,
+                        "region": region,
+                    },
                 )
                 self.kms_pending = True
             self.action(
@@ -179,6 +189,10 @@ class KmsMixin:
                     "--time-of-deletion",
                     kms_deletion_time,
                 ],
-                details={"deletion_time": kms_deletion_time},
+                details={
+                    "deletion_time": kms_deletion_time,
+                    "resource_id": vault_id,
+                    "region": region,
+                },
             )
             self.kms_pending = True
