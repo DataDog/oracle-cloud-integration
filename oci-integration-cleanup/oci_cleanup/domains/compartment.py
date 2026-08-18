@@ -243,9 +243,11 @@ class CompartmentMixin:
             return
         LOGGER.info("Stage 5/5: validating optional compartment deletion")
         if not context.compartment:
-            self.failures.append(
+            self._record_failure(
                 "Compartment deletion requested, but the target compartment was "
-                "not proven to be Quickstart-created and tagged"
+                "not proven to be Quickstart-created and tagged",
+                resource_id=context.compartment_id,
+                region=context.home_region,
             )
             return
         if (
@@ -254,9 +256,11 @@ class CompartmentMixin:
             not in {"", AUTO_COMPARTMENT_DESCRIPTION}
             or not is_owned(context.compartment)
         ):
-            self.failures.append(
+            self._record_failure(
                 "Compartment deletion requested, but ownership/name/description "
-                "validation failed"
+                "validation failed",
+                resource_id=context.compartment_id,
+                region=context.home_region,
             )
             return
         if not self.execute:
@@ -286,34 +290,13 @@ class CompartmentMixin:
             return
         residuals, children = self.compartment_residuals(context)
         if residuals or children or self.kms_pending:
-            self.failures.append(
+            self._record_failure(
                 "Compartment preserved: "
                 f"{len(residuals)} residual resources, {len(children)} child "
-                f"compartments, kms_pending={self.kms_pending}"
+                f"compartments, kms_pending={self.kms_pending}",
+                resource_id=context.compartment_id,
+                region=context.home_region,
             )
-            self.manifest.data["compartment_blockers"] = {
-                "resources": [
-                    {
-                        "id": resource_id(resource),
-                        "name": resource_name(resource),
-                        "type": resource.get("resource-type")
-                        or resource.get("resource_type"),
-                        "region": resource.get("_region"),
-                        "owned": is_owned(resource),
-                    }
-                    for resource in residuals
-                ],
-                "child_compartments": [
-                    {
-                        "id": resource_id(child),
-                        "name": resource_name(child),
-                    }
-                    for child in children
-                ],
-                "kms_pending": self.kms_pending,
-            }
-            if self.execute:
-                self.manifest.save()
             return
         self.action(
             f"compartment:{context.compartment_id}",

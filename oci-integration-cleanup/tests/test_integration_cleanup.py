@@ -730,7 +730,10 @@ class CleanupTestCase(unittest.TestCase):
         self.assertEqual(1, len(validated))
         self.assertEqual(cleanup.CONNECTOR_GROUP_NAME, cleanup.resource_name(validated[0][1]))
         self.assertTrue(
-            any("manual review required" in failure for failure in cleaner.failures)
+            any(
+                "manual review required" in failure["message"]
+                for failure in cleaner.failures
+            )
         )
 
     def test_functions_cleanup_preserves_customer_application(self):
@@ -1470,33 +1473,175 @@ class CleanupTestCase(unittest.TestCase):
         self.assertEqual(1, len(api_key_calls))
         self.assertIn('user.value eq "scim-user"', api_key_calls[0])
 
-    def test_failed_regional_destroy_preserves_stack_and_records_failure(self):
+    def test_failed_regional_destroy_records_structured_failure(self):
         oci = FakeOci()
+        oci.add_list("resource-manager job list", [])
         oci.add_run(
             "create-destroy-job",
-            {"data": {"id": "job", "lifecycle-state": "FAILED"}},
+            {
+                "data": {
+                    "id": "job",
+                    "lifecycle-state": "FAILED",
+                    "failure-details": {
+                        "code": "TerraformError",
+                        "message": "provider failed",
+                    },
+                }
+            },
         )
         cleaner = self.make_cleaner(execute=True, oci=oci)
         result = cleaner.destroy_regional_stack(
             HOME_REGION,
-            {"id": "stack", "display-name": "datadog-regional-stack-test"},
+            {
+                "id": "ocid1.ormstack.oc1..stack",
+                "display-name": "datadog-regional-stack-test",
+            },
         )
         self.assertFalse(result)
         self.assertFalse(
             any("stack delete" in " ".join(call) for call in oci.run_calls)
         )
+        self.assertEqual("failed", cleaner.planned[0]["status"])
         self.assertEqual(
-            "failed",
-            cleaner.manifest.data["actions"][
-                f"regional-stack:{HOME_REGION}:stack"
-            ]["status"],
+            {
+                "message": (
+                    "Regional destroy job for ocid1.ormstack.oc1..stack "
+                    "ended in FAILED"
+                ),
+                "resource_id": "ocid1.ormstack.oc1..stack",
+                "region": HOME_REGION,
+                "error_code": "TerraformError",
+                "deletion_message": "provider failed",
+            },
+            cleaner.failures[0],
         )
 
-    def test_successful_regional_destroy_waits_for_stack_deleted(self):
+    def test_dry_run_stack_teardown_does_not_mutate_or_reconcile_jobs(self):
         oci = FakeOci()
+        cleaner = self.make_cleaner(oci=oci)
+
+        self.assertTrue(
+            cleaner.destroy_regional_stack(
+                HOME_REGION,
+                {"id": "stack", "display-name": "datadog-regional-stack-test"},
+            )
+        )
+
+        self.assertEqual([], oci.list_calls)
+        self.assertEqual([], oci.run_calls)
+        self.assertEqual("planned", cleaner.planned[0]["status"])
+
+    def test_in_progress_destroy_is_waited_without_duplicate_create(self):
+        oci = FakeOci()
+        oci.add_list(
+            "resource-manager job list",
+            [
+                {
+                    "id": "older-destroy",
+                    "operation": "DESTROY",
+                    "lifecycle-state": "SUCCEEDED",
+                    "time-created": "2026-08-17T10:00:00Z",
+                },
+                {
+                    "id": "newer-apply",
+                    "operation": "APPLY",
+                    "lifecycle-state": "IN_PROGRESS",
+                    "time-created": "2026-08-18T12:00:00Z",
+                },
+                {
+                    "id": "active-destroy",
+                    "operation": "DESTROY",
+                    "lifecycle-state": "IN_PROGRESS",
+                    "time_created": "2026-08-18T11:00:00+00:00",
+                },
+            ],
+        )
+        oci.add_run(
+            "resource-manager job get",
+            {"data": {"id": "active-destroy", "lifecycle-state": "SUCCEEDED"}},
+        )
+        cleaner = self.make_cleaner(execute=True, oci=oci)
+
+        self.assertTrue(
+            cleaner.destroy_regional_stack(
+                HOME_REGION,
+                {"id": "stack", "display-name": "datadog-regional-stack-test"},
+            )
+        )
+
+        job_list = next(call for call in oci.list_calls if "job" in call)
+        self.assertEqual(
+            [
+                "--region",
+                HOME_REGION,
+                "resource-manager",
+                "job",
+                "list",
+                "--stack-id",
+                "stack",
+            ],
+            job_list,
+        )
+        job_get = next(
+            call for call in oci.run_calls if "get" in call and "job" in call
+        )
+        self.assertIn("active-destroy", job_get)
+        self.assertIn("SUCCEEDED", job_get)
+        self.assertIn("FAILED", job_get)
+        self.assertFalse(
+            any("create-destroy-job" in call for call in oci.run_calls)
+        )
+
+    def test_in_progress_destroy_that_fails_is_retried_once(self):
+        oci = FakeOci()
+        oci.add_list(
+            "resource-manager job list",
+            [
+                {
+                    "id": "active-destroy",
+                    "operation": "DESTROY",
+                    "lifecycle-state": "IN_PROGRESS",
+                    "time-created": "2026-08-18T12:00:00Z",
+                }
+            ],
+        )
+        oci.add_run(
+            "resource-manager job get",
+            {"data": {"id": "active-destroy", "lifecycle-state": "FAILED"}},
+        )
         oci.add_run(
             "create-destroy-job",
-            {"data": {"id": "job", "lifecycle-state": "SUCCEEDED"}},
+            {"data": {"id": "retry-job", "lifecycle-state": "SUCCEEDED"}},
+        )
+        cleaner = self.make_cleaner(execute=True, oci=oci)
+
+        self.assertTrue(
+            cleaner.destroy_regional_stack(
+                HOME_REGION,
+                {"id": "stack", "display-name": "datadog-regional-stack-test"},
+            )
+        )
+        self.assertEqual(
+            1,
+            sum("create-destroy-job" in call for call in oci.run_calls),
+        )
+        job_get = next(
+            call for call in oci.run_calls if "get" in call and "job" in call
+        )
+        self.assertIn("CANCELED", job_get)
+
+    def test_succeeded_destroy_job_is_reused_and_stack_record_deleted(self):
+        oci = FakeOci()
+        oci.add_list(
+            "resource-manager job list",
+            [
+                {
+                    "id": "completed-destroy",
+                    "operation": "DESTROY",
+                    "lifecycle-state": "SUCCEEDED",
+                    "time-created": "2026-08-18T12:00:00Z",
+                }
+            ],
         )
         cleaner = self.make_cleaner(execute=True, oci=oci)
 
@@ -1506,12 +1651,47 @@ class CleanupTestCase(unittest.TestCase):
         )
 
         self.assertTrue(result)
+        self.assertFalse(
+            any("create-destroy-job" in call for call in oci.run_calls)
+        )
         stack_delete = next(
             call
             for call in oci.run_calls
             if "stack" in call and "delete" in call
         )
         self.assertEqual("DELETED", stack_delete[-1])
+        delete_kwargs = oci.run_kwargs[oci.run_calls.index(stack_delete)]
+        self.assertTrue(delete_kwargs["allow_not_found"])
+
+    def test_failed_destroy_job_is_retried_with_new_destroy(self):
+        oci = FakeOci()
+        oci.add_list(
+            "resource-manager job list",
+            [
+                {
+                    "id": "failed-destroy",
+                    "operation": "DESTROY",
+                    "lifecycle-state": "FAILED",
+                    "time-created": "2026-08-18T12:00:00Z",
+                }
+            ],
+        )
+        oci.add_run(
+            "create-destroy-job",
+            {"data": {"id": "retry-job", "lifecycle-state": "SUCCEEDED"}},
+        )
+        cleaner = self.make_cleaner(execute=True, oci=oci)
+
+        self.assertTrue(
+            cleaner.destroy_regional_stack(
+                HOME_REGION,
+                {"id": "stack", "display-name": "datadog-regional-stack-test"},
+            )
+        )
+        creates = [
+            call for call in oci.run_calls if "create-destroy-job" in call
+        ]
+        self.assertEqual(1, len(creates))
 
     def test_regional_stack_cleanup_requires_exact_ownership(self):
         oci = FakeOci()
@@ -1580,6 +1760,64 @@ class CleanupTestCase(unittest.TestCase):
             [action["id"] for action in cleaner.planned],
         )
 
+    def test_parent_stack_cleanup_treats_missing_stack_as_complete(self):
+        oci = FakeOci()
+        cleaner = self.make_cleaner(
+            execute=True,
+            oci=oci,
+            args=argparse.Namespace(parent_stack_id="missing-stack"),
+        )
+
+        cleaner.cleanup_parent_stack(context())
+
+        self.assertEqual([], cleaner.planned)
+        self.assertEqual([], cleaner.failures)
+        self.assertEqual(
+            {"attempts": 2, "allow_not_found": True},
+            oci.run_kwargs[0],
+        )
+
+    def test_in_progress_parent_destroy_job_is_waited(self):
+        oci = FakeOci()
+        oci.add_run(
+            "resource-manager stack get",
+            {
+                "data": owned(
+                    {
+                        "id": "parent-stack",
+                        "display-name": "Datadog Forwarding Infrastructure",
+                    }
+                )
+            },
+        )
+        oci.add_list(
+            "resource-manager job list",
+            [
+                {
+                    "id": "parent-destroy",
+                    "operation": "DESTROY",
+                    "lifecycle-state": "ACCEPTED",
+                    "time-created": "2026-08-18T12:00:00Z",
+                }
+            ],
+        )
+        oci.add_run(
+            "resource-manager job get",
+            {"data": {"id": "parent-destroy", "lifecycle-state": "SUCCEEDED"}},
+        )
+        cleaner = self.make_cleaner(
+            execute=True,
+            oci=oci,
+            args=argparse.Namespace(parent_stack_id="parent-stack"),
+        )
+
+        cleaner.cleanup_parent_stack(context())
+
+        self.assertTrue(any("job" in call and "get" in call for call in oci.run_calls))
+        self.assertFalse(
+            any("create-destroy-job" in call for call in oci.run_calls)
+        )
+
     def test_parent_stack_cleanup_preserves_unowned_stack(self):
         oci = FakeOci()
         oci.add_run(
@@ -1632,8 +1870,13 @@ class CleanupTestCase(unittest.TestCase):
         )
         cleaner.delete_compartment(context(compartment=tagged_compartment))
         self.assertTrue(
-            any("Compartment preserved" in failure for failure in cleaner.failures)
+            any(
+                "Compartment preserved" in failure["message"]
+                for failure in cleaner.failures
+            )
         )
+        self.assertEqual(COMPARTMENT, cleaner.failures[0]["resource_id"])
+        self.assertEqual(HOME_REGION, cleaner.failures[0]["region"])
         self.assertFalse(
             any(action["id"].startswith("compartment:") for action in cleaner.planned)
         )

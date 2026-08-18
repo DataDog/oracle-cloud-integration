@@ -107,9 +107,11 @@ class IdentityMixin:
             ):
                 validated.append((endpoint, group))
             else:
-                self.failures.append(
+                self._record_failure(
                     f"Dynamic group {name} failed ownership-chain validation; "
-                    "manual review required"
+                    "manual review required",
+                    resource_id=identifier,
+                    region=context.home_region,
                 )
         return validated
 
@@ -180,9 +182,16 @@ class IdentityMixin:
             if exact_owned(group, expected_names={GROUP_NAME})
         ]
         if len(users) > 1 or len(groups) > 1:
-            self.failures.append(
+            ambiguous_ids = [
+                resource_id(resource)
+                for _, resource in [*users, *groups]
+                if resource_id(resource)
+            ]
+            self._record_failure(
                 "Multiple tagged dd-svc users or dd-svc-admin groups found; "
-                "identity deletion requires manual review"
+                "identity deletion requires manual review",
+                resource_id=",".join(ambiguous_ids),
+                region=context.home_region,
             )
             return
 
