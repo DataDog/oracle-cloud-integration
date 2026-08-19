@@ -683,6 +683,59 @@ class CleanupTestCase(unittest.TestCase):
             self.assertEqual(value, cleaner.failures[0][key])
             self.assertEqual(value, cleaner.planned[0][key])
 
+    def test_dynamic_group_requires_name_description_rule_and_policy_reference(self):
+        oci = FakeOci()
+        connector_ocid = "ocid1.dynamicresourcegroup.oc1..connector"
+        function_ocid = "ocid1.dynamicresourcegroup.oc1..function"
+        oci.add_list(
+            "identity-domains dynamic-resource-groups list",
+            [
+                {
+                    "id": "connector-scim",
+                    "ocid": connector_ocid,
+                    "display-name": cleanup.CONNECTOR_GROUP_NAME,
+                    "description": cleanup.CONNECTOR_GROUP_DESCRIPTION,
+                    "matching-rule": (
+                        "All {resource.type = 'serviceconnector', "
+                        f"resource.compartment.id = '{COMPARTMENT}'}}"
+                    ),
+                },
+                {
+                    "id": "function-scim",
+                    "ocid": function_ocid,
+                    "display-name": cleanup.FUNCTION_GROUP_NAME,
+                    "description": "wrong description",
+                    "matching-rule": (
+                        "All {resource.type = 'fnfunc', "
+                        f"resource.compartment.id = '{COMPARTMENT}'}}"
+                    ),
+                },
+            ],
+        )
+        cleaner = self.make_cleaner(oci=oci)
+        policy = owned(
+            {
+                "id": "policy",
+                "name": cleanup.DYNAMIC_POLICY_NAME,
+                "compartment-id": TENANCY,
+                "statements": [
+                    f"Allow dynamic-group id {connector_ocid} to read metrics in tenancy",
+                    f"Allow dynamic-group id {function_ocid} to use fn-function in tenancy",
+                ],
+            }
+        )
+        validated = cleaner._validated_dynamic_groups(
+            context(domains=[{"url": "https://identity.example"}]), [policy]
+        )
+        self.assertEqual(1, len(validated))
+        self.assertEqual(cleanup.CONNECTOR_GROUP_NAME, cleanup.resource_name(validated[0][1]))
+        self.assertTrue(
+            any(
+                "manual review required" in failure["message"]
+                for failure in cleaner.failures
+            )
+        )
+
     def test_functions_cleanup_preserves_customer_application(self):
         oci = FakeOci()
         oci.add_list(
@@ -1385,6 +1438,563 @@ class CleanupTestCase(unittest.TestCase):
         self.assertEqual("DELETED", event_delete[-1])
         self.assertEqual("DELETED", stream_delete[-1])
 
+    def test_identity_cleanup_deletes_keys_only_for_tagged_user(self):
+        oci = FakeOci()
+        oci.add_list(
+            "iam policy list",
+            [],
+        )
+        oci.add_list("identity-domains dynamic-resource-groups list", [])
+        tagged_user = owned({"id": "scim-user", "display-name": cleanup.USER_NAME})
+        untagged_user = {"id": "existing-user", "display-name": cleanup.USER_NAME}
+        oci.add_list("identity-domains users list", [tagged_user, untagged_user])
+        oci.add_list(
+            "identity-domains groups list",
+            [owned({"id": "scim-group", "display-name": cleanup.GROUP_NAME})],
+        )
+        oci.add_list(
+            "identity-domains api-keys list",
+            [{"id": "key-1"}, {"id": "key-2"}],
+        )
+        cleaner = self.make_cleaner(oci=oci)
+        cleaner.cleanup_home_identity(
+            context(domains=[{"url": "https://identity.example"}])
+        )
+        action_ids = {action["id"] for action in cleaner.planned}
+        self.assertIn("api-key:key-1", action_ids)
+        self.assertIn("api-key:key-2", action_ids)
+        self.assertIn("identity-user:scim-user", action_ids)
+        self.assertNotIn("identity-user:existing-user", action_ids)
+        api_key_calls = [
+            " ".join(call)
+            for call in oci.list_calls
+            if "api-keys" in " ".join(call)
+        ]
+        self.assertEqual(1, len(api_key_calls))
+        self.assertIn('user.value eq "scim-user"', api_key_calls[0])
+
+    def test_failed_regional_destroy_records_structured_failure(self):
+        oci = FakeOci()
+        oci.add_list("resource-manager job list", [])
+        oci.add_run(
+            "create-destroy-job",
+            {
+                "data": {
+                    "id": "job",
+                    "lifecycle-state": "FAILED",
+                    "failure-details": {
+                        "code": "TerraformError",
+                        "message": "provider failed",
+                    },
+                }
+            },
+        )
+        cleaner = self.make_cleaner(execute=True, oci=oci)
+        result = cleaner.destroy_regional_stack(
+            HOME_REGION,
+            {
+                "id": "ocid1.ormstack.oc1..stack",
+                "display-name": "datadog-regional-stack-test",
+            },
+        )
+        self.assertFalse(result)
+        self.assertFalse(
+            any("stack delete" in " ".join(call) for call in oci.run_calls)
+        )
+        self.assertEqual("failed", cleaner.planned[0]["status"])
+        self.assertEqual(
+            {
+                "message": (
+                    "Regional destroy job for ocid1.ormstack.oc1..stack "
+                    "ended in FAILED"
+                ),
+                "resource_id": "ocid1.ormstack.oc1..stack",
+                "region": HOME_REGION,
+                "error_code": "TerraformError",
+                "deletion_message": "provider failed",
+            },
+            cleaner.failures[0],
+        )
+
+    def test_dry_run_stack_teardown_does_not_mutate_or_reconcile_jobs(self):
+        oci = FakeOci()
+        cleaner = self.make_cleaner(oci=oci)
+
+        self.assertTrue(
+            cleaner.destroy_regional_stack(
+                HOME_REGION,
+                {"id": "stack", "display-name": "datadog-regional-stack-test"},
+            )
+        )
+
+        self.assertEqual([], oci.list_calls)
+        self.assertEqual([], oci.run_calls)
+        self.assertEqual("planned", cleaner.planned[0]["status"])
+
+    def test_in_progress_destroy_is_waited_without_duplicate_create(self):
+        oci = FakeOci()
+        oci.add_list(
+            "resource-manager job list",
+            [
+                {
+                    "id": "older-destroy",
+                    "operation": "DESTROY",
+                    "lifecycle-state": "SUCCEEDED",
+                    "time-created": "2026-08-17T10:00:00Z",
+                },
+                {
+                    "id": "newer-apply",
+                    "operation": "APPLY",
+                    "lifecycle-state": "IN_PROGRESS",
+                    "time-created": "2026-08-18T12:00:00Z",
+                },
+                {
+                    "id": "active-destroy",
+                    "operation": "DESTROY",
+                    "lifecycle-state": "IN_PROGRESS",
+                    "time_created": "2026-08-18T11:00:00+00:00",
+                },
+            ],
+        )
+        oci.add_run(
+            "resource-manager job get",
+            {"data": {"id": "active-destroy", "lifecycle-state": "SUCCEEDED"}},
+        )
+        cleaner = self.make_cleaner(execute=True, oci=oci)
+
+        self.assertTrue(
+            cleaner.destroy_regional_stack(
+                HOME_REGION,
+                {"id": "stack", "display-name": "datadog-regional-stack-test"},
+            )
+        )
+
+        job_list = next(call for call in oci.list_calls if "job" in call)
+        self.assertEqual(
+            [
+                "--region",
+                HOME_REGION,
+                "resource-manager",
+                "job",
+                "list",
+                "--stack-id",
+                "stack",
+            ],
+            job_list,
+        )
+        job_get = next(
+            call for call in oci.run_calls if "get" in call and "job" in call
+        )
+        self.assertIn("active-destroy", job_get)
+        self.assertIn("SUCCEEDED", job_get)
+        self.assertIn("FAILED", job_get)
+        self.assertFalse(
+            any("create-destroy-job" in call for call in oci.run_calls)
+        )
+
+    def test_in_progress_destroy_that_fails_is_retried_once(self):
+        oci = FakeOci()
+        oci.add_list(
+            "resource-manager job list",
+            [
+                {
+                    "id": "active-destroy",
+                    "operation": "DESTROY",
+                    "lifecycle-state": "IN_PROGRESS",
+                    "time-created": "2026-08-18T12:00:00Z",
+                }
+            ],
+        )
+        oci.add_run(
+            "resource-manager job get",
+            {"data": {"id": "active-destroy", "lifecycle-state": "FAILED"}},
+        )
+        oci.add_run(
+            "create-destroy-job",
+            {"data": {"id": "retry-job", "lifecycle-state": "SUCCEEDED"}},
+        )
+        cleaner = self.make_cleaner(execute=True, oci=oci)
+
+        self.assertTrue(
+            cleaner.destroy_regional_stack(
+                HOME_REGION,
+                {"id": "stack", "display-name": "datadog-regional-stack-test"},
+            )
+        )
+        self.assertEqual(
+            1,
+            sum("create-destroy-job" in call for call in oci.run_calls),
+        )
+        job_get = next(
+            call for call in oci.run_calls if "get" in call and "job" in call
+        )
+        self.assertIn("CANCELED", job_get)
+
+    def test_succeeded_destroy_job_is_reused_and_stack_record_deleted(self):
+        oci = FakeOci()
+        oci.add_list(
+            "resource-manager job list",
+            [
+                {
+                    "id": "completed-destroy",
+                    "operation": "DESTROY",
+                    "lifecycle-state": "SUCCEEDED",
+                    "time-created": "2026-08-18T12:00:00Z",
+                }
+            ],
+        )
+        cleaner = self.make_cleaner(execute=True, oci=oci)
+
+        result = cleaner.destroy_regional_stack(
+            HOME_REGION,
+            {"id": "stack", "display-name": "datadog-regional-stack-test"},
+        )
+
+        self.assertTrue(result)
+        self.assertFalse(
+            any("create-destroy-job" in call for call in oci.run_calls)
+        )
+        stack_delete = next(
+            call
+            for call in oci.run_calls
+            if "stack" in call and "delete" in call
+        )
+        self.assertEqual("DELETED", stack_delete[-1])
+        delete_kwargs = oci.run_kwargs[oci.run_calls.index(stack_delete)]
+        self.assertTrue(delete_kwargs["allow_not_found"])
+
+    def test_failed_destroy_job_is_retried_with_new_destroy(self):
+        oci = FakeOci()
+        oci.add_list(
+            "resource-manager job list",
+            [
+                {
+                    "id": "failed-destroy",
+                    "operation": "DESTROY",
+                    "lifecycle-state": "FAILED",
+                    "time-created": "2026-08-18T12:00:00Z",
+                }
+            ],
+        )
+        oci.add_run(
+            "create-destroy-job",
+            {"data": {"id": "retry-job", "lifecycle-state": "SUCCEEDED"}},
+        )
+        cleaner = self.make_cleaner(execute=True, oci=oci)
+
+        self.assertTrue(
+            cleaner.destroy_regional_stack(
+                HOME_REGION,
+                {"id": "stack", "display-name": "datadog-regional-stack-test"},
+            )
+        )
+        creates = [
+            call for call in oci.run_calls if "create-destroy-job" in call
+        ]
+        self.assertEqual(1, len(creates))
+
+    def test_regional_stack_cleanup_plans_confirmation_for_untagged_match(self):
+        oci = FakeOci()
+        oci.add_list(
+            "resource-manager stack list",
+            [
+                owned(
+                    {
+                        "id": "owned-stack",
+                        "display-name": "datadog-regional-stack-owned",
+                        "compartment-id": COMPARTMENT,
+                    }
+                ),
+                {
+                    "id": "untagged-stack",
+                    "display-name": "datadog-regional-stack-customer",
+                    "compartment-id": COMPARTMENT,
+                },
+                owned(
+                    {
+                        "id": "wrong-name",
+                        "display-name": "customer-stack",
+                        "compartment-id": COMPARTMENT,
+                    }
+                ),
+                owned(
+                    {
+                        "id": "wrong-compartment",
+                        "display-name": "datadog-regional-stack-other",
+                        "compartment-id": "customer-compartment",
+                    }
+                ),
+            ],
+        )
+        cleaner = self.make_cleaner(oci=oci)
+        cleaner._ask_yes_no = lambda _prompt: self.fail("dry-run prompted")
+
+        cleaner.cleanup_regional_stacks(context(), HOME_REGION)
+
+        self.assertEqual(
+            [
+                f"regional-stack:{HOME_REGION}:owned-stack",
+                f"regional-stack:{HOME_REGION}:untagged-stack",
+            ],
+            [action["id"] for action in cleaner.planned],
+        )
+        self.assertNotIn("requires_confirmation", cleaner.planned[0])
+        self.assertTrue(cleaner.planned[1]["requires_confirmation"])
+
+    def test_regional_stack_cleanup_prompts_for_untagged_match(self):
+        oci = FakeOci()
+        oci.add_list(
+            "resource-manager stack list",
+            [
+                {
+                    "id": "untagged-stack",
+                    "display-name": "datadog-regional-stack-test",
+                    "compartment-id": COMPARTMENT,
+                }
+            ],
+        )
+        cleaner = self.make_cleaner(execute=True, oci=oci)
+        prompts = []
+        destroyed = []
+        cleaner._ask_yes_no = lambda prompt: prompts.append(prompt) or True
+        cleaner.destroy_regional_stack = (
+            lambda region, stack: destroyed.append((region, stack["id"]))
+        )
+
+        cleaner.cleanup_regional_stacks(context(), HOME_REGION)
+
+        self.assertEqual(
+            [(HOME_REGION, "untagged-stack")],
+            destroyed,
+        )
+        self.assertIn("datadog-regional-stack-test", prompts[0])
+
+    def test_declined_untagged_regional_stack_blocks_final_teardown(self):
+        oci = FakeOci()
+        oci.add_list(
+            "resource-manager stack list",
+            [
+                {
+                    "id": "untagged-stack",
+                    "display-name": "datadog-regional-stack-test",
+                    "compartment-id": COMPARTMENT,
+                }
+            ],
+        )
+        cleaner = self.make_cleaner(execute=True, oci=oci)
+        cleaner._ask_yes_no = lambda _prompt: False
+        cleaner.destroy_regional_stack = lambda _region, _stack: self.fail(
+            "declined stack was destroyed"
+        )
+
+        cleaner.cleanup_regional_stacks(context(), HOME_REGION)
+
+        self.assertEqual("untagged-stack", cleaner.failures[0]["resource_id"])
+        self.assertIn("not approved", cleaner.failures[0]["message"])
+
+    def test_parent_stack_cleanup_requires_ownership_and_distinct_action_id(self):
+        oci = FakeOci()
+        oci.add_run(
+            "resource-manager stack get",
+            {
+                "data": owned(
+                    {
+                        "id": "parent-stack",
+                        "display-name": "Datadog Forwarding Infrastructure",
+                    }
+                )
+            },
+        )
+        cleaner = self.make_cleaner(
+            oci=oci,
+            args=argparse.Namespace(parent_stack_id="parent-stack"),
+        )
+
+        cleaner.cleanup_parent_stack(context())
+
+        self.assertEqual(
+            [f"parent-stack:{HOME_REGION}:parent-stack"],
+            [action["id"] for action in cleaner.planned],
+        )
+
+    def test_parent_stack_cleanup_treats_missing_stack_as_complete(self):
+        oci = FakeOci()
+        cleaner = self.make_cleaner(
+            execute=True,
+            oci=oci,
+            args=argparse.Namespace(parent_stack_id="missing-stack"),
+        )
+
+        cleaner.cleanup_parent_stack(context())
+
+        self.assertEqual([], cleaner.planned)
+        self.assertEqual([], cleaner.failures)
+        self.assertEqual(
+            {"attempts": 2, "allow_not_found": True},
+            oci.run_kwargs[0],
+        )
+
+    def test_in_progress_parent_destroy_job_is_waited(self):
+        oci = FakeOci()
+        oci.add_run(
+            "resource-manager stack get",
+            {
+                "data": owned(
+                    {
+                        "id": "parent-stack",
+                        "display-name": "Datadog Forwarding Infrastructure",
+                    }
+                )
+            },
+        )
+        oci.add_list(
+            "resource-manager job list",
+            [
+                {
+                    "id": "parent-destroy",
+                    "operation": "DESTROY",
+                    "lifecycle-state": "ACCEPTED",
+                    "time-created": "2026-08-18T12:00:00Z",
+                }
+            ],
+        )
+        oci.add_run(
+            "resource-manager job get",
+            {"data": {"id": "parent-destroy", "lifecycle-state": "SUCCEEDED"}},
+        )
+        cleaner = self.make_cleaner(
+            execute=True,
+            oci=oci,
+            args=argparse.Namespace(parent_stack_id="parent-stack"),
+        )
+
+        cleaner.cleanup_parent_stack(context())
+
+        self.assertTrue(any("job" in call and "get" in call for call in oci.run_calls))
+        self.assertFalse(
+            any("create-destroy-job" in call for call in oci.run_calls)
+        )
+
+    def test_parent_stack_cleanup_plans_confirmation_for_untagged_stack(self):
+        oci = FakeOci()
+        oci.add_run(
+            "resource-manager stack get",
+            {
+                "data": {
+                    "id": "customer-stack",
+                    "display-name": "Customer Infrastructure",
+                }
+            },
+        )
+        cleaner = self.make_cleaner(
+            oci=oci,
+            args=argparse.Namespace(parent_stack_id="customer-stack"),
+        )
+        cleaner._ask_yes_no = lambda _prompt: self.fail("dry-run prompted")
+
+        cleaner.cleanup_parent_stack(context())
+
+        self.assertEqual(
+            [f"parent-stack:{HOME_REGION}:customer-stack"],
+            [action["id"] for action in cleaner.planned],
+        )
+        self.assertTrue(cleaner.planned[0]["requires_confirmation"])
+
+    def test_parent_stack_cleanup_prompts_for_untagged_stack(self):
+        oci = FakeOci()
+        oci.add_run(
+            "resource-manager stack get",
+            {
+                "data": {
+                    "id": "parent-stack",
+                    "display-name": "Datadog Forwarding Infrastructure",
+                }
+            },
+        )
+        cleaner = self.make_cleaner(
+            execute=True,
+            oci=oci,
+            args=argparse.Namespace(parent_stack_id="parent-stack"),
+        )
+        prompts = []
+        destroyed = []
+        cleaner._ask_yes_no = lambda prompt: prompts.append(prompt) or True
+        cleaner._destroy_stack = (
+            lambda region, stack, **kwargs: destroyed.append(
+                (region, stack["id"], kwargs["stack_kind"])
+            )
+        )
+
+        cleaner.cleanup_parent_stack(context())
+
+        self.assertEqual(
+            [(HOME_REGION, "parent-stack", "parent")],
+            destroyed,
+        )
+        self.assertIn("Datadog Forwarding Infrastructure", prompts[0])
+
+    def test_compartment_deletion_refuses_residual_or_child_resources(self):
+        oci = FakeOci()
+        oci.add_list(
+            "iam compartment list",
+            [{"id": "child", "name": "customer-child", "lifecycle-state": "ACTIVE"}],
+        )
+        oci.add_run(
+            "query all resources where compartmentId",
+            {
+                "data": {
+                    "items": [
+                        {
+                            "identifier": "customer-resource",
+                            "display-name": "customer",
+                            "resource-type": "Instance",
+                            "compartment-id": COMPARTMENT,
+                        }
+                    ]
+                }
+            },
+        )
+        args = argparse.Namespace(delete_compartment=True)
+        cleaner = self.make_cleaner(execute=True, oci=oci, args=args)
+        tagged_compartment = owned(
+            {
+                "id": COMPARTMENT,
+                "name": cleanup.AUTO_COMPARTMENT_NAME,
+                "description": cleanup.AUTO_COMPARTMENT_DESCRIPTION,
+            }
+        )
+        cleaner.delete_compartment(context(compartment=tagged_compartment))
+        self.assertTrue(
+            any(
+                "Compartment preserved" in failure["message"]
+                for failure in cleaner.failures
+            )
+        )
+        self.assertEqual(COMPARTMENT, cleaner.failures[0]["resource_id"])
+        self.assertEqual(HOME_REGION, cleaner.failures[0]["region"])
+        self.assertFalse(
+            any(action["id"].startswith("compartment:") for action in cleaner.planned)
+        )
+
+    def test_dry_run_compartment_deletion_is_conditional(self):
+        args = argparse.Namespace(delete_compartment=True)
+        cleaner = self.make_cleaner(args=args)
+        tagged_compartment = owned(
+            {
+                "id": COMPARTMENT,
+                "name": cleanup.AUTO_COMPARTMENT_NAME,
+                "description": cleanup.AUTO_COMPARTMENT_DESCRIPTION,
+            }
+        )
+        cleaner.delete_compartment(context(compartment=tagged_compartment))
+        action = next(
+            action
+            for action in cleaner.planned
+            if action["id"] == f"compartment:{COMPARTMENT}"
+        )
+        self.assertTrue(action["conditional"])
+        self.assertEqual([], cleaner.failures)
+
     def test_kms_actions_use_minimum_buffered_deletion_times(self):
         before = dt.datetime.now(dt.timezone.utc)
         oci = FakeOci()
@@ -1551,6 +2161,26 @@ class CleanupTestCase(unittest.TestCase):
         self.assertEqual("vault", cleaner.failures[0]["resource_id"])
         self.assertEqual(HOME_REGION, cleaner.failures[0]["region"])
         self.assertIn("no management endpoint", cleaner.failures[0]["message"])
+
+    def test_cleanup_region_dependency_order(self):
+        cleaner = self.make_cleaner()
+        calls = []
+        methods = [
+            "cleanup_regional_stacks",
+            "cleanup_connectors_events_streams",
+            "cleanup_buckets",
+            "cleanup_functions",
+            "cleanup_network",
+            "cleanup_kms",
+        ]
+        for method in methods:
+            setattr(
+                cleaner,
+                method,
+                lambda _context, _region, method=method: calls.append(method),
+            )
+        cleaner.cleanup_region(context(), HOME_REGION)
+        self.assertEqual(methods, calls)
 
     def test_run_cleans_regions_concurrently(self):
         cleaner = self.make_cleaner(

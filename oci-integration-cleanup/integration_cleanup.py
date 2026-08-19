@@ -25,10 +25,14 @@ from oci_cleanup import *  # noqa: F401,F403
 from oci_cleanup import __all__ as package_api
 from oci_cleanup.base import CleanupBase
 from oci_cleanup.discovery import DiscoveryMixin
+from oci_cleanup.domains.compartment import CompartmentMixin
 from oci_cleanup.domains.extras import ExtrasMixin
+from oci_cleanup.domains.identity import IdentityMixin
 from oci_cleanup.domains.kms import KmsMixin
 from oci_cleanup.domains.network import NetworkMixin
 from oci_cleanup.domains.services import ServicesMixin
+from oci_cleanup.domains.stacks import StacksMixin
+from oci_cleanup.domains.tags import TagsMixin
 from oci_cleanup.engine import EngineMixin
 from oci_cleanup.region import RegionMixin
 
@@ -40,12 +44,16 @@ class QuickstartCleanup(
     DiscoveryMixin,
     ExtrasMixin,
     RegionMixin,
+    StacksMixin,
     ServicesMixin,
     NetworkMixin,
     KmsMixin,
+    IdentityMixin,
+    TagsMixin,
+    CompartmentMixin,
     CleanupBase,
 ):
-    """Remove Quickstart resources and schedule KMS deletion."""
+    """Safely discover and remove one Datadog OCI Quickstart installation."""
 
 
 def _parse_bool(value: str) -> bool:

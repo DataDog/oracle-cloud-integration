@@ -1,7 +1,10 @@
 """Responsibility: coordinate the complete cleanup sequence for the assembled engine.
 
-Based off the number of workers supplied, the engine will orchestrate the cleanup of the
-regions in parallel by calling the cleanup region function detailed in region.py.
+Safety boundary: withholds IAM and container teardown whenever regional or confirmation failures remain.
+Cleanup sequence role: drives discovery, confirmations, regional work, IAM, tags, stacks, and compartment cleanup.
+
+``EngineMixin.run`` is the stage orchestrator, including concurrent regional jobs
+and the fail-closed transition to tenancy-wide teardown.
 """
 
 from __future__ import annotations
@@ -14,6 +17,15 @@ from .constants import LOGGER
 
 class EngineMixin:
     """Coordinate the complete cleanup sequence for the assembled engine."""
+
+    def _preserve(self, action_id: str, description: str) -> None:
+        self.planned.append(
+            {
+                "id": action_id,
+                "description": description,
+                "status": "blocked",
+            }
+        )
 
     def run(self) -> int:
         LOGGER.info(
@@ -51,6 +63,34 @@ class EngineMixin:
                 }
                 for future in as_completed(futures):
                     future.result()
+
+        if self.failures:
+            # Keep IAM and credentials so failed child-stack destroy jobs can be
+            # retried and declined extra resources remain usable. This is safer
+            # than partially removing authorization.
+            self._preserve(
+                "home-identity",
+                "Preserve IAM because cleanup has unresolved failures",
+            )
+        else:
+            self.cleanup_home_identity(context)
+            if not self.failures:
+                self.cleanup_tags(context)
+
+        if not self.failures:
+            self.cleanup_parent_stack(context)
+            self.delete_compartment(context)
+        else:
+            if self.args.parent_stack_id:
+                self._preserve(
+                    "parent-stack",
+                    "Preserve parent stack because cleanup has failures",
+                )
+            if self.args.delete_compartment:
+                self._preserve(
+                    "compartment",
+                    "Preserve compartment because cleanup has failures",
+                )
 
         summary = {
             "mode": "execute" if self.execute else "dry-run",
