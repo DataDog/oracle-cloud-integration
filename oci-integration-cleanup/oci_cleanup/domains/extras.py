@@ -83,6 +83,47 @@ class ExtrasMixin:
             details=details or {},
         )
 
+    def _discover_function_extras(
+        self, context: CleanupContext, region: str
+    ) -> list[ExtraResourceCandidate]:
+        candidates: list[ExtraResourceCandidate] = []
+        for application, functions in self._owned_function_applications(
+            context, region
+        ):
+            application_id = resource_id(application)
+            for function in functions:
+                function_id = resource_id(function)
+                marker_proven = defined_marker(function) or self._is_managed_function(
+                    context, region, function_id
+                )
+                if marker_proven or resource_name(function) in FUNCTION_NAMES:
+                    continue
+                candidates.append(
+                    self._extra_candidate(
+                        kind="function",
+                        resource=function,
+                        region=region,
+                        container_id=application_id,
+                        container_name=FUNCTION_APP_NAME,
+                        impact=(
+                            "Deleting it is required before the owned Functions "
+                            "application can be deleted."
+                        ),
+                        command=[
+                            "--region",
+                            region,
+                            "fn",
+                            "function",
+                            "delete",
+                            "--function-id",
+                            function_id,
+                            "--force",
+                            "--wait-for-state",
+                            "DELETED",
+                        ],
+                    )
+                )
+        return candidates
 
     def _compute_compartment_ids(self, context: CleanupContext) -> list[str]:
         if self._accessible_compartment_ids is not None:
@@ -560,7 +601,10 @@ class ExtrasMixin:
         LOGGER.info("Discovering extra resources inside owned Datadog containers")
         candidates: dict[str, ExtraResourceCandidate] = {}
         for region in context.regions:
-            discovered = self._discover_network_extras(context, region)
+            discovered = [
+                *self._discover_function_extras(context, region),
+                *self._discover_network_extras(context, region),
+            ]
             for candidate in discovered:
                 candidates[candidate.candidate_id] = candidate
         return sorted(
