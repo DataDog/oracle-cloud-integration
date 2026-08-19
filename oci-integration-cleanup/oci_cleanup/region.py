@@ -10,7 +10,8 @@ class RegionMixin:
     """Coordinate cleanup and failure isolation for each region."""
 
     def cleanup_region(self, context: CleanupContext, region: str) -> None:
-        LOGGER.info("No regional cleanup domains enabled yet in %s", region)
+        LOGGER.info("Cleaning Quickstart networking in %s", region)
+        self.cleanup_network(context, region)
 
 
     def _cleanup_region_safely(

@@ -871,6 +871,210 @@ class CleanupTestCase(unittest.TestCase):
         )
         self.assertEqual(2, list_region.call_count)
 
+    def test_subnet_deletion_retries_vnic_detach_conflict(self):
+        oci = FakeOci()
+        responses = iter(
+            [
+                cleanup.CommandError(
+                    ["oci", "network", "subnet", "delete"],
+                    1,
+                    "Conflict: The Subnet references the VNIC test-vnic",
+                ),
+                {},
+            ]
+        )
+
+        def delete_subnet():
+            response = next(responses)
+            if isinstance(response, Exception):
+                raise response
+            return response
+
+        oci.add_run("network subnet delete", delete_subnet)
+        cleaner = self.make_cleaner(oci=oci)
+        with patch("oci_cleanup.domains.network.time.sleep") as sleep:
+            cleaner._delete_subnet_after_vnic_detach(HOME_REGION, "test-subnet")
+
+        self.assertEqual(2, len(oci.run_calls))
+        sleep.assert_called_once_with(
+            cleanup.SUBNET_VNIC_RETRY_INTERVAL_SECONDS
+        )
+
+    def test_blocked_subnet_records_stateless_failures_and_stops_dependents(self):
+        oci = FakeOci()
+        oci.add_list(
+            "network vcn list",
+            [
+                owned(
+                    {
+                        "id": "dd-vcn-id",
+                        "display-name": cleanup.VCN_NAME,
+                        "compartment-id": COMPARTMENT,
+                    }
+                )
+            ],
+        )
+        oci.add_list("network nat-gateway list", [])
+        oci.add_list("network service-gateway list", [])
+        oci.add_list(
+            "network subnet list",
+            [
+                owned(
+                    {
+                        "id": "blocked-subnet",
+                        "display-name": cleanup.SUBNET_NAME,
+                        "compartment-id": COMPARTMENT,
+                    }
+                )
+            ],
+        )
+        cleaner = self.make_cleaner(execute=True, oci=oci)
+        cleaner.extra_candidates = [
+            extra_candidate(
+                candidate_id=f"extra:unsupported-vnic:{HOME_REGION}:vnic",
+                kind="unsupported-vnic",
+                resource_id="vnic",
+                container_id="blocked-subnet",
+                command=None,
+            )
+        ]
+
+        cleaner.cleanup_network(context(), HOME_REGION)
+
+        subnet_action = next(
+            action
+            for action in cleaner.planned
+            if action["id"] == f"subnet:{HOME_REGION}:blocked-subnet"
+        )
+        self.assertEqual("blocked", subnet_action["status"])
+        self.assertEqual("blocked-subnet", subnet_action["resource_id"])
+        self.assertEqual(HOME_REGION, subnet_action["region"])
+        self.assertIsNone(subnet_action["error_code"])
+        self.assertIn("Preserve Quickstart subnet", subnet_action["deletion_message"])
+        self.assertFalse(
+            any(
+                "network route-table list" in " ".join(call)
+                for call in oci.list_calls
+            )
+        )
+        self.assertTrue(
+            any(
+                action["id"] == f"network-dependents:{HOME_REGION}"
+                and action["status"] == "blocked"
+                for action in cleaner.planned
+            )
+        )
+        self.assertEqual(2, len(cleaner.failures))
+        subnet_failure, dependents_failure = cleaner.failures
+        self.assertEqual(
+            {
+                "message": subnet_action["description"],
+                "resource_id": "blocked-subnet",
+                "region": HOME_REGION,
+                "error_code": None,
+                "deletion_message": subnet_action["description"],
+            },
+            subnet_failure,
+        )
+        self.assertEqual("", dependents_failure["resource_id"])
+        self.assertEqual(HOME_REGION, dependents_failure["region"])
+        self.assertIsNone(dependents_failure["error_code"])
+        self.assertIn(
+            "Preserve route tables, gateways, and VCN",
+            dependents_failure["deletion_message"],
+        )
+
+    def test_network_deletes_route_tables_before_owned_gateways(self):
+        oci = FakeOci()
+        oci.add_list(
+            "network vcn list",
+            [
+                owned(
+                    {
+                        "id": "dd-vcn-id",
+                        "display-name": cleanup.VCN_NAME,
+                        "compartment-id": COMPARTMENT,
+                        "default-route-table-id": "default-route-table",
+                    }
+                )
+            ],
+        )
+        oci.add_list(
+            "network nat-gateway list",
+            [
+                owned(
+                    {
+                        "id": "nat-gateway",
+                        "display-name": cleanup.NAT_GATEWAY_NAME,
+                        "compartment-id": COMPARTMENT,
+                    }
+                )
+            ],
+        )
+        oci.add_list(
+            "network service-gateway list",
+            [
+                owned(
+                    {
+                        "id": "service-gateway",
+                        "display-name": cleanup.SERVICE_GATEWAY_NAME,
+                        "compartment-id": COMPARTMENT,
+                    }
+                )
+            ],
+        )
+        oci.add_list("network subnet list", [])
+        oci.add_list(
+            "network route-table list",
+            [
+                {
+                    "id": "default-route-table",
+                    "display-name": "Default Route Table for dd-vcn",
+                    "vcn-id": "dd-vcn-id",
+                    "route-rules": [
+                        {"network-entity-id": "nat-gateway"},
+                        {"network-entity-id": "customer-gateway"},
+                    ],
+                },
+                owned(
+                    {
+                        "id": "service-route-table",
+                        "display-name": "service-gw-route",
+                        "vcn-id": "dd-vcn-id",
+                        "route-rules": [
+                            {"network-entity-id": "service-gateway"}
+                        ],
+                    }
+                ),
+            ],
+        )
+        cleaner = self.make_cleaner(oci=oci, execute=True)
+        cleaner.cleanup_network(context(), HOME_REGION)
+
+        commands = [" ".join(call) for call in oci.run_calls]
+        update_index = next(
+            index
+            for index, command in enumerate(commands)
+            if "route-table update" in command
+        )
+        route_delete_index = next(
+            index
+            for index, command in enumerate(commands)
+            if "route-table delete" in command
+        )
+        gateway_delete_index = next(
+            index
+            for index, command in enumerate(commands)
+            if "service-gateway delete" in command
+        )
+        self.assertLess(update_index, gateway_delete_index)
+        self.assertLess(route_delete_index, gateway_delete_index)
+        self.assertIn("customer-gateway", commands[update_index])
+        self.assertNotIn(
+            '"network-entity-id":"nat-gateway"',
+            commands[update_index],
+        )
+
     def test_run_cleans_regions_concurrently(self):
         cleaner = self.make_cleaner(
             args=SimpleNamespace(region_workers=2)
