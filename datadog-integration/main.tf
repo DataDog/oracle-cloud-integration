@@ -190,7 +190,8 @@ resource "null_resource" "precheck_marker" {
         --dg-policy-name '${local.dg_policy_name}' \
         --domain-display-name '${local.domain_display_name}' \
         --idcs-endpoint '${local.idcs_endpoint}' \
-        --compartment-id '${var.compartment_id != null ? var.compartment_id : ""}'
+        --compartment-id '${var.compartment_id != null ? var.compartment_id : ""}' \
+        --existing-home-region-vault-id '${var.existing_home_region_vault_id != null ? var.existing_home_region_vault_id : ""}'
     EOT
   }
 }
@@ -206,13 +207,14 @@ module "compartment" {
 }
 
 module "kms" {
-  depends_on      = [null_resource.precheck_marker]
-  source          = "./modules/kms"
-  count           = local.is_current_region_home_region ? 1 : 0
-  compartment_id  = module.compartment.id
-  datadog_api_key = var.datadog_api_key
-  tags            = local.tags
-  defined_tags    = local.defined_tags
+  depends_on                    = [null_resource.precheck_marker]
+  source                        = "./modules/kms"
+  count                         = local.is_current_region_home_region ? 1 : 0
+  compartment_id                = module.compartment.id
+  datadog_api_key               = var.datadog_api_key
+  existing_home_region_vault_id = var.existing_home_region_vault_id
+  tags                          = local.tags
+  defined_tags                  = local.defined_tags
 }
 
 module "auth" {
