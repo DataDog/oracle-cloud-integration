@@ -33,9 +33,9 @@ variableGroups:
   - title: "(Optional) Enable multi-region vaults"
     variables:
       - ${enable_regional_vaults}
-  - title: "(Optional) Reuse an existing vault"
+  - title: "(Optional) Reuse an existing home-region vault"
     variables:
-      - ${existing_vault_id}
+      - ${existing_home_region_vault_id}
   - title: "(Optional) Advanced configuration"
     variables:
       - ${show_advanced_options}
@@ -204,12 +204,13 @@ variables:
     required: false
     default: false
 
-  existing_vault_id:
-    title: Existing Vault OCID (reuse)
+  existing_home_region_vault_id:
+    title: Existing Home-Region Vault OCID (reuse)
     type: string
     description: |
-      <strong>This is uncommon.</strong> Reuse an existing <code>datadog-vault</code> in the Datadog compartment instead of creating a new one.
-      Use this only when a previous install's vault is in <em>PENDING_DELETION</em> and the tenancy has no spare vault quota to create another.
+      <strong>This is uncommon.</strong> Reuse an existing <code>datadog-vault</code> in the <strong>home region</strong> instead of creating a new one.
+      This field is a fallback for the home region only: set it only when you are hitting a vault-quota error and want to re-use the previous <code>datadog-vault</code>'s key and secret.
+      When per-region vaults are enabled, this reused home-region vault is also what a non-home region falls back to if that region itself has no vault quota.
       <strong>Before setting this, you must:</strong>
       1. Cancel the deletion of the existing <code>datadog-vault</code> (restores it to ACTIVE).
       2. Cancel the deletion of the <code>datadog-key</code> inside that vault (also a 7-day window).

@@ -113,10 +113,10 @@ variable "enable_regional_vaults" {
   default     = false
 }
 
-variable "existing_vault_id" {
+variable "existing_home_region_vault_id" {
   type        = string
   description = <<-EOT
-    OCID of an existing datadog-vault in the Datadog compartment to reuse instead of creating a new one. Use this when a prior install's vault is in PENDING_DELETION and the tenancy has no spare virtual-vault-count quota to create another.
+    OCID of an existing datadog-vault in the home region to reuse instead of creating a new one. This is a home-region-only escape hatch for the case where a prior install's home-region vault is in PENDING_DELETION and the tenancy has no spare virtual-vault-count quota to create another. Set it only when you are hitting that quota error and want to re-use the previous datadog-vault's key and secret.
 
     Prerequisites the customer must perform first:
       1. Cancel the deletion of the existing datadog-vault (restores it to ACTIVE).
@@ -125,7 +125,7 @@ variable "existing_vault_id" {
 
     The existing DatadogAPIKey secret is reused as-is — its stored content is the API key the forwarder reads. We do NOT create a new secret, because OCI holds a secret name for the full pending-deletion window and a duplicate would be rejected. When this is set, the vault-quota check in pre_check.py is skipped (the apply does not create a vault).
 
-    Only the home-region vault (module.kms) is reused via this variable. Regional vaults (modules/regional-stacks) are unaffected and still fall back to the home-region vault when their own quota is exhausted.
+    Only the home-region vault (module.kms) is reused via this variable. Regional vaults (modules/regional-stacks) are unaffected and still fall back to the home-region vault — the reused one when this is set — when their own quota is exhausted.
   EOT
   default     = null
 }

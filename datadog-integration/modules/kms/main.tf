@@ -21,13 +21,13 @@ locals {
   # of the same name would be rejected as a duplicate. Reusing the existing
   # ACTIVE secret avoids that collision. The customer must cancel the deletion
   # of the vault, the key, AND the secret so all three are usable.
-  reuse_vault = var.existing_vault_id != null && var.existing_vault_id != ""
+  reuse_vault = var.existing_home_region_vault_id != null && var.existing_home_region_vault_id != ""
 }
 
 # Reuse path: read the existing vault by OCID.
 data "oci_kms_vault" "existing" {
   count    = local.reuse_vault ? 1 : 0
-  vault_id = var.existing_vault_id
+  vault_id = var.existing_home_region_vault_id
 }
 
 # Reuse path: find the existing datadog-key inside the reused vault. The key is
@@ -38,7 +38,7 @@ data "oci_kms_vault" "existing" {
 # from the vault itself). In the documented flow both compartments coincide —
 # the OCID points at a vault in the Datadog compartment this stack manages —
 # but deriving it from the vault keeps the two layers consistent even if a
-# customer points existing_vault_id at a vault in another compartment.
+# customer points existing_home_region_vault_id at a vault in another compartment.
 data "oci_kms_keys" "existing" {
   count               = local.reuse_vault ? 1 : 0
   compartment_id      = data.oci_kms_vault.existing[0].compartment_id
@@ -89,29 +89,29 @@ resource "null_resource" "existing_vault_validation" {
       VAULT_STATE='${data.oci_kms_vault.existing[0].state}'
       VAULT_NAME='${data.oci_kms_vault.existing[0].display_name}'
       if [ "$VAULT_STATE" != "ACTIVE" ]; then
-        echo "ERROR: existing_vault_id '${var.existing_vault_id}' is in state '$VAULT_STATE', not ACTIVE."
+        echo "ERROR: existing_home_region_vault_id '${var.existing_home_region_vault_id}' is in state '$VAULT_STATE', not ACTIVE."
         echo "Cancel the deletion of the existing datadog-vault to restore it to ACTIVE, then re-apply."
         exit 1
       fi
       if [ "$VAULT_NAME" != "datadog-vault" ]; then
-        echo "ERROR: existing_vault_id '${var.existing_vault_id}' is named '$VAULT_NAME', not 'datadog-vault'."
-        echo "existing_vault_id must point at a vault created by a previous Datadog install."
+        echo "ERROR: existing_home_region_vault_id '${var.existing_home_region_vault_id}' is named '$VAULT_NAME', not 'datadog-vault'."
+        echo "existing_home_region_vault_id must point at a vault created by a previous Datadog install."
         exit 1
       fi
       KEY_ID='${local.existing_key_id}'
       if [ -z "$KEY_ID" ] || [ "$KEY_ID" = "null" ]; then
-        echo "ERROR: existing_vault_id '${var.existing_vault_id}' was reused, but no ENABLED key named 'datadog-key' was found inside it."
-        echo "Either cancel the deletion of the existing datadog-key, or unset existing_vault_id to create a fresh vault."
+        echo "ERROR: existing_home_region_vault_id '${var.existing_home_region_vault_id}' was reused, but no ENABLED key named 'datadog-key' was found inside it."
+        echo "Either cancel the deletion of the existing datadog-key, or unset existing_home_region_vault_id to create a fresh vault."
         exit 1
       fi
       SECRET_ID='${local.existing_secret_id}'
       if [ -z "$SECRET_ID" ] || [ "$SECRET_ID" = "null" ]; then
-        echo "ERROR: existing_vault_id '${var.existing_vault_id}' was reused, but no ACTIVE secret named 'DatadogAPIKey' was found inside it."
+        echo "ERROR: existing_home_region_vault_id '${var.existing_home_region_vault_id}' was reused, but no ACTIVE secret named 'DatadogAPIKey' was found inside it."
         echo "Cancel the deletion of the existing DatadogAPIKey secret to restore it to ACTIVE, then re-apply."
         echo "The existing secret is reused as-is (its stored content is the API key the forwarder reads)."
         exit 1
       fi
-      echo "✅ Reusing existing vault ${var.existing_vault_id}, datadog-key $KEY_ID, and DatadogAPIKey secret $SECRET_ID"
+      echo "✅ Reusing existing vault ${var.existing_home_region_vault_id}, datadog-key $KEY_ID, and DatadogAPIKey secret $SECRET_ID"
     EOT
   }
 }
@@ -172,7 +172,7 @@ resource "oci_kms_key" "datadog_key" {
 # content is the API key the forwarder reads; the datadog_api_key variable is
 # only written on the create path. To rotate the API key on a reused vault, the
 # customer must update the secret content out-of-band or unset
-# existing_vault_id to recreate the vault stack.
+# existing_home_region_vault_id to recreate the vault stack.
 resource "oci_vault_secret" "api_key" {
   count          = local.reuse_vault ? 0 : 1
   compartment_id = var.compartment_id

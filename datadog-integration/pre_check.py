@@ -154,18 +154,18 @@ def validate_vault_quota(tenancy_ocid, home_region, compartment_id):
     except Exception as e:
         return f"Failed to check vault quota: {str(e)}"
 
-def validate_existing_vault(existing_vault_id, home_region, compartment_id):
-    """When existing_vault_id is set, confirm the vault, its datadog-key, and its
-    DatadogAPIKey secret are all usable (vault ACTIVE, key ENABLED, secret ACTIVE).
-    Fails at precheck time (rather than later at apply) on a typo, a non-existent
-    OCID, or any of the three still being in a pending-deletion state. The secret
-    is reused as-is, so it must be ACTIVE — its stored content is the API key the
-    forwarder reads.
+def validate_existing_vault(existing_home_region_vault_id, home_region, compartment_id):
+    """When existing_home_region_vault_id is set, confirm the vault, its
+    datadog-key, and its DatadogAPIKey secret are all usable (vault ACTIVE, key
+    ENABLED, secret ACTIVE). Fails at precheck time (rather than later at apply)
+    on a typo, a non-existent OCID, or any of the three still being in a
+    pending-deletion state. The secret is reused as-is, so it must be ACTIVE —
+    its stored content is the API key the forwarder reads.
     """
     # 1. Vault must exist, be ACTIVE, and be named datadog-vault.
     vault_cmd = [
         "oci", "kms", "management", "vault", "get",
-        "--vault-id", existing_vault_id,
+        "--vault-id", existing_home_region_vault_id,
         "--region", home_region,
         "--query", "data",
         "--raw-output",
@@ -173,17 +173,17 @@ def validate_existing_vault(existing_vault_id, home_region, compartment_id):
     try:
         result = subprocess.check_output(vault_cmd).decode().strip()
     except subprocess.CalledProcessError:
-        return f"existing_vault_id '{existing_vault_id}' could not be read (not found or no permission)."
+        return f"existing_home_region_vault_id '{existing_home_region_vault_id}' could not be read (not found or no permission)."
     except Exception as e:
-        return f"Failed to validate existing_vault_id '{existing_vault_id}': {str(e)}"
+        return f"Failed to validate existing_home_region_vault_id '{existing_home_region_vault_id}': {str(e)}"
     if not result or result == "null":
-        return f"existing_vault_id '{existing_vault_id}' does not resolve to a vault."
+        return f"existing_home_region_vault_id '{existing_home_region_vault_id}' does not resolve to a vault."
     vault = json.loads(result)
     if vault.get("lifecycle-state") != "ACTIVE":
-        return (f"existing_vault_id '{existing_vault_id}' is in state '{vault.get('lifecycle-state')}', not ACTIVE. "
+        return (f"existing_home_region_vault_id '{existing_home_region_vault_id}' is in state '{vault.get('lifecycle-state')}', not ACTIVE. "
                 f"Cancel the deletion of the existing datadog-vault to restore it to ACTIVE.")
     if vault.get("display-name") != DATADOG_VAULT_NAME:
-        return (f"existing_vault_id '{existing_vault_id}' is named '{vault.get('display-name')}', not '{DATADOG_VAULT_NAME}'. "
+        return (f"existing_home_region_vault_id '{existing_home_region_vault_id}' is named '{vault.get('display-name')}', not '{DATADOG_VAULT_NAME}'. "
                 f"It must point at a vault created by a previous Datadog install.")
     management_endpoint = vault.get("management-endpoint")
     # The vault's own compartment-id is the authoritative compartment for its
@@ -207,16 +207,16 @@ def validate_existing_vault(existing_vault_id, home_region, compartment_id):
     try:
         key_result = subprocess.check_output(key_cmd).decode().strip()
     except Exception as e:
-        return f"Failed to list keys in existing_vault_id '{existing_vault_id}': {str(e)}"
+        return f"Failed to list keys in existing_home_region_vault_id '{existing_home_region_vault_id}': {str(e)}"
     if not key_result or key_result == "null":
-        return (f"existing_vault_id '{existing_vault_id}' has no ENABLED key named 'datadog-key'. "
+        return (f"existing_home_region_vault_id '{existing_home_region_vault_id}' has no ENABLED key named 'datadog-key'. "
                 f"Cancel the deletion of the existing datadog-key to restore it to ENABLED.")
 
     # 3. The vault must contain an ACTIVE DatadogAPIKey secret (reused as-is).
     secret_cmd = [
         "oci", "vault", "secret", "list",
         "--compartment-id", vault_compartment_id,
-        "--vault-id", existing_vault_id,
+        "--vault-id", existing_home_region_vault_id,
         "--region", home_region,
         "--all",
         "--query", f"data[?\"secret-name\"=='DatadogAPIKey' && \"lifecycle-state\"=='ACTIVE'] | [0]",
@@ -225,9 +225,9 @@ def validate_existing_vault(existing_vault_id, home_region, compartment_id):
     try:
         secret_result = subprocess.check_output(secret_cmd).decode().strip()
     except Exception as e:
-        return f"Failed to list secrets in existing_vault_id '{existing_vault_id}': {str(e)}"
+        return f"Failed to list secrets in existing_home_region_vault_id '{existing_home_region_vault_id}': {str(e)}"
     if not secret_result or secret_result == "null":
-        return (f"existing_vault_id '{existing_vault_id}' has no ACTIVE secret named 'DatadogAPIKey'. "
+        return (f"existing_home_region_vault_id '{existing_home_region_vault_id}' has no ACTIVE secret named 'DatadogAPIKey'. "
                 f"Cancel the deletion of the existing DatadogAPIKey secret to restore it to ACTIVE — "
                 f"it is reused as-is (its stored content is the API key the forwarder reads).")
     return OK_STATUS
@@ -248,7 +248,7 @@ def parse_args():
     parser.add_argument("--domain-display-name", required=True)
     parser.add_argument("--idcs-endpoint", required=True)
     parser.add_argument("--compartment-id", required=False, default="")
-    parser.add_argument("--existing-vault-id", required=False, default="")
+    parser.add_argument("--existing-home-region-vault-id", required=False, default="")
     return parser.parse_args()
 
 def main():
@@ -297,11 +297,12 @@ def main():
         errors.append("User not found in any domain")
 
     # Validation 5: Vault quota check (skipped when vault already exists — idempotent re-apply —
-    # or when the customer is reusing an existing vault via existing_vault_id, in which case no
-    # vault is created and quota is irrelevant). When reusing, validate the OCID resolves to an
-    # ACTIVE datadog-vault so a typo or pending-deletion vault fails here, not later at apply.
-    if args.existing_vault_id:
-        result = validate_existing_vault(args.existing_vault_id, params["home_region"], params["compartment_id"])
+    # or when the customer is reusing an existing home-region vault via
+    # existing_home_region_vault_id, in which case no vault is created and quota is irrelevant).
+    # When reusing, validate the OCID resolves to an ACTIVE datadog-vault so a typo or
+    # pending-deletion vault fails here, not later at apply.
+    if args.existing_home_region_vault_id:
+        result = validate_existing_vault(args.existing_home_region_vault_id, params["home_region"], params["compartment_id"])
         if result != OK_STATUS:
             errors.append(result)
     else:
