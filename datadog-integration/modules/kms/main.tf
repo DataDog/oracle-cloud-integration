@@ -31,18 +31,27 @@ data "oci_kms_vault" "existing" {
 }
 
 # Reuse path: find the existing datadog-key inside the reused vault. The key is
-# looked up by display name on the vault's management endpoint.
+# looked up by display name on the vault's management endpoint. We scope the
+# lookup to the compartment the reused vault actually lives in (read from the
+# vault data source) rather than var.compartment_id, so the Terraform layer
+# matches the precheck's validate_existing_vault (which derives the compartment
+# from the vault itself). In the documented flow both compartments coincide —
+# the OCID points at a vault in the Datadog compartment this stack manages —
+# but deriving it from the vault keeps the two layers consistent even if a
+# customer points existing_vault_id at a vault in another compartment.
 data "oci_kms_keys" "existing" {
   count               = local.reuse_vault ? 1 : 0
-  compartment_id      = var.compartment_id
+  compartment_id      = data.oci_kms_vault.existing[0].compartment_id
   management_endpoint = data.oci_kms_vault.existing[0].management_endpoint
 }
 
 # Reuse path: find the existing DatadogAPIKey secret in the vault. We reuse the
 # ACTIVE one as-is; the validation provisioner below enforces that one exists.
+# compartment_id is taken from the reused vault for the same reason as
+# oci_kms_keys.existing above.
 data "oci_vault_secrets" "existing" {
   count          = local.reuse_vault ? 1 : 0
-  compartment_id = var.compartment_id
+  compartment_id = data.oci_kms_vault.existing[0].compartment_id
   vault_id       = data.oci_kms_vault.existing[0].id
   name           = "DatadogAPIKey"
 }
