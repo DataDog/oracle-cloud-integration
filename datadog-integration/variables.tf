@@ -112,3 +112,20 @@ variable "enable_regional_vaults" {
   description = "Create a regional Vault, Key, and Secret in each subscribed region so that region's forwarder reads its API key locally instead of crossing to the home region. Existing customers must explicitly set this to true to opt in; the default is false to preserve prior behavior."
   default     = false
 }
+
+variable "existing_vault_id" {
+  type        = string
+  description = <<-EOT
+    OCID of an existing datadog-vault in the Datadog compartment to reuse instead of creating a new one. Use this when a prior install's vault is in PENDING_DELETION and the tenancy has no spare virtual-vault-count quota to create another.
+
+    Prerequisites the customer must perform first:
+      1. Cancel the deletion of the existing datadog-vault (restores it to ACTIVE).
+      2. Cancel the deletion of the datadog-key inside that vault (also a 7-day window).
+      3. Cancel the deletion of the DatadogAPIKey secret inside that vault (restores it to ACTIVE).
+
+    The existing DatadogAPIKey secret is reused as-is — its stored content is the API key the forwarder reads. We do NOT create a new secret, because OCI holds a secret name for the full pending-deletion window and a duplicate would be rejected. When this is set, the vault-quota check in pre_check.py is skipped (the apply does not create a vault).
+
+    Only the home-region vault (module.kms) is reused via this variable. Regional vaults (modules/regional-stacks) are unaffected and still fall back to the home-region vault when their own quota is exhausted.
+  EOT
+  default     = null
+}

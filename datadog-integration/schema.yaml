@@ -33,6 +33,9 @@ variableGroups:
   - title: "(Optional) Enable multi-region vaults"
     variables:
       - ${enable_regional_vaults}
+  - title: "(Optional) Reuse an existing vault"
+    variables:
+      - ${existing_vault_id}
   - title: "(Optional) Advanced configuration"
     variables:
       - ${show_advanced_options}
@@ -200,6 +203,21 @@ variables:
       Create a regional Vault, Key, and Secret in each subscribed region so that region's forwarder functions read its Datadog API key locally instead of crossing to the home region.
     required: false
     default: false
+
+  existing_vault_id:
+    title: Existing Vault OCID (reuse)
+    type: string
+    description: |
+      <strong>This is uncommon.</strong> Reuse an existing <code>datadog-vault</code> in the Datadog compartment instead of creating a new one.
+      Use this only when a previous install's vault is in <em>PENDING_DELETION</em> and the tenancy has no spare vault quota to create another.
+      <strong>Before setting this, you must:</strong>
+      1. Cancel the deletion of the existing <code>datadog-vault</code> (restores it to ACTIVE).
+      2. Cancel the deletion of the <code>datadog-key</code> inside that vault (also a 7-day window).
+      3. Cancel the deletion of the <code>DatadogAPIKey</code> secret inside that vault (restores it to ACTIVE).
+      The existing <code>DatadogAPIKey</code> secret is reused as-is — its stored content is the API key the forwarder reads. We do NOT create a new secret, because OCI holds a secret name for the full pending-deletion window and a duplicate would be rejected. When set, the vault-quota precheck is skipped because no vault is created.
+      Leave blank for normal installs.
+    required: false
+    default: null
 
   defined_tags:
     title: Resource tags

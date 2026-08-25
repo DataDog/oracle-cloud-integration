@@ -190,10 +190,11 @@ module "kms" {
     oci = oci.home_region
   }
 
-  compartment_id  = module.compartment.id
-  datadog_api_key = var.datadog_api_key
-  tags            = local.tags
-  defined_tags    = local.defined_tags
+  compartment_id    = module.compartment.id
+  datadog_api_key   = var.datadog_api_key
+  existing_vault_id = var.existing_vault_id
+  tags              = local.tags
+  defined_tags      = local.defined_tags
 }
 
 module "auth" {

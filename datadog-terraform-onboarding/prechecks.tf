@@ -120,7 +120,12 @@ data "oci_limits_resource_availability" "vault_quota" {
 resource "terraform_data" "validate_vault_quota" {
   lifecycle {
     precondition {
-      condition     = try(data.oci_limits_resource_availability.vault_quota.available, 0) >= 1 || data.external.check_resources_in_state.result.vault_exists == "true"
+      # Skipped when reusing an existing vault (existing_vault_id set to a
+      # non-empty OCID): no vault is created, so quota is irrelevant. The
+      # empty-string check mirrors the kms module's reuse_vault predicate so
+      # that existing_vault_id="" does NOT bypass this check while still
+      # taking the create path.
+      condition     = (var.existing_vault_id != null && var.existing_vault_id != "") || try(data.oci_limits_resource_availability.vault_quota.available, 0) >= 1 || data.external.check_resources_in_state.result.vault_exists == "true"
       error_message = <<-EOF
         ╔═══════════════════════════════════════════════════════════════════════════════════╗
         ║                         VAULT QUOTA EXHAUSTED ERROR                               ║
