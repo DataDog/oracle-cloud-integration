@@ -3,7 +3,7 @@ terraform {
   required_providers {
     oci = {
       source  = "oracle/oci"
-      version = ">= 8.5.0, < 9.0.0"
+      version = "~> 8.5"
     }
     restapi = {
       source  = "Mastercard/restapi"
