@@ -208,14 +208,14 @@ variables:
     title: Existing Home-Region Vault OCID (reuse)
     type: string
     description: |
-      <strong>This is uncommon.</strong> Reuse an existing <code>datadog-vault</code> in the <strong>home region</strong> instead of creating a new one.
-      This field is a fallback for the home region only: set it only when you are hitting a vault-quota error and want to re-use the previous <code>datadog-vault</code>'s key and secret.
+      <strong>This is uncommon.</strong> Reuse an existing datadog-vault in the <strong>home region</strong> instead of creating a new one.
+      This field is a fallback for the home region only: set it only when you are hitting a vault-quota error and want to re-use the previous datadog-vault's key and secret.
       When per-region vaults are enabled, this reused home-region vault is also what a non-home region falls back to if that region itself has no vault quota.
       <strong>Before setting this, you must:</strong>
-      1. Cancel the deletion of the existing <code>datadog-vault</code> (restores it to ACTIVE).
-      2. Cancel the deletion of the <code>datadog-key</code> inside that vault (also a 7-day window).
-      3. Cancel the deletion of the <code>DatadogAPIKey</code> secret inside that vault (restores it to ACTIVE).
-      The existing <code>DatadogAPIKey</code> secret is reused as-is — its stored content is the API key the forwarder reads. We do NOT create a new secret, because OCI holds a secret name for the full pending-deletion window and a duplicate would be rejected. When set, the vault-quota precheck is skipped because no vault is created.
+      1. Cancel the deletion of the existing datadog-vault (restores it to ACTIVE).
+      2. Cancel the deletion of the datadog-key inside that vault (also a 7-day window).
+      3. Cancel the deletion of the DatadogAPIKey secret inside that vault (restores it to ACTIVE).
+      The existing DatadogAPIKey secret is reused as-is — its stored content is the API key the forwarder reads. We do NOT create a new secret, because OCI holds a secret name for the full pending-deletion window and a duplicate would be rejected. When set, the vault-quota precheck is skipped because no vault is created.
       Leave blank for normal installs.
     required: false
     default: null
