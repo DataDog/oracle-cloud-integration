@@ -42,7 +42,9 @@ output "regional_resources" {
     length(module.regional_deployment_us_phoenix_1) > 0 ? { "us-phoenix-1" = module.regional_deployment_us_phoenix_1[0].output_ids } : {},
     length(module.regional_deployment_us_sanjose_1) > 0 ? { "us-sanjose-1" = module.regional_deployment_us_sanjose_1[0].output_ids } : {},
     length(module.regional_deployment_eu_madrid_3) > 0 ? { "eu-madrid-3" = module.regional_deployment_eu_madrid_3[0].output_ids } : {},
-    length(module.regional_deployment_eu_turin_1) > 0 ? { "eu-turin-1" = module.regional_deployment_eu_turin_1[0].output_ids } : {}
+    length(module.regional_deployment_eu_turin_1) > 0 ? { "eu-turin-1" = module.regional_deployment_eu_turin_1[0].output_ids } : {},
+    length(module.regional_deployment_af_casablanca_1) > 0 ? { "af-casablanca-1" = module.regional_deployment_af_casablanca_1[0].output_ids } : {},
+    length(module.regional_deployment_ap_kulai_2) > 0 ? { "ap-kulai-2" = module.regional_deployment_ap_kulai_2[0].output_ids } : {}
   )
 }
 

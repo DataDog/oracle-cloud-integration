@@ -303,3 +303,15 @@ provider "oci" {
   region              = "eu-madrid-3"
   config_file_profile = var.config_file_profile
 }
+
+provider "oci" {
+  alias               = "af-casablanca-1"
+  region              = "af-casablanca-1"
+  config_file_profile = var.config_file_profile
+}
+
+provider "oci" {
+  alias               = "ap-kulai-2"
+  region              = "ap-kulai-2"
+  config_file_profile = var.config_file_profile
+}

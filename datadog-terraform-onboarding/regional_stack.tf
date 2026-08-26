@@ -1265,3 +1265,63 @@ module "regional_deployment_eu_turin_1" {
     module.kms
   ]
 }
+
+module "regional_deployment_af_casablanca_1" {
+  count  = contains(local.final_regions_for_stacks, "af-casablanca-1") ? 1 : 0
+  source = "./modules/regional-stacks"
+
+  providers = {
+    oci = oci.af-casablanca-1
+  }
+
+  tenancy_ocid                   = var.tenancy_ocid
+  region                         = "af-casablanca-1"
+  region_key                     = local.subscribed_regions_map["af-casablanca-1"].region_key
+  compartment_ocid               = module.compartment.id
+  subnet_ocid                    = lookup(local.region_to_subnet_ocid_map, "af-casablanca-1", "")
+  datadog_site                   = var.datadog_site
+  api_key_secret_id              = local.api_key_secret_id
+  datadog_api_key                = var.datadog_api_key
+  create_regional_vault          = var.enable_regional_vaults && "af-casablanca-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "af-casablanca-1") ? tonumber(data.external.vault_quota["af-casablanca-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["af-casablanca-1"].result.vault_exists
+  home_region                    = local.home_region_name
+  tags                           = local.tags
+  defined_tags                   = local.defined_tags
+
+  depends_on = [
+    terraform_data.prechecks_complete,
+    module.compartment,
+    module.auth,
+    module.kms
+  ]
+}
+
+module "regional_deployment_ap_kulai_2" {
+  count  = contains(local.final_regions_for_stacks, "ap-kulai-2") ? 1 : 0
+  source = "./modules/regional-stacks"
+
+  providers = {
+    oci = oci.ap-kulai-2
+  }
+
+  tenancy_ocid                   = var.tenancy_ocid
+  region                         = "ap-kulai-2"
+  region_key                     = local.subscribed_regions_map["ap-kulai-2"].region_key
+  compartment_ocid               = module.compartment.id
+  subnet_ocid                    = lookup(local.region_to_subnet_ocid_map, "ap-kulai-2", "")
+  datadog_site                   = var.datadog_site
+  api_key_secret_id              = local.api_key_secret_id
+  datadog_api_key                = var.datadog_api_key
+  create_regional_vault          = var.enable_regional_vaults && "ap-kulai-2" != local.home_region_name && (contains(keys(data.external.vault_quota), "ap-kulai-2") ? tonumber(data.external.vault_quota["ap-kulai-2"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["ap-kulai-2"].result.vault_exists
+  home_region                    = local.home_region_name
+  tags                           = local.tags
+  defined_tags                   = local.defined_tags
+
+  depends_on = [
+    terraform_data.prechecks_complete,
+    module.compartment,
+    module.auth,
+    module.kms
+  ]
+}
