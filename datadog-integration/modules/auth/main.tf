@@ -3,7 +3,7 @@ terraform {
   required_providers {
     oci = {
       source  = "oracle/oci"
-      version = ">=7.1.0"
+      version = "~> 8.1"
     }
   }
 }
@@ -129,6 +129,10 @@ resource "oci_identity_domains_user" "dd_auth" {
   }
   display_name = var.user_name
 
+  lifecycle {
+    ignore_changes = [schemas]
+  }
+
   urnietfparamsscimschemasoracleidcsextension_oci_tags {
     dynamic "freeform_tags" {
       for_each = var.tags
@@ -159,6 +163,10 @@ resource "oci_identity_domains_group" "dd_auth" {
   members {
     value = var.existing_user_id != null && var.existing_user_id != "" ? var.existing_user_id : oci_identity_domains_user.dd_auth[0].id
     type  = "User"
+  }
+
+  lifecycle {
+    ignore_changes = [schemas]
   }
 
   urnietfparamsscimschemasoracleidcsextension_oci_tags {
@@ -229,6 +237,10 @@ resource "oci_identity_domains_dynamic_resource_group" "service_connector" {
   display_name  = var.dg_sch_name
   description   = "[DO NOT REMOVE] Dynamic group for forwarding by service connector"
   matching_rule = "All {resource.type = 'serviceconnector', resource.compartment.id = '${var.compartment_id}'}"
+
+  lifecycle {
+    ignore_changes = [schemas]
+  }
 }
 
 resource "oci_identity_domains_dynamic_resource_group" "forwarding_function" {
@@ -238,6 +250,10 @@ resource "oci_identity_domains_dynamic_resource_group" "forwarding_function" {
   display_name  = var.dg_fn_name
   description   = "[DO NOT REMOVE] Dynamic group for forwarding functions"
   matching_rule = "All {resource.type = 'fnfunc', resource.compartment.id = '${var.compartment_id}'}"
+
+  lifecycle {
+    ignore_changes = [schemas]
+  }
 }
 
 resource "oci_identity_policy" "dynamic_group" {
