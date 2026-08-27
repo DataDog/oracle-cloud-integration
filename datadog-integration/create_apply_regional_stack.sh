@@ -14,7 +14,12 @@ API_KEY_SECRET_ID="$9"
 HOME_REGION="${10}"
 DEFINED_TAGS="${11}"
 ENABLE_REGIONAL_VAULTS="${12}"
-DEFINED_TAGS_FLAG="${13}"
+STACK_DEFINED_TAGS="${13}"
+
+DEFINED_TAGS_ARGS=()
+if [[ "$STACK_DEFINED_TAGS" != "{}" ]]; then
+  DEFINED_TAGS_ARGS=(--defined-tags "$STACK_DEFINED_TAGS")
+fi
 
 export OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING=True
 
@@ -46,7 +51,7 @@ if [[ -z "$STACK_IDS" ]]; then
   STACK_ID=$(oci resource-manager stack create --compartment-id "$COMPARTMENT_ID" --display-name "$STACK_NAME" \
     --config-source ./modules/regional-stacks/dd_regional_stack.zip --variables "$VARIABLES_JSON" \
     --terraform-version 1.5.x \
-    $DEFINED_TAGS_FLAG \
+    "${DEFINED_TAGS_ARGS[@]}" \
     --wait-for-state ACTIVE \
     --max-wait-seconds 120 \
     --wait-interval-seconds 5 \
@@ -59,7 +64,7 @@ else
   if ! UPDATE_OUTPUT=$(oci resource-manager stack update --stack-id "$STACK_ID" --force \
     --config-source ./modules/regional-stacks/dd_regional_stack.zip --variables "$VARIABLES_JSON" \
     --terraform-version 1.5.x \
-    $DEFINED_TAGS_FLAG \
+    "${DEFINED_TAGS_ARGS[@]}" \
     --region "$REGION" 2>&1); then
     echo "ERROR: Failed to update stack $STACK_ID in region $REGION: $UPDATE_OUTPUT"
     exit 1
@@ -71,7 +76,7 @@ JOB_JSON=""
 for attempt in {1..5}; do
   echo "Attempting to create job (attempt $attempt/5)..."
   if JOB_JSON=$(oci resource-manager job create-apply-job \
-    --stack-id "$STACK_ID" $DEFINED_TAGS_FLAG \
+    --stack-id "$STACK_ID" "${DEFINED_TAGS_ARGS[@]}" \
     --wait-for-state SUCCEEDED --wait-for-state FAILED \
     --execution-plan-strategy AUTO_APPROVED \
     --region "$REGION" \

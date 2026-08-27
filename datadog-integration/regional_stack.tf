@@ -27,7 +27,7 @@ resource "null_resource" "regional_stacks_create_apply_parallel" {
 
   provisioner "local-exec" {
     working_dir = path.module
-    command     = "bash ./create_apply_regional_stack.sh '${each.key}' '${local.supported_regions[each.key].result.failure}' '${local.subscribed_regions_map[each.key].region_key}' '${lookup(local.region_to_subnet_ocid_map, each.key, "")}' '${module.compartment.id}' '${terraform_data.stack_digest.id}' '${var.tenancy_ocid}' '${var.datadog_site}' '${module.kms[0].api_key_secret_id}' '${local.home_region_name}' '${jsonencode(jsonencode(local.defined_tags))}' '${var.enable_regional_vaults}' '${local.stack_create_defined_tags_flag}'"
+    command     = "bash ./create_apply_regional_stack.sh '${each.key}' '${local.supported_regions[each.key].result.failure}' '${local.subscribed_regions_map[each.key].region_key}' '${lookup(local.region_to_subnet_ocid_map, each.key, "")}' '${module.compartment.id}' '${terraform_data.stack_digest.id}' '${var.tenancy_ocid}' '${var.datadog_site}' '${module.kms[0].api_key_secret_id}' '${local.home_region_name}' '${jsonencode(local.defined_tags)}' '${var.enable_regional_vaults}' '${jsonencode(local.compartment_defined_tags)}'"
   }
 
   triggers = {
@@ -52,7 +52,7 @@ resource "null_resource" "regional_stacks_create_apply_sequential" {
       FAILURE=$(echo "$REGIONS_JSON" | jq -r --arg region "$REGION" '.[$region].failure')
       REGION_KEY=$(echo "$REGIONS_JSON" | jq -r --arg region "$REGION" '.[$region].region_key')
       SUBNET_OCID=$(echo "$REGIONS_JSON" | jq -r --arg region "$REGION" '.[$region].subnet_ocid')
-      bash ./create_apply_regional_stack.sh "$REGION" "$FAILURE" "$REGION_KEY" "$SUBNET_OCID" '${module.compartment.id}' '${terraform_data.stack_digest.id}' '${var.tenancy_ocid}' '${var.datadog_site}' '${module.kms[0].api_key_secret_id}' '${local.home_region_name}' '${jsonencode(jsonencode(local.defined_tags))}' '${var.enable_regional_vaults}' '${local.stack_create_defined_tags_flag}'
+      bash ./create_apply_regional_stack.sh "$REGION" "$FAILURE" "$REGION_KEY" "$SUBNET_OCID" '${module.compartment.id}' '${terraform_data.stack_digest.id}' '${var.tenancy_ocid}' '${var.datadog_site}' '${module.kms[0].api_key_secret_id}' '${local.home_region_name}' '${jsonencode(local.defined_tags)}' '${var.enable_regional_vaults}' '${jsonencode(local.compartment_defined_tags)}'
     done
     EOT
 }
