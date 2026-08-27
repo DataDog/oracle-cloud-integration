@@ -505,6 +505,7 @@ class CleanupTestCase(unittest.TestCase):
             for kind in [
                 "service-gateway",
                 "route-table",
+                "security-list",
                 "subnet",
                 "secondary-vnic",
             ]
@@ -523,6 +524,7 @@ class CleanupTestCase(unittest.TestCase):
             [
                 "delete secondary-vnic",
                 "delete subnet",
+                "delete security-list",
                 "delete route-table",
                 "delete service-gateway",
             ],
@@ -1174,6 +1176,87 @@ class CleanupTestCase(unittest.TestCase):
         self.assertIn("detach-vnic", candidate.command or ())
         self.assertIn("instance-compartment", candidate.command or ())
 
+    def test_discovers_cross_compartment_subnet_and_nondefault_security_list(self):
+        oci = FakeOci()
+        oci.add_list(
+            "network vcn list",
+            [
+                owned(
+                    {
+                        "id": "dd-vcn",
+                        "display-name": cleanup.VCN_NAME,
+                        "compartment-id": COMPARTMENT,
+                        "default-security-list-id": "default-security-list",
+                    }
+                )
+            ],
+        )
+        oci.add_list("network subnet list", [])
+        oci.add_list(
+            "network security-list list",
+            [{"id": "default-security-list", "display-name": "Default"}],
+        )
+        oci.add_list("network route-table list", [])
+        oci.add_list("network nat-gateway list", [])
+        oci.add_list("network service-gateway list", [])
+        oci.add_list("network internet-gateway list", [])
+        oci.add_list("network local-peering-gateway list", [])
+        oci.add_run(
+            "query Subnet resources",
+            {"data": {"items": [{"identifier": "cross-compartment-subnet"}]}},
+        )
+        oci.add_run(
+            "network subnet get",
+            {
+                "data": {
+                    "id": "cross-compartment-subnet",
+                    "display-name": "customer-subnet",
+                    "compartment-id": "other-compartment",
+                }
+            },
+        )
+        oci.add_run(
+            "query SecurityList resources",
+            {
+                "data": {
+                    "items": [
+                        {"identifier": "default-security-list"},
+                        {"identifier": "custom-security-list"},
+                    ]
+                }
+            },
+        )
+        oci.add_run(
+            "network security-list get",
+            {
+                "data": {
+                    "id": "custom-security-list",
+                    "display-name": "customer-security-list",
+                    "compartment-id": "other-compartment",
+                }
+            },
+        )
+
+        candidates = self.make_cleaner(oci=oci)._discover_network_extras(
+            context(), HOME_REGION
+        )
+        by_kind = {candidate.kind: candidate for candidate in candidates}
+
+        self.assertEqual(
+            "cross-compartment-subnet", by_kind["subnet"].resource_id
+        )
+        self.assertEqual(
+            "custom-security-list", by_kind["security-list"].resource_id
+        )
+        self.assertIn(
+            "security-list delete",
+            " ".join(by_kind["security-list"].command or ()),
+        )
+        self.assertNotIn(
+            "default-security-list",
+            [candidate.resource_id for candidate in candidates],
+        )
+
     def test_discovers_primary_vnic_attachment_in_another_compartment(self):
         oci = FakeOci()
         oci.add_run(
@@ -1667,6 +1750,13 @@ class CleanupTestCase(unittest.TestCase):
                 for call in policy_calls
             )
         )
+        identity_deletes = [
+            call
+            for call in oci.run_calls
+            if "identity-domains" in call and "delete" in call
+        ]
+        self.assertTrue(identity_deletes)
+        self.assertTrue(all("--force" in call for call in identity_deletes))
 
     def test_failed_regional_destroy_records_structured_failure(self):
         oci = FakeOci()

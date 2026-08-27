@@ -65,6 +65,7 @@ class NetworkMixin:
             "unverified-secondary-vnic",
             "compute-instance",
             "subnet",
+            "security-list",
             "route-table",
             "nat-gateway",
             "service-gateway",
@@ -72,7 +73,8 @@ class NetworkMixin:
             "local-peering-gateway",
         }
         approved_extras_deleted = self._delete_approved_extras(
-            region=region, kinds=network_extra_kinds
+            region=region,
+            kinds=network_extra_kinds - {"security-list"},
         )
         network_dependencies_blocked = any(
             candidate.region == region
@@ -206,6 +208,14 @@ class NetworkMixin:
         if network_dependencies_blocked:
             self._block_network_dependents(
                 region, "a subnet or nested network dependency remains"
+            )
+            return
+
+        if not self._delete_approved_extras(
+            region=region, kinds={"security-list"}
+        ):
+            self._block_network_dependents(
+                region, "an approved security-list deletion failed"
             )
             return
 
