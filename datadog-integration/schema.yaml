@@ -78,7 +78,7 @@ variables:
     type: boolean
     description: |
       Apply one regional Resource Manager stack at a time instead of applying all regional stacks concurrently.
-      Enable this only when the tenancy has a restrictive concurrent Resource Manager job limit.
+      Do not enable this unless the tenancy has a stack quota that prevents parallel Resource Manager jobs.
     required: false
     default: false
     visible: ${show_advanced_options}
