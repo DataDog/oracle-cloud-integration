@@ -65,10 +65,9 @@ def _parse_bool(value: str) -> bool:
     raise argparse.ArgumentTypeError("expected true or false")
 
 
-def _profile_tenancy(profile: Optional[str]) -> str:
+def _profile_identity(profile: Optional[str]) -> tuple[str, str]:
     environment_tenancy = os.getenv("OCI_CLI_TENANCY", "").strip()
-    if environment_tenancy:
-        return environment_tenancy
+    environment_user = os.getenv("OCI_CLI_USER", "").strip()
 
     config_path = pathlib.Path(
         os.getenv("OCI_CLI_CONFIG_FILE", "~/.oci/config")
@@ -83,12 +82,17 @@ def _profile_tenancy(profile: Optional[str]) -> str:
         raise ValueError(
             f"OCI profile {profile_name!r} was not found in {config_path}"
         ) from error
-    tenancy_id = section.get("tenancy", "").strip()
+    tenancy_id = environment_tenancy or section.get("tenancy", "").strip()
     if not tenancy_id:
         raise ValueError(
             f"OCI profile {profile_name!r} has no tenancy in {config_path}"
         )
-    return tenancy_id
+    user_id = environment_user or section.get("user", "").strip()
+    if not user_id:
+        raise ValueError(
+            f"OCI profile {profile_name!r} has no user in {config_path}"
+        )
+    return tenancy_id, user_id
 
 
 def _resolve_oci_binary(binary: str) -> str:
@@ -109,6 +113,14 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         )
     )
     parser.add_argument("--compartment-ocid", dest="compartment_id")
+    parser.add_argument(
+        "--domain-ocid",
+        dest="domain_id",
+        help=(
+            "Identity Domain OCID used by the installation. Defaults to the "
+            "domain containing the OCI profile user."
+        ),
+    )
     parser.add_argument("--parent-stack-id")
     parser.add_argument("--profile")
     parser.add_argument("--oci-bin", default=os.getenv("OCI_BIN", "oci"))
@@ -146,7 +158,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         parser.error("--region-workers must be at least 1")
 
     try:
-        args.tenancy_id = _profile_tenancy(args.profile)
+        args.tenancy_id, args.profile_user_id = _profile_identity(args.profile)
     except ValueError as error:
         parser.error(str(error))
 

@@ -54,7 +54,10 @@ class ServicesMixin:
             connector_id = resource_id(connector)
             self.action(
                 f"connector:{region}:{connector_id}",
-                f"Delete Datadog-owned service connector {resource_name(connector)}",
+                (
+                    "Delete Datadog-owned service connector "
+                    f"{resource_name(connector)} ({connector_id})"
+                ),
                 command=[
                     "--region",
                     region,
@@ -89,7 +92,10 @@ class ServicesMixin:
             deleted_rule_ids.add(rule_id)
             self.action(
                 f"event-rule:{region}:{rule_id}",
-                f"Delete Datadog-owned event rule {resource_name(rule)}",
+                (
+                    "Delete Datadog-owned event rule "
+                    f"{resource_name(rule)} ({rule_id})"
+                ),
                 command=[
                     "--region",
                     region,
@@ -123,7 +129,10 @@ class ServicesMixin:
             deleted_stream_ids.add(stream_id)
             self.action(
                 f"stream:{region}:{stream_id}",
-                f"Delete Datadog-owned stream {resource_name(stream)}",
+                (
+                    f"Delete Datadog-owned stream {resource_name(stream)} "
+                    f"({stream_id})"
+                ),
                 command=[
                     "--region",
                     region,
@@ -150,7 +159,10 @@ class ServicesMixin:
             if identifier.startswith("ocid1.eventrule.") and identifier not in deleted_rule_ids:
                 self.action(
                     f"event-rule:{region}:{identifier}",
-                    f"Delete marker-proven Datadog event rule {resource_name(resource)}",
+                    (
+                        "Delete marker-proven Datadog event rule "
+                        f"{resource_name(resource)} ({identifier})"
+                    ),
                     command=[
                         "--region",
                         region,
@@ -167,7 +179,10 @@ class ServicesMixin:
             elif identifier.startswith("ocid1.stream.") and identifier not in deleted_stream_ids:
                 self.action(
                     f"stream:{region}:{identifier}",
-                    f"Delete marker-proven Datadog stream {resource_name(resource)}",
+                    (
+                        "Delete marker-proven Datadog stream "
+                        f"{resource_name(resource)} ({identifier})"
+                    ),
                     command=[
                         "--region",
                         region,

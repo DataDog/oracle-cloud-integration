@@ -34,13 +34,23 @@ class IdentityMixin:
         return str(domain.get("url") or domain.get("endpoint") or "")
 
     def _identity_resources(
-        self, context: CleanupContext, kind: str
+        self,
+        context: CleanupContext,
+        kind: str,
+        filter_expression: str,
     ) -> list[tuple[str, dict[str, Any]]]:
         found: list[tuple[str, dict[str, Any]]] = []
         for domain in context.domains:
             endpoint = self._domain_endpoint(domain)
             if not endpoint:
                 continue
+            LOGGER.info(
+                "Checking %s in Identity Domain %s",
+                kind,
+                domain.get("display-name")
+                or domain.get("display_name")
+                or endpoint,
+            )
             resources = self.oci.list(
                 [
                     "identity-domains",
@@ -48,6 +58,8 @@ class IdentityMixin:
                     "list",
                     "--endpoint",
                     endpoint,
+                    "--filter",
+                    filter_expression,
                 ]
             )
             found.extend((endpoint, resource) for resource in resources)
@@ -82,7 +94,12 @@ class IdentityMixin:
         }
         validated: list[tuple[str, dict[str, Any]]] = []
         for endpoint, group in self._identity_resources(
-            context, "dynamic-resource-groups"
+            context,
+            "dynamic-resource-groups",
+            (
+                f'displayName eq "{CONNECTOR_GROUP_NAME}" or '
+                f'displayName eq "{FUNCTION_GROUP_NAME}"'
+            ),
         ):
             name = resource_name(group)
             if name not in expected:
@@ -117,17 +134,25 @@ class IdentityMixin:
 
     def cleanup_home_identity(self, context: CleanupContext) -> None:
         LOGGER.info("Stage 3/5: cleaning home-region IAM and Identity Domains")
-        policies = self.oci.list(
-            [
-                "--region",
-                context.home_region,
-                "iam",
-                "policy",
-                "list",
-                "--compartment-id",
-                context.tenancy_id,
-            ]
-        )
+        policies_by_id: dict[str, dict[str, Any]] = {}
+        for policy_name in (USER_POLICY_NAME, DYNAMIC_POLICY_NAME):
+            for policy in self.oci.list(
+                [
+                    "--region",
+                    context.home_region,
+                    "iam",
+                    "policy",
+                    "list",
+                    "--compartment-id",
+                    context.tenancy_id,
+                    "--name",
+                    policy_name,
+                ]
+            ):
+                identifier = resource_id(policy)
+                if identifier:
+                    policies_by_id[identifier] = policy
+        policies = list(policies_by_id.values())
         validated_dynamic_groups = self._validated_dynamic_groups(context, policies)
 
         for policy in policies:
@@ -173,12 +198,20 @@ class IdentityMixin:
 
         users = [
             (endpoint, user)
-            for endpoint, user in self._identity_resources(context, "users")
+            for endpoint, user in self._identity_resources(
+                context,
+                "users",
+                f'userName eq "{USER_NAME}"',
+            )
             if exact_owned(user, expected_names={USER_NAME})
         ]
         groups = [
             (endpoint, group)
-            for endpoint, group in self._identity_resources(context, "groups")
+            for endpoint, group in self._identity_resources(
+                context,
+                "groups",
+                f'displayName eq "{GROUP_NAME}"',
+            )
             if exact_owned(group, expected_names={GROUP_NAME})
         ]
         if len(users) > 1 or len(groups) > 1:

@@ -22,6 +22,7 @@ from .resources import (
     is_deleted_or_deleting,
     is_owned,
     resource_compartment,
+    resource_field,
     resource_id,
     resource_name,
     resource_type,
@@ -126,6 +127,71 @@ class DiscoveryMixin:
         ]
         return tagged, managed
 
+    def _resolve_profile_domain(
+        self,
+        domains: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        explicit_domain_id = str(self.args.domain_id or "")
+        if explicit_domain_id:
+            matches = [
+                domain
+                for domain in domains
+                if resource_id(domain) == explicit_domain_id
+            ]
+        else:
+            matches = []
+            for domain in domains:
+                endpoint = str(
+                    domain.get("url") or domain.get("endpoint") or ""
+                )
+                if not endpoint:
+                    continue
+                LOGGER.info(
+                    "Checking OCI profile user in Identity Domain %s",
+                    resource_name(domain) or resource_id(domain),
+                )
+                users = self.oci.list(
+                    [
+                        "identity-domains",
+                        "users",
+                        "list",
+                        "--endpoint",
+                        endpoint,
+                        "--filter",
+                        f'ocid eq "{self.args.profile_user_id}"',
+                    ]
+                )
+                if any(
+                    str(user.get("ocid") or "") == self.args.profile_user_id
+                    for user in users
+                ):
+                    matches.append(domain)
+        if len(matches) != 1:
+            source = (
+                f"explicit domain {explicit_domain_id}"
+                if explicit_domain_id
+                else f"OCI profile user {self.args.profile_user_id}"
+            )
+            raise CleanupError(
+                f"Expected exactly one active Identity Domain for {source}, "
+                f"found {[resource_id(domain) for domain in matches]}"
+            )
+        return matches[0]
+
+    @staticmethod
+    def _domain_regions(domain: dict[str, Any]) -> set[str]:
+        regions = {
+            str(resource_field(domain, "home-region", "") or "")
+        }
+        replicas = resource_field(domain, "replica-regions", [])
+        if isinstance(replicas, list):
+            regions.update(
+                str(resource_field(replica, "region", "") or "")
+                for replica in replicas
+                if isinstance(replica, dict)
+            )
+        return {region for region in regions if region}
+
     def discover(self) -> CleanupContext:
         LOGGER.info("Stage 1/5: discovering tenancy and subscribed regions")
         subscriptions = self.oci.list(
@@ -159,6 +225,49 @@ class DiscoveryMixin:
             "Discovered home region %s and %d subscribed region(s)",
             home_region,
             len(regions),
+        )
+
+        domains = self.oci.list(
+            [
+                "--region",
+                home_region,
+                "iam",
+                "domain",
+                "list",
+                "--compartment-id",
+                self.args.tenancy_id,
+            ]
+        )
+        domains = [
+            domain
+            for domain in domains
+            if str(
+                domain.get("lifecycle-state")
+                or domain.get("lifecycle_state")
+                or "ACTIVE"
+            ).upper()
+            == "ACTIVE"
+        ]
+        profile_domain = self._resolve_profile_domain(domains)
+        domain_regions = self._domain_regions(profile_domain)
+        if not domain_regions:
+            raise CleanupError(
+                f"Identity Domain {resource_id(profile_domain)} reported no "
+                "home or replica regions"
+            )
+        excluded_regions = sorted(set(regions) - domain_regions)
+        regions = sorted(set(regions) & domain_regions)
+        if not regions:
+            raise CleanupError(
+                "No tenancy subscriptions overlap the selected Identity "
+                "Domain's home or replica regions"
+            )
+        LOGGER.info(
+            "Using Identity Domain %s in %d region(s); excluding "
+            "non-replicated region(s): %s",
+            resource_name(profile_domain) or resource_id(profile_domain),
+            len(regions),
+            excluded_regions or "none",
         )
 
         tagged: list[dict[str, Any]] = []
@@ -235,35 +344,13 @@ class DiscoveryMixin:
         ]
         compartment = matching_auto[0] if matching_auto else None
 
-        domains = self.oci.list(
-            [
-                "--region",
-                home_region,
-                "iam",
-                "domain",
-                "list",
-                "--compartment-id",
-                self.args.tenancy_id,
-            ]
-        )
-        domains = [
-            domain
-            for domain in domains
-            if str(
-                domain.get("lifecycle-state")
-                or domain.get("lifecycle_state")
-                or "ACTIVE"
-            ).upper()
-            == "ACTIVE"
-        ]
-
         context = CleanupContext(
             tenancy_id=self.args.tenancy_id,
             home_region=home_region,
             regions=regions,
             compartment_id=compartment_id,
             compartment=compartment,
-            domains=domains,
+            domains=[profile_domain],
             tagged_resources=tagged,
             managed_resources=managed,
         )

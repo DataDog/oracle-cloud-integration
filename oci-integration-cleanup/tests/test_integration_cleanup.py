@@ -5,6 +5,7 @@ import io
 import json
 import os
 import pathlib
+import subprocess
 import sys
 import tempfile
 import threading
@@ -21,6 +22,8 @@ from oci_cleanup.resources import resource_field, resource_management_endpoint
 
 
 TENANCY = "ocid1.tenancy.oc1..test"
+USER = "ocid1.user.oc1..profile"
+DOMAIN = "ocid1.domain.oc1..datadog"
 COMPARTMENT = "ocid1.compartment.oc1..datadog"
 HOME_REGION = "us-ashburn-1"
 
@@ -29,7 +32,7 @@ def parse_cleanup_args(argv, *, config: str = ""):
     with tempfile.TemporaryDirectory() as directory:
         config_path = pathlib.Path(directory) / "config"
         config_path.write_text(
-            config or f"[DEFAULT]\ntenancy={TENANCY}\n",
+            config or f"[DEFAULT]\ntenancy={TENANCY}\nuser={USER}\n",
             encoding="utf-8",
         )
         with patch.dict(
@@ -38,6 +41,7 @@ def parse_cleanup_args(argv, *, config: str = ""):
                 "OCI_CLI_CONFIG_FILE": str(config_path),
                 "OCI_CLI_PROFILE": "",
                 "OCI_CLI_TENANCY": "",
+                "OCI_CLI_USER": "",
             },
         ):
             return cleanup.parse_args(argv)
@@ -48,6 +52,7 @@ class FakeOci:
         self.list_responses = {}
         self.run_responses = {}
         self.list_calls = []
+        self.list_kwargs = []
         self.run_calls = []
         self.run_kwargs = []
 
@@ -61,9 +66,10 @@ class FakeOci:
     def add_run(self, contains, response):
         self.run_responses[contains] = response
 
-    def list(self, args):
+    def list(self, args, **kwargs):
         key = self._key(args)
         self.list_calls.append(args)
+        self.list_kwargs.append(kwargs)
         for contains, response in self.list_responses.items():
             if contains in key:
                 if isinstance(response, Exception):
@@ -85,6 +91,26 @@ class FakeOci:
 
 def owned(resource):
     return {**resource, "freeform-tags": {"ownedby": "datadog"}}
+
+
+def add_profile_domain(
+    oci,
+    *,
+    replicas=None,
+):
+    domain = {
+        "id": DOMAIN,
+        "display-name": "Datadog",
+        "url": "https://datadog.identity.example",
+        "home-region": HOME_REGION,
+        "replica-regions": [
+            {"region": region} for region in (replicas or [])
+        ],
+        "lifecycle-state": "ACTIVE",
+    }
+    oci.add_list("iam domain list", [domain])
+    oci.add_list("identity-domains users list", [{"ocid": USER}])
+    return domain
 
 
 def context(**overrides):
@@ -157,6 +183,8 @@ class CleanupTestCase(unittest.TestCase):
             execute=execute,
             tenancy_id=TENANCY,
             compartment_id=COMPARTMENT,
+            domain_id=None,
+            profile_user_id=USER,
             delete_compartment=False,
             parent_stack_id=None,
             region_workers=1,
@@ -263,6 +291,7 @@ class CleanupTestCase(unittest.TestCase):
         self.assertFalse(args.execute)
         self.assertTrue(args.dry_run)
         self.assertEqual(TENANCY, args.tenancy_id)
+        self.assertEqual(USER, args.profile_user_id)
         self.assertEqual(1, args.region_workers)
 
     def test_dry_run_accepts_explicit_true_and_rejects_other_values(self):
@@ -276,7 +305,7 @@ class CleanupTestCase(unittest.TestCase):
     def test_named_profile_supplies_tenancy(self):
         args = parse_cleanup_args(
             ["--profile", "CUSTOMER"],
-            config=f"[CUSTOMER]\ntenancy={TENANCY}\n",
+            config=f"[CUSTOMER]\ntenancy={TENANCY}\nuser={USER}\n",
         )
         self.assertEqual(TENANCY, args.tenancy_id)
 
@@ -322,18 +351,52 @@ class CleanupTestCase(unittest.TestCase):
         self.assertEqual([], invoked)
         self.assertEqual("planned", cleaner.planned[0]["status"])
 
+    def test_execute_action_uses_default_command_timeout(self):
+        cleaner = self.make_cleaner(execute=True, oci=cleanup.OciCli())
+        with patch(
+            "oci_cleanup.oci.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(["oci"], 180),
+        ) as run:
+            result = cleaner.action(
+                "delete:test",
+                "Delete test",
+                command=["compute", "instance", "terminate"],
+            )
+
+        self.assertFalse(result)
+        self.assertEqual(180, run.call_args.kwargs["timeout"])
+        self.assertIn("timed out after 180 seconds", cleaner.failures[0]["message"])
+
     def test_oci_command_error_includes_stdout_when_stderr_is_empty(self):
         process = SimpleNamespace(
             returncode=2,
             stdout="Invalid value for --wait-for-state: TERMINATED",
             stderr="",
         )
-        with patch("oci_cleanup.oci.subprocess.run", return_value=process):
+        with patch(
+            "oci_cleanup.oci.subprocess.run",
+            return_value=process,
+        ) as run:
             with self.assertRaises(cleanup.CommandError) as raised:
                 cleanup.OciCli().run(["compute", "instance", "terminate"])
 
         self.assertIn("Invalid value", str(raised.exception))
         self.assertEqual(process.stdout, raised.exception.stdout)
+        self.assertEqual(180, run.call_args.kwargs["timeout"])
+
+    def test_oci_command_timeout_is_reported(self):
+        with patch(
+            "oci_cleanup.oci.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(["oci"], 60),
+        ) as run:
+            with self.assertRaises(cleanup.CommandError) as raised:
+                cleanup.OciCli().run(
+                    ["identity-domains", "users", "list"],
+                    timeout_seconds=60,
+                )
+
+        self.assertIn("timed out after 60 seconds", str(raised.exception))
+        self.assertEqual(60, run.call_args.kwargs["timeout"])
 
     def test_extra_resource_dry_run_reports_without_prompting(self):
         cleaner = self.make_cleaner()
@@ -530,7 +593,7 @@ class CleanupTestCase(unittest.TestCase):
                 }
             ],
         )
-        oci.add_list("iam domain list", [])
+        add_profile_domain(oci)
         oci.add_run(
             "freeformTags.key = 'ownedby'",
             {
@@ -566,12 +629,42 @@ class CleanupTestCase(unittest.TestCase):
                 }
             ],
         )
-        oci.add_list("iam domain list", [])
+        add_profile_domain(oci)
         cleaner = self.make_cleaner(oci=oci)
 
         discovered = cleaner.discover()
 
         self.assertEqual(COMPARTMENT, discovered.compartment_id)
+
+    def test_discovery_excludes_regions_not_replicated_by_profile_domain(self):
+        oci = FakeOci()
+        oci.add_list(
+            "iam region-subscription list",
+            [
+                {
+                    "region-name": HOME_REGION,
+                    "is-home-region": True,
+                    "status": "READY",
+                },
+                {
+                    "region-name": "sa-saopaulo-1",
+                    "is-home-region": False,
+                    "status": "READY",
+                },
+            ],
+        )
+        add_profile_domain(oci)
+        cleaner = self.make_cleaner(oci=oci)
+
+        discovered = cleaner.discover()
+
+        self.assertEqual([HOME_REGION], discovered.regions)
+        self.assertEqual([DOMAIN], [
+            cleanup.resource_id(domain) for domain in discovered.domains
+        ])
+        self.assertFalse(any(
+            "sa-saopaulo-1" in call for call in oci.run_calls
+        ))
 
     def test_discovery_aborts_on_ambiguous_tagged_compartments(self):
         oci = FakeOci()
@@ -585,7 +678,7 @@ class CleanupTestCase(unittest.TestCase):
                 }
             ],
         )
-        oci.add_list("iam domain list", [])
+        add_profile_domain(oci)
         oci.add_run(
             "freeformTags.key = 'ownedby'",
             {
@@ -729,6 +822,18 @@ class CleanupTestCase(unittest.TestCase):
         )
         self.assertEqual(1, len(validated))
         self.assertEqual(cleanup.CONNECTOR_GROUP_NAME, cleanup.resource_name(validated[0][1]))
+        dynamic_group_args = next(
+            call for call in oci.list_calls if "dynamic-resource-groups" in call
+        )
+        dynamic_group_call = " ".join(dynamic_group_args)
+        self.assertIn(
+            f'displayName eq "{cleanup.CONNECTOR_GROUP_NAME}"',
+            dynamic_group_call,
+        )
+        self.assertIn(
+            f'displayName eq "{cleanup.FUNCTION_GROUP_NAME}"',
+            dynamic_group_call,
+        )
         self.assertTrue(
             any(
                 "manual review required" in failure["message"]
@@ -1398,6 +1503,7 @@ class CleanupTestCase(unittest.TestCase):
         self.assertIn("SUCCEEDED", delete)
         self.assertIn("FAILED", delete)
         self.assertNotIn("DELETED", delete)
+        self.assertIn("(connector)", cleaner.planned[0]["description"])
 
     def test_marker_proven_event_rule_outside_target_compartment_is_deleted(self):
         oci = FakeOci()
@@ -1437,6 +1543,10 @@ class CleanupTestCase(unittest.TestCase):
         )
         self.assertEqual("DELETED", event_delete[-1])
         self.assertEqual("DELETED", stream_delete[-1])
+        self.assertTrue(all(
+            action["id"].rsplit(":", 1)[-1] in action["description"]
+            for action in cleaner.planned
+        ))
 
     def test_identity_cleanup_deletes_keys_only_for_tagged_user(self):
         oci = FakeOci()
@@ -1472,6 +1582,33 @@ class CleanupTestCase(unittest.TestCase):
         ]
         self.assertEqual(1, len(api_key_calls))
         self.assertIn('user.value eq "scim-user"', api_key_calls[0])
+        user_call = next(
+            " ".join(call)
+            for call in oci.list_calls
+            if "identity-domains users list" in " ".join(call)
+        )
+        group_call = next(
+            " ".join(call)
+            for call in oci.list_calls
+            if "identity-domains groups list" in " ".join(call)
+        )
+        self.assertIn(f'userName eq "{cleanup.USER_NAME}"', user_call)
+        self.assertIn(f'displayName eq "{cleanup.GROUP_NAME}"', group_call)
+        policy_calls = [
+            " ".join(call)
+            for call in oci.list_calls
+            if "iam policy list" in " ".join(call)
+        ]
+        self.assertEqual(2, len(policy_calls))
+        self.assertTrue(
+            any(f"--name {cleanup.USER_POLICY_NAME}" in call for call in policy_calls)
+        )
+        self.assertTrue(
+            any(
+                f"--name {cleanup.DYNAMIC_POLICY_NAME}" in call
+                for call in policy_calls
+            )
+        )
 
     def test_failed_regional_destroy_records_structured_failure(self):
         oci = FakeOci()
