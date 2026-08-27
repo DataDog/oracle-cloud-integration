@@ -900,6 +900,14 @@ class CleanupTestCase(unittest.TestCase):
                 for failure in cleaner.failures
             )
         )
+        orphaned = cleaner._validated_dynamic_groups(
+            context(domains=[{"url": "https://identity.example"}]), []
+        )
+        self.assertEqual(1, len(orphaned))
+        self.assertEqual(
+            cleanup.CONNECTOR_GROUP_NAME,
+            cleanup.resource_name(orphaned[0][1]),
+        )
 
     def test_functions_cleanup_preserves_customer_application(self):
         oci = FakeOci()
