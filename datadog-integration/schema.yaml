@@ -39,6 +39,7 @@ variableGroups:
   - title: "(Optional) Advanced configuration"
     variables:
       - ${show_advanced_options}
+      - ${apply_regional_stacks_sequentially}
       - ${compartment_id}
       - ${domain_id}
       - ${user_email}
@@ -71,6 +72,16 @@ variables:
       <strong>(Recommended): If left blank, a new Compartment will be created.</strong>
     required: false
     default: false
+
+  apply_regional_stacks_sequentially:
+    title: Apply regional stacks sequentially
+    type: boolean
+    description: |
+      Apply one regional Resource Manager stack at a time instead of applying all regional stacks concurrently.
+      Do not enable this unless the tenancy has a stack quota that prevents parallel Resource Manager jobs.
+    required: false
+    default: false
+    visible: ${show_advanced_options}
 
   # Networking Options
   subnet_ocids:

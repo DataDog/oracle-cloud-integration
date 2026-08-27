@@ -21,103 +21,13 @@ resource "terraform_data" "stack_digest" {
 
 
 # Using a null resource because we want this to be applied on every execution.
-resource "null_resource" "regional_stacks_create_apply" {
+resource "null_resource" "regional_stacks_create_apply_parallel" {
   depends_on = [null_resource.precheck_marker, null_resource.region_intersection_info, terraform_data.regional_stack_zip, terraform_data.stack_digest, module.compartment, module.auth, module.kms]
-  # Using intersection of subscribed regions, domain regions, and subnet regions
-  # keep this here since we need the list to be available at plan time
-  # this is why we cannot use the final_regions_for_stacks local variable
-  # and we have logic to exit early if the region is not supported
-  for_each = local.target_regions_for_stacks
+  for_each   = var.apply_regional_stacks_sequentially ? toset([]) : local.target_regions_for_stacks
+
   provisioner "local-exec" {
     working_dir = path.module
-    command     = <<EOT
-    # Suppress OCI CLI warnings
-    export OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING=True
-
-    echo "Checking if the region ${each.key} is supported or not"
-    VALUE="${local.supported_regions[each.key].result.failure}"
-    CURRENT_REGION="${each.key}"
-
-    
-    if [[ "$VALUE" != "" ]]; then
-      echo "The region ${each.key} is not supported.....exit"
-      exit 0
-    fi
-
-    echo "Checking any existing stacks in the compartment...."
-
-    # The name of the stack to be created. Combined with the stack_digest to make it unique to this stack
-    STACK_NAME="datadog-regional-stack-${terraform_data.stack_digest.id}"
-
-    # Fetching the existing regional stacks associated with this parent stack
-    STACK_IDS=($(oci --region ${each.key} resource-manager stack list --display-name $STACK_NAME --compartment-id ${module.compartment.id} --raw-output | jq -r '.data[]."id"'))
-    STACK_ID=''
-
-    VARIABLES_JSON='{"tenancy_ocid": "${var.tenancy_ocid}", "region": "${each.key}", "compartment_ocid": "${module.compartment.id}", "datadog_site": "${var.datadog_site}", "api_key_secret_id": "${module.kms[0].api_key_secret_id}", "home_region": "${local.home_region_name}", "region_key": "${local.subscribed_regions_map[each.key].region_key}", "subnet_ocid": "${lookup(local.region_to_subnet_ocid_map, each.key, "")}", "defined_tags": ${jsonencode(jsonencode(local.defined_tags))}, "enable_regional_vaults": "${var.enable_regional_vaults}"}'
-
-    if [[ -z "$STACK_IDS" ]]; then
-      echo "No stack found in the compartment by the name $STACK_NAME in region ${each.key}. Creating..."
-      STACK_ID=$(oci resource-manager stack create --compartment-id ${module.compartment.id} --display-name $STACK_NAME \
-      --config-source ${path.module}/modules/regional-stacks/dd_regional_stack.zip  --variables "$VARIABLES_JSON" \
-      ${local.stack_create_defined_tags_flag} \
-      --wait-for-state ACTIVE \
-      --max-wait-seconds 120 \
-      --wait-interval-seconds 5 \
-      --query "data.id" --raw-output --region ${each.key})
-      echo "Created Stack ID: $STACK_ID in region ${each.key}"
-    else
-      echo "Found stacks..... $${STACK_IDS[@]}"
-      STACK_ID="$${STACK_IDS[@]:0:1}"
-      echo "Refreshing config source and variables for existing stack $STACK_ID in region ${each.key}..."
-      if ! UPDATE_OUTPUT=$(oci resource-manager stack update --stack-id "$STACK_ID" --force \
-      --config-source ${path.module}/modules/regional-stacks/dd_regional_stack.zip --variables "$VARIABLES_JSON" \
-      ${local.stack_create_defined_tags_flag} \
-      --region ${each.key} 2>&1); then
-        echo "ERROR: Failed to update stack $STACK_ID in region ${each.key}: $UPDATE_OUTPUT"
-        exit 1
-      fi
-    fi
-  
-
-    # Create and wait for apply job
-    echo "Apply Job for stack: $STACK_ID in region ${each.key}"
-
-    # Retry up to 5 times for transient OCI API errors; a FAILED apply state is not retried.
-    JOB_JSON=""
-    for attempt in {1..5}; do
-      echo "Attempting to create job (attempt $attempt/5)..."
-      if JOB_JSON=$(oci resource-manager job create-apply-job \
-        --stack-id $STACK_ID ${local.stack_create_defined_tags_flag} \
-        --wait-for-state SUCCEEDED --wait-for-state FAILED \
-        --execution-plan-strategy AUTO_APPROVED \
-        --region ${each.key} \
-        --query "data.{id:id,state:\"lifecycle-state\"}"); then
-        break
-      else
-        echo "Job creation failed on attempt $attempt"
-        if [ $attempt -lt 5 ]; then
-          echo "Waiting 6 seconds before retry..."
-          sleep 6
-        fi
-      fi
-    done
-
-    JOB_ID=$(echo "$JOB_JSON" | jq -r '.id')
-    JOB_STATE=$(echo "$JOB_JSON" | jq -r '.state')
-
-    if [[ -z "$JOB_ID" || "$JOB_ID" == "null" ]]; then
-      echo "ERROR: Failed to create apply job after 5 attempts for region ${each.key}."
-      exit 1
-    fi
-
-    echo "Apply job ($JOB_ID) for region ${each.key} finished with state $JOB_STATE"
-
-    if [[ "$JOB_STATE" != "SUCCEEDED" ]]; then
-      echo "ERROR: Apply job $JOB_ID did not succeed (state: $JOB_STATE) for region ${each.key}."
-      exit 1
-    fi
-
-    EOT
+    command     = "bash ./create_apply_regional_stack.sh '${each.key}' '${local.supported_regions[each.key].result.failure}' '${local.subscribed_regions_map[each.key].region_key}' '${lookup(local.region_to_subnet_ocid_map, each.key, "")}' '${module.compartment.id}' '${terraform_data.stack_digest.id}' '${var.tenancy_ocid}' '${var.datadog_site}' '${module.kms[0].api_key_secret_id}' '${local.home_region_name}' '${jsonencode(local.defined_tags)}' '${var.enable_regional_vaults}' '${jsonencode(local.compartment_defined_tags)}'"
   }
 
   triggers = {
@@ -125,7 +35,34 @@ resource "null_resource" "regional_stacks_create_apply" {
   }
 }
 
-# Using terraform_data only for destroy because other resource data or local variables cannot be referenced in destroy block. terraform_data allows that to refer from the self reference which is not 
+resource "null_resource" "regional_stacks_create_apply_sequential" {
+  count      = var.apply_regional_stacks_sequentially ? 1 : 0
+  depends_on = [null_resource.precheck_marker, null_resource.region_intersection_info, terraform_data.regional_stack_zip, terraform_data.stack_digest, module.compartment, module.auth, module.kms]
+
+  provisioner "local-exec" {
+    working_dir = path.module
+    command = <<EOT
+    REGIONS_JSON='${jsonencode({ for region in local.target_regions_for_stacks : region => {
+    failure     = local.supported_regions[region].result.failure
+    region_key  = local.subscribed_regions_map[region].region_key
+    subnet_ocid = lookup(local.region_to_subnet_ocid_map, region, "")
+} })}'
+
+    for REGION in ${join(" ", sort(tolist(local.target_regions_for_stacks)))}; do
+      FAILURE=$(echo "$REGIONS_JSON" | jq -r --arg region "$REGION" '.[$region].failure')
+      REGION_KEY=$(echo "$REGIONS_JSON" | jq -r --arg region "$REGION" '.[$region].region_key')
+      SUBNET_OCID=$(echo "$REGIONS_JSON" | jq -r --arg region "$REGION" '.[$region].subnet_ocid')
+      bash ./create_apply_regional_stack.sh "$REGION" "$FAILURE" "$REGION_KEY" "$SUBNET_OCID" '${module.compartment.id}' '${terraform_data.stack_digest.id}' '${var.tenancy_ocid}' '${var.datadog_site}' '${module.kms[0].api_key_secret_id}' '${local.home_region_name}' '${jsonencode(local.defined_tags)}' '${var.enable_regional_vaults}' '${jsonencode(local.compartment_defined_tags)}' || { echo "ERROR: regional stack apply failed for region $REGION; aborting sequential apply." >&2; exit 1; }
+    done
+    EOT
+}
+
+triggers = {
+  always_run = timestamp()
+}
+}
+
+# Using terraform_data only for destroy because other resource data or local variables cannot be referenced in destroy block. terraform_data allows that to refer from the self reference which is not
 # present in null_resource. This is not used during create because terraform_data is destroyed on trigger.
 resource "terraform_data" "regional_stacks_destroy" {
   depends_on = [null_resource.precheck_marker, terraform_data.regional_stack_zip, terraform_data.stack_digest, module.kms]

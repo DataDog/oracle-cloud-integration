@@ -252,7 +252,7 @@ module "key" {
 }
 
 module "integration" {
-  depends_on = [null_resource.precheck_marker, module.auth, module.key, module.kms, null_resource.regional_stacks_create_apply]
+  depends_on = [null_resource.precheck_marker, module.auth, module.key, module.kms, null_resource.regional_stacks_create_apply_parallel, null_resource.regional_stacks_create_apply_sequential]
   source     = "./modules/integration"
   providers = {
     restapi = restapi
