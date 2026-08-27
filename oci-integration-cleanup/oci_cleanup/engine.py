@@ -38,6 +38,7 @@ class EngineMixin:
         )
         context = self.discover()
         self.prepare_extra_resource_cleanup(context)
+        self.prepare_regional_stack_cleanup(context)
 
         worker_count = min(self.args.region_workers, len(context.regions))
         LOGGER.info(

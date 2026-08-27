@@ -2,9 +2,8 @@
 
 ## Usage
 
-Use an OCI CLI profile whose `tenancy` and `user` identify the installation
-tenancy and Identity Domain. The profile defaults to `DEFAULT`; select another
-with `--profile`.
+Use an OCI CLI profile whose `tenancy` identifies the installation tenancy.
+The profile defaults to `DEFAULT`; select another with `--profile`.
 
 Always review a dry run first:
 
@@ -30,9 +29,7 @@ python3 oci-integration-cleanup/integration_cleanup.py \
 compartment. Discovery only queries tenancy subscriptions that are also home or
 replica regions of the profile user's Identity Domain. Use `--domain-ocid` when
 the installation belongs to a different domain. Add `--parent-stack-id` to
-destroy the parent Resource Manager stack. Stack deletion requires the freeform
-tag `ownedby=datadog`; add it manually to parent or legacy regional stacks that
-predate automatic tagging. Add `--delete-compartment` only when the proven
+destroy the parent Resource Manager stack. Add `--delete-compartment` only when the proven
 Quickstart-created compartment should also be removed. Use `--oci-bin` or
 `OCI_BIN` when the OCI CLI is not available as `oci` on `PATH`.
 

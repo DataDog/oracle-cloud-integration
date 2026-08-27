@@ -22,7 +22,6 @@ from oci_cleanup.resources import resource_field, resource_management_endpoint
 
 
 TENANCY = "ocid1.tenancy.oc1..test"
-USER = "ocid1.user.oc1..profile"
 DOMAIN = "ocid1.domain.oc1..datadog"
 COMPARTMENT = "ocid1.compartment.oc1..datadog"
 HOME_REGION = "us-ashburn-1"
@@ -32,7 +31,7 @@ def parse_cleanup_args(argv, *, config: str = ""):
     with tempfile.TemporaryDirectory() as directory:
         config_path = pathlib.Path(directory) / "config"
         config_path.write_text(
-            config or f"[DEFAULT]\ntenancy={TENANCY}\nuser={USER}\n",
+            config or f"[DEFAULT]\ntenancy={TENANCY}\n",
             encoding="utf-8",
         )
         with patch.dict(
@@ -109,7 +108,6 @@ def add_profile_domain(
         "lifecycle-state": "ACTIVE",
     }
     oci.add_list("iam domain list", [domain])
-    oci.add_list("identity-domains users list", [{"ocid": USER}])
     return domain
 
 
@@ -183,8 +181,6 @@ class CleanupTestCase(unittest.TestCase):
             execute=execute,
             tenancy_id=TENANCY,
             compartment_id=COMPARTMENT,
-            domain_id=None,
-            profile_user_id=USER,
             delete_compartment=False,
             parent_stack_id=None,
             region_workers=1,
@@ -291,7 +287,6 @@ class CleanupTestCase(unittest.TestCase):
         self.assertFalse(args.execute)
         self.assertTrue(args.dry_run)
         self.assertEqual(TENANCY, args.tenancy_id)
-        self.assertEqual(USER, args.profile_user_id)
         self.assertEqual(1, args.region_workers)
 
     def test_dry_run_accepts_explicit_true_and_rejects_other_values(self):
@@ -305,7 +300,7 @@ class CleanupTestCase(unittest.TestCase):
     def test_named_profile_supplies_tenancy(self):
         args = parse_cleanup_args(
             ["--profile", "CUSTOMER"],
-            config=f"[CUSTOMER]\ntenancy={TENANCY}\nuser={USER}\n",
+            config=f"[CUSTOMER]\ntenancy={TENANCY}\n",
         )
         self.assertEqual(TENANCY, args.tenancy_id)
 
@@ -636,7 +631,7 @@ class CleanupTestCase(unittest.TestCase):
 
         self.assertEqual(COMPARTMENT, discovered.compartment_id)
 
-    def test_discovery_excludes_regions_not_replicated_by_profile_domain(self):
+    def test_discovery_keeps_subscribed_regions_and_all_active_domains(self):
         oci = FakeOci()
         oci.add_list(
             "iam region-subscription list",
@@ -653,18 +648,81 @@ class CleanupTestCase(unittest.TestCase):
                 },
             ],
         )
-        add_profile_domain(oci)
+        first_domain = add_profile_domain(oci)
+        other_domain = {
+            "id": "other-domain",
+            "display-name": "Other",
+            "url": "https://other.identity.example",
+            "home-region": "sa-saopaulo-1",
+            "replica-regions": [],
+            "lifecycle-state": "ACTIVE",
+        }
+        oci.add_list("iam domain list", [first_domain, other_domain])
+        cleaner = self.make_cleaner(oci=oci)
+
+        discovered = cleaner.discover()
+
+        self.assertEqual(["sa-saopaulo-1", HOME_REGION], discovered.regions)
+        self.assertEqual(
+            [DOMAIN, "other-domain"],
+            [cleanup.resource_id(domain) for domain in discovered.domains],
+        )
+        self.assertFalse(
+            any(
+                "identity-domains" in " ".join(call)
+                for call in oci.list_calls
+            )
+        )
+
+    def test_discovery_skips_unauthorized_subscribed_regions(self):
+        oci = FakeOci()
+        oci.add_list(
+            "iam region-subscription list",
+            [
+                {
+                    "region-name": HOME_REGION,
+                    "is-home-region": True,
+                    "status": "READY",
+                },
+                {
+                    "region-name": "sa-saopaulo-1",
+                    "is-home-region": False,
+                    "status": "READY",
+                },
+            ],
+        )
+        oci.add_list(
+            "iam domain list",
+            [
+                {
+                    "id": DOMAIN,
+                    "display-name": "Datadog",
+                    "url": "https://datadog.identity.example",
+                    "home-region": HOME_REGION,
+                    "replica-regions": [],
+                    "lifecycle-state": "ACTIVE",
+                }
+            ],
+        )
+        oci.add_run(
+            "--region sa-saopaulo-1 search resource",
+            cleanup.CommandError(
+                ["oci", "--region", "sa-saopaulo-1", "search"],
+                1,
+                json.dumps(
+                    {
+                        "code": "NotAuthorized",
+                        "status": 401,
+                        "message": "Region is not available",
+                    }
+                ),
+            ),
+        )
         cleaner = self.make_cleaner(oci=oci)
 
         discovered = cleaner.discover()
 
         self.assertEqual([HOME_REGION], discovered.regions)
-        self.assertEqual([DOMAIN], [
-            cleanup.resource_id(domain) for domain in discovered.domains
-        ])
-        self.assertFalse(any(
-            "sa-saopaulo-1" in call for call in oci.run_calls
-        ))
 
     def test_discovery_aborts_on_ambiguous_tagged_compartments(self):
         oci = FakeOci()
@@ -1566,7 +1624,7 @@ class CleanupTestCase(unittest.TestCase):
             "identity-domains api-keys list",
             [{"id": "key-1"}, {"id": "key-2"}],
         )
-        cleaner = self.make_cleaner(oci=oci)
+        cleaner = self.make_cleaner(oci=oci, execute=True)
         cleaner.cleanup_home_identity(
             context(domains=[{"url": "https://identity.example"}])
         )
@@ -1898,6 +1956,10 @@ class CleanupTestCase(unittest.TestCase):
             lambda region, stack: destroyed.append((region, stack["id"]))
         )
 
+        cleaner.prepare_regional_stack_cleanup(context())
+        cleaner._ask_yes_no = lambda _prompt: self.fail(
+            "worker cleanup prompted after serial preparation"
+        )
         cleaner.cleanup_regional_stacks(context(), HOME_REGION)
 
         self.assertEqual(
@@ -1924,6 +1986,7 @@ class CleanupTestCase(unittest.TestCase):
             "declined stack was destroyed"
         )
 
+        cleaner.prepare_regional_stack_cleanup(context())
         cleaner.cleanup_regional_stacks(context(), HOME_REGION)
 
         self.assertEqual("untagged-stack", cleaner.failures[0]["resource_id"])
@@ -2012,7 +2075,7 @@ class CleanupTestCase(unittest.TestCase):
             any("create-destroy-job" in call for call in oci.run_calls)
         )
 
-    def test_parent_stack_cleanup_plans_confirmation_for_untagged_stack(self):
+    def test_parent_stack_cleanup_plans_explicit_untagged_stack(self):
         oci = FakeOci()
         oci.add_run(
             "resource-manager stack get",
@@ -2035,9 +2098,9 @@ class CleanupTestCase(unittest.TestCase):
             [f"parent-stack:{HOME_REGION}:customer-stack"],
             [action["id"] for action in cleaner.planned],
         )
-        self.assertTrue(cleaner.planned[0]["requires_confirmation"])
+        self.assertNotIn("requires_confirmation", cleaner.planned[0])
 
-    def test_parent_stack_cleanup_prompts_for_untagged_stack(self):
+    def test_parent_stack_cleanup_does_not_prompt_for_explicit_stack(self):
         oci = FakeOci()
         oci.add_run(
             "resource-manager stack get",
@@ -2053,9 +2116,10 @@ class CleanupTestCase(unittest.TestCase):
             oci=oci,
             args=argparse.Namespace(parent_stack_id="parent-stack"),
         )
-        prompts = []
         destroyed = []
-        cleaner._ask_yes_no = lambda prompt: prompts.append(prompt) or True
+        cleaner._ask_yes_no = lambda _prompt: self.fail(
+            "explicit parent stack prompted"
+        )
         cleaner._destroy_stack = (
             lambda region, stack, **kwargs: destroyed.append(
                 (region, stack["id"], kwargs["stack_kind"])
@@ -2068,7 +2132,6 @@ class CleanupTestCase(unittest.TestCase):
             [(HOME_REGION, "parent-stack", "parent")],
             destroyed,
         )
-        self.assertIn("Datadog Forwarding Infrastructure", prompts[0])
 
     def test_compartment_deletion_refuses_residual_or_child_resources(self):
         oci = FakeOci()

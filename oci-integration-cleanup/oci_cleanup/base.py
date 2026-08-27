@@ -41,6 +41,9 @@ class CleanupBase:
         self.kms_pending = False
         self.extra_candidates: list[ExtraResourceCandidate] = []
         self.approved_extra_ids: set[str] = set()
+        self.regional_stacks_by_region: dict[str, list[dict[str, Any]]] = {}
+        self.regional_stack_approvals: dict[tuple[str, str], bool] = {}
+        self.regional_stack_confirmations_prepared = False
         self._accessible_compartment_ids: Optional[list[str]] = None
 
     def action(

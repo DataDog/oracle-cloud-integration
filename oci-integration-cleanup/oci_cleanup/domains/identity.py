@@ -193,6 +193,7 @@ class IdentityMixin:
                     identifier,
                     "--force-delete",
                     "true",
+                    "--force",
                 ],
             )
 
@@ -275,6 +276,7 @@ class IdentityMixin:
                     identifier,
                     "--force-delete",
                     "true",
+                    "--force",
                 ],
             )
         if users:
@@ -293,5 +295,6 @@ class IdentityMixin:
                     identifier,
                     "--force-delete",
                     "true",
+                    "--force",
                 ],
             )
