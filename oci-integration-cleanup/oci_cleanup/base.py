@@ -15,7 +15,7 @@ from typing import Any, Callable, Optional
 
 from .constants import LOGGER
 from .models import ExtraResourceCandidate
-from .oci import OciCli
+from .oci import DELETE_COMMAND_TIMEOUT_SECONDS, OciCli
 from .resources import (
     defined_marker,
     is_owned,
@@ -78,7 +78,12 @@ class CleanupBase:
             if function:
                 function()
             elif command:
-                self.oci.run(command, attempts=3, allow_not_found=True)
+                self.oci.run(
+                    command,
+                    attempts=3,
+                    allow_not_found=True,
+                    timeout_seconds=DELETE_COMMAND_TIMEOUT_SECONDS,
+                )
             entry["status"] = "completed"
             LOGGER.info("Completed: %s", description)
             return True

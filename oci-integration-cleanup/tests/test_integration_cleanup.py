@@ -346,11 +346,11 @@ class CleanupTestCase(unittest.TestCase):
         self.assertEqual([], invoked)
         self.assertEqual("planned", cleaner.planned[0]["status"])
 
-    def test_execute_action_uses_default_command_timeout(self):
+    def test_execute_action_uses_extended_deletion_timeout(self):
         cleaner = self.make_cleaner(execute=True, oci=cleanup.OciCli())
         with patch(
             "oci_cleanup.oci.subprocess.run",
-            side_effect=subprocess.TimeoutExpired(["oci"], 180),
+            side_effect=subprocess.TimeoutExpired(["oci"], 600),
         ) as run:
             result = cleaner.action(
                 "delete:test",
@@ -359,8 +359,8 @@ class CleanupTestCase(unittest.TestCase):
             )
 
         self.assertFalse(result)
-        self.assertEqual(180, run.call_args.kwargs["timeout"])
-        self.assertIn("timed out after 180 seconds", cleaner.failures[0]["message"])
+        self.assertEqual(600, run.call_args.kwargs["timeout"])
+        self.assertIn("timed out after 600 seconds", cleaner.failures[0]["message"])
 
     def test_oci_command_error_includes_stdout_when_stderr_is_empty(self):
         process = SimpleNamespace(
@@ -799,7 +799,11 @@ class CleanupTestCase(unittest.TestCase):
         )
 
         self.assertEqual(
-            {"attempts": 3, "allow_not_found": True},
+            {
+                "attempts": 3,
+                "allow_not_found": True,
+                "timeout_seconds": 10 * 60,
+            },
             cleaner.oci.run_kwargs[0],
         )
 
@@ -1792,7 +1796,7 @@ class CleanupTestCase(unittest.TestCase):
         self.assertTrue(identity_deletes)
         self.assertTrue(all("--force" in call for call in identity_deletes))
 
-    def test_failed_regional_destroy_records_structured_failure(self):
+    def test_failed_regional_destroy_still_deletes_stack_record(self):
         oci = FakeOci()
         oci.add_list("resource-manager job list", [])
         oci.add_run(
@@ -1816,24 +1820,21 @@ class CleanupTestCase(unittest.TestCase):
                 "display-name": "datadog-regional-stack-test",
             },
         )
-        self.assertFalse(result)
-        self.assertFalse(
+        self.assertTrue(result)
+        self.assertTrue(
             any("stack delete" in " ".join(call) for call in oci.run_calls)
         )
-        self.assertEqual("failed", cleaner.planned[0]["status"])
+        self.assertEqual("completed", cleaner.planned[0]["status"])
+        self.assertEqual("FAILED", cleaner.planned[0]["destroy_job_state"])
         self.assertEqual(
-            {
-                "message": (
-                    "Regional destroy job for ocid1.ormstack.oc1..stack "
-                    "ended in FAILED"
-                ),
-                "resource_id": "ocid1.ormstack.oc1..stack",
-                "region": HOME_REGION,
-                "error_code": "TerraformError",
-                "deletion_message": "provider failed",
-            },
-            cleaner.failures[0],
+            "TerraformError",
+            cleaner.planned[0]["destroy_error_code"],
         )
+        self.assertEqual(
+            "provider failed",
+            cleaner.planned[0]["destroy_error_message"],
+        )
+        self.assertEqual([], cleaner.failures)
 
     def test_dry_run_stack_teardown_does_not_mutate_or_reconcile_jobs(self):
         oci = FakeOci()

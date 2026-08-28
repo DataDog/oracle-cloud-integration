@@ -11,6 +11,7 @@ failures and flattens OCI pagination payloads into resource dictionaries.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import time
 from typing import Any, Optional
@@ -20,6 +21,7 @@ from .resources import data_items
 
 
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 3 * 60
+DELETE_COMMAND_TIMEOUT_SECONDS = 10 * 60
 
 
 def _is_not_found(stderr: str, stdout: str) -> bool:
@@ -66,6 +68,10 @@ class OciCli:
                 process = subprocess.run(
                     command,
                     check=False,
+                    env={
+                        **os.environ,
+                        "OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING": "True",
+                    },
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
