@@ -908,6 +908,32 @@ class CleanupTestCase(unittest.TestCase):
             cleanup.CONNECTOR_GROUP_NAME,
             cleanup.resource_name(orphaned[0][1]),
         )
+        oci.add_list("iam policy list", [policy])
+        prompted = self.make_cleaner(execute=True, oci=oci)
+        prompts = []
+        prompted._ask_yes_no = lambda prompt: prompts.append(prompt) or True
+        identity_context = context(
+            domains=[{"url": "https://identity.example"}]
+        )
+
+        prompted.prepare_dynamic_group_cleanup(identity_context)
+        prompted._ask_yes_no = lambda _prompt: self.fail(
+            "identity cleanup prompted after serial preparation"
+        )
+        prompted.cleanup_home_identity(identity_context)
+
+        self.assertEqual(1, len(prompts))
+        self.assertIn(cleanup.FUNCTION_GROUP_NAME, prompts[0])
+        action_ids = [action["id"] for action in prompted.planned]
+        policy_index = action_ids.index("policy:policy")
+        self.assertLess(
+            action_ids.index("dynamic-group:connector-scim"),
+            policy_index,
+        )
+        self.assertLess(
+            action_ids.index("dynamic-group:function-scim"),
+            policy_index,
+        )
 
     def test_functions_cleanup_preserves_customer_application(self):
         oci = FakeOci()

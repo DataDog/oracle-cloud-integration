@@ -44,6 +44,10 @@ class CleanupBase:
         self.regional_stacks_by_region: dict[str, list[dict[str, Any]]] = {}
         self.regional_stack_approvals: dict[tuple[str, str], bool] = {}
         self.regional_stack_confirmations_prepared = False
+        self.identity_policies: list[dict[str, Any]] = []
+        self.dynamic_groups_for_cleanup: list[tuple[str, dict[str, Any]]] = []
+        self.dynamic_group_confirmations_prepared = False
+        self.dynamic_group_cleanup_ready = True
         self._accessible_compartment_ids: Optional[list[str]] = None
 
     def action(

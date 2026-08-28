@@ -27,11 +27,16 @@ def _is_not_found(stderr: str, stdout: str) -> bool:
     code = str(payload.get("code") or "")
     status = int(payload.get("status") or 0)
     message = str(payload.get("message") or "").lower()
+    raw_output = f"{stderr}\n{stdout}".lower()
     return (
         code in {"NotAuthorizedOrNotFound", "NotFound"}
         or status == 404
         or "does not exist" in message
         or " is deleted" in message
+        or (
+            "a vnic attachment could not be found for the given vnic id"
+            in raw_output
+        )
     )
 
 
