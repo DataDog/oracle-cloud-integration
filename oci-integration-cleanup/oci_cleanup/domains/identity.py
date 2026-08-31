@@ -69,7 +69,17 @@ class IdentityMixin:
         self,
         context: CleanupContext,
         policies: list[dict[str, Any]],
+        *,
+        confirm_invalid: bool = False,
     ) -> list[tuple[str, dict[str, Any]]]:
+        policy_candidate = next(
+            (
+                candidate
+                for candidate in policies
+                if resource_name(candidate) == DYNAMIC_POLICY_NAME
+            ),
+            None,
+        )
         policy = next(
             (
                 candidate
@@ -82,9 +92,9 @@ class IdentityMixin:
             ),
             None,
         )
-        if not policy:
-            return []
-        statements = "\n".join(str(value) for value in policy.get("statements", []))
+        statements = "\n".join(
+            str(value) for value in (policy or {}).get("statements", [])
+        )
         expected = {
             CONNECTOR_GROUP_NAME: (
                 CONNECTOR_GROUP_DESCRIPTION,
@@ -120,9 +130,51 @@ class IdentityMixin:
                 str(group.get("description", "")) == description
                 and correct_rule
                 and identifier
-                and identifier in statements
+                and (
+                    identifier in statements
+                    or policy_candidate is None
+                )
             ):
                 validated.append((endpoint, group))
+            elif confirm_invalid:
+                review = {
+                    "id": f"review:dynamic-group:{identifier}",
+                    "description": (
+                        f"Review untagged dynamic group {name} ({identifier})"
+                    ),
+                    "status": "confirmation-required",
+                    "resource_id": identifier,
+                    "region": context.home_region,
+                    "error_code": None,
+                    "deletion_message": (
+                        f"Delete untagged dynamic group {name} ({identifier})"
+                    ),
+                }
+                self.planned.append(review)
+                if not self.execute:
+                    self.dynamic_group_cleanup_ready = False
+                    continue
+                LOGGER.warning(
+                    "Dynamic group %s (%s) failed ownership-chain validation:\n"
+                    "  description: %s\n  matching rule: %s",
+                    name,
+                    identifier,
+                    group.get("description", ""),
+                    matching_rule,
+                )
+                if self._ask_yes_no(
+                    f"Delete this untagged dynamic group {name} ({identifier})?"
+                ):
+                    review["status"] = "approved"
+                    validated.append((endpoint, group))
+                else:
+                    review["status"] = "declined"
+                    self.dynamic_group_cleanup_ready = False
+                    self._record_failure(
+                        f"Dynamic group {name} deletion was not approved",
+                        resource_id=identifier,
+                        region=context.home_region,
+                    )
             else:
                 self._record_failure(
                     f"Dynamic group {name} failed ownership-chain validation; "
@@ -132,8 +184,7 @@ class IdentityMixin:
                 )
         return validated
 
-    def cleanup_home_identity(self, context: CleanupContext) -> None:
-        LOGGER.info("Stage 3/5: cleaning home-region IAM and Identity Domains")
+    def _identity_policies(self, context: CleanupContext) -> list[dict[str, Any]]:
         policies_by_id: dict[str, dict[str, Any]] = {}
         for policy_name in (USER_POLICY_NAME, DYNAMIC_POLICY_NAME):
             for policy in self.oci.list(
@@ -152,8 +203,55 @@ class IdentityMixin:
                 identifier = resource_id(policy)
                 if identifier:
                     policies_by_id[identifier] = policy
-        policies = list(policies_by_id.values())
-        validated_dynamic_groups = self._validated_dynamic_groups(context, policies)
+        return list(policies_by_id.values())
+
+    def prepare_dynamic_group_cleanup(self, context: CleanupContext) -> None:
+        """Inventory and confirm untagged dynamic groups before cleanup starts."""
+
+        self.identity_policies = self._identity_policies(context)
+        self.dynamic_group_cleanup_ready = True
+        self.dynamic_groups_for_cleanup = self._validated_dynamic_groups(
+            context,
+            self.identity_policies,
+            confirm_invalid=True,
+        )
+        self.dynamic_group_confirmations_prepared = True
+
+    def cleanup_home_identity(self, context: CleanupContext) -> None:
+        LOGGER.info("Stage 3/5: cleaning home-region IAM and Identity Domains")
+        failure_count = len(self.failures)
+        if self.dynamic_group_confirmations_prepared:
+            policies = self.identity_policies
+            validated_dynamic_groups = self.dynamic_groups_for_cleanup
+        else:
+            policies = self._identity_policies(context)
+            validated_dynamic_groups = self._validated_dynamic_groups(
+                context, policies
+            )
+        dynamic_groups_deleted = (
+            self.dynamic_group_cleanup_ready
+            and len(self.failures) == failure_count
+        )
+
+        for endpoint, group in validated_dynamic_groups:
+            identifier = resource_id(group)
+            if not self.action(
+                f"dynamic-group:{identifier}",
+                f"Delete validated dynamic resource group {resource_name(group)}",
+                command=[
+                    "identity-domains",
+                    "dynamic-resource-group",
+                    "delete",
+                    "--endpoint",
+                    endpoint,
+                    "--dynamic-resource-group-id",
+                    identifier,
+                    "--force-delete",
+                    "true",
+                    "--force",
+                ],
+            ):
+                dynamic_groups_deleted = False
 
         for policy in policies:
             if not exact_owned(
@@ -161,6 +259,15 @@ class IdentityMixin:
                 expected_names={USER_POLICY_NAME, DYNAMIC_POLICY_NAME},
                 compartment_id=context.tenancy_id,
             ):
+                continue
+            if (
+                resource_name(policy) == DYNAMIC_POLICY_NAME
+                and not dynamic_groups_deleted
+            ):
+                LOGGER.warning(
+                    "Preserving %s because dynamic group cleanup was incomplete",
+                    DYNAMIC_POLICY_NAME,
+                )
                 continue
             identifier = resource_id(policy)
             self.action(
@@ -174,25 +281,6 @@ class IdentityMixin:
                     "delete",
                     "--policy-id",
                     identifier,
-                    "--force",
-                ],
-            )
-
-        for endpoint, group in validated_dynamic_groups:
-            identifier = resource_id(group)
-            self.action(
-                f"dynamic-group:{identifier}",
-                f"Delete validated dynamic resource group {resource_name(group)}",
-                command=[
-                    "identity-domains",
-                    "dynamic-resource-group",
-                    "delete",
-                    "--endpoint",
-                    endpoint,
-                    "--dynamic-resource-group-id",
-                    identifier,
-                    "--force-delete",
-                    "true",
                     "--force",
                 ],
             )

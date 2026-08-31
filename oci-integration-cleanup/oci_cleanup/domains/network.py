@@ -25,6 +25,7 @@ from ..constants import (
 )
 from ..errors import CommandError
 from ..models import CleanupContext
+from ..oci import DELETE_COMMAND_TIMEOUT_SECONDS
 from ..resources import (
     exact_owned,
     is_owned,
@@ -372,6 +373,7 @@ class NetworkMixin:
                     command,
                     attempts=3,
                     allow_not_found=True,
+                    timeout_seconds=DELETE_COMMAND_TIMEOUT_SECONDS,
                 )
             except CommandError as error:
                 retryable = (
