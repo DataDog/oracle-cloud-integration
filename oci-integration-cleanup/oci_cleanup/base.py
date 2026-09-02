@@ -15,7 +15,7 @@ from typing import Any, Callable, Optional
 
 from .constants import LOGGER
 from .models import ExtraResourceCandidate
-from .oci import OciCli
+from .oci import DELETE_COMMAND_TIMEOUT_SECONDS, OciCli
 from .resources import (
     defined_marker,
     is_owned,
@@ -41,6 +41,13 @@ class CleanupBase:
         self.kms_pending = False
         self.extra_candidates: list[ExtraResourceCandidate] = []
         self.approved_extra_ids: set[str] = set()
+        self.regional_stacks_by_region: dict[str, list[dict[str, Any]]] = {}
+        self.regional_stack_approvals: dict[tuple[str, str], bool] = {}
+        self.regional_stack_confirmations_prepared = False
+        self.identity_policies: list[dict[str, Any]] = []
+        self.dynamic_groups_for_cleanup: list[tuple[str, dict[str, Any]]] = []
+        self.dynamic_group_confirmations_prepared = False
+        self.dynamic_group_cleanup_ready = True
         self._accessible_compartment_ids: Optional[list[str]] = None
 
     def action(
@@ -71,7 +78,12 @@ class CleanupBase:
             if function:
                 function()
             elif command:
-                self.oci.run(command, attempts=3, allow_not_found=True)
+                self.oci.run(
+                    command,
+                    attempts=3,
+                    allow_not_found=True,
+                    timeout_seconds=DELETE_COMMAND_TIMEOUT_SECONDS,
+                )
             entry["status"] = "completed"
             LOGGER.info("Completed: %s", description)
             return True

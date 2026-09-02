@@ -117,8 +117,6 @@ class TagsMixin:
                     namespace_id,
                     "--force",
                     "--wait-for-state",
-                    "SUCCEEDED",
-                    "--wait-for-state",
-                    "FAILED",
+                    "DELETED",
                 ],
             )

@@ -4,8 +4,8 @@ Safety boundary: preserves failed stacks for retry and only accepts constrained 
 Cleanup sequence role: handles regional stacks before orphan services and the parent near the end.
 
 ``StacksMixin`` validates region-prefixed child stacks and the selected parent stack,
-reconciles Resource Manager destroy jobs, and deletes a stack record only after
-OCI reports a successful destroy.
+reconciles Resource Manager destroy jobs, and removes stack records even when
+legacy Terraform state prevents a successful destroy.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from typing import Any
 from ..constants import LOGGER, REGIONAL_STACK_PREFIX
 from ..errors import CleanupError
 from ..models import CleanupContext
+from ..oci import DELETE_COMMAND_TIMEOUT_SECONDS
 from ..resources import (
     exact_owned,
     is_owned,
@@ -25,7 +26,6 @@ from ..resources import (
     resource_id,
     resource_name,
 )
-
 
 class StacksMixin:
     """Destroy validated regional and parent Resource Manager stacks."""
@@ -82,6 +82,7 @@ class StacksMixin:
                 "CANCELED",
             ],
             attempts=2,
+            timeout_seconds=DELETE_COMMAND_TIMEOUT_SECONDS,
         )
         return result.get("data", result)
 
@@ -107,6 +108,7 @@ class StacksMixin:
                 "FAILED",
             ],
             attempts=2,
+            timeout_seconds=DELETE_COMMAND_TIMEOUT_SECONDS,
         )
         return result.get("data", result)
 
@@ -139,6 +141,7 @@ class StacksMixin:
         if not self.execute:
             return True
 
+        job: dict[str, Any] = {}
         try:
             destroy_jobs = [
                 job
@@ -175,20 +178,29 @@ class StacksMixin:
             final_state = lifecycle_state(job)
             if final_state != "SUCCEEDED":
                 error_code, deletion_message = self._job_failure(job)
-                failure = self._record_failure(
-                    f"{stack_kind.capitalize()} destroy job for {stack_id} "
-                    f"ended in {final_state or 'UNKNOWN'}",
-                    resource_id=stack_id,
-                    region=region,
-                    error_code=error_code,
-                    deletion_message=deletion_message,
+                LOGGER.warning(
+                    "%s destroy job for %s ended in %s%s; deleting the stack "
+                    "record anyway",
+                    stack_kind.capitalize(),
+                    stack_id,
+                    final_state or "UNKNOWN",
+                    f": {deletion_message}" if deletion_message else "",
                 )
-                action["status"] = "failed"
-                action["error"] = failure["message"]
-                action["error_code"] = failure["error_code"]
-                action["deletion_message"] = failure["deletion_message"]
-                return False
+                action["destroy_job_state"] = final_state or "UNKNOWN"
+                action["destroy_error_code"] = error_code
+                action["destroy_error_message"] = deletion_message
+        except Exception as error:
+            LOGGER.warning(
+                "%s destroy attempt for %s failed: %s; deleting the stack "
+                "record anyway",
+                stack_kind.capitalize(),
+                stack_id,
+                error,
+            )
+            action["destroy_job_state"] = "ERROR"
+            action["destroy_error"] = str(error)
 
+        try:
             self.oci.run(
                 [
                     "--region",
@@ -204,15 +216,14 @@ class StacksMixin:
                 ],
                 attempts=2,
                 allow_not_found=True,
+                timeout_seconds=DELETE_COMMAND_TIMEOUT_SECONDS,
             )
             action["status"] = "completed"
             action["destroy_job_id"] = resource_id(job)
             return True
         except Exception as error:
-            # Preserve the stack and its state. Direct orphan cleanup can still
-            # proceed, but the failure remains visible and prevents IAM teardown.
             failure = self._record_failure(
-                f"{description}: {error}",
+                f"Delete {stack_kind} stack record {name} ({stack_id}): {error}",
                 resource_id=stack_id,
                 region=region,
                 error=error,
@@ -233,25 +244,61 @@ class StacksMixin:
             stack_kind="regional",
         )
 
+    def _list_matching_regional_stacks(
+        self, context: CleanupContext, region: str
+    ) -> list[dict[str, Any]]:
+        return [
+            stack
+            for stack in self._list_region(
+                region,
+                [
+                    "resource-manager",
+                    "stack",
+                    "list",
+                    "--compartment-id",
+                    context.compartment_id,
+                ],
+            )
+            if resource_name(stack).startswith(REGIONAL_STACK_PREFIX)
+            and resource_compartment(stack) == context.compartment_id
+        ]
+
+    def prepare_regional_stack_cleanup(self, context: CleanupContext) -> None:
+        """Inventory and confirm regional stacks before workers start."""
+
+        for region in context.regions:
+            stacks = self._list_matching_regional_stacks(context, region)
+            self.regional_stacks_by_region[region] = stacks
+            if not self.execute:
+                continue
+            for stack in stacks:
+                if is_owned(stack):
+                    continue
+                name = resource_name(stack)
+                identifier = resource_id(stack)
+                LOGGER.warning(
+                    "Regional stack %s (%s) in %s has the expected Datadog "
+                    "name but no ownedby=datadog tag",
+                    name,
+                    identifier,
+                    region,
+                )
+                self.regional_stack_approvals[(region, identifier)] = (
+                    self._ask_yes_no(
+                        f"Delete this untagged regional stack {name}?"
+                    )
+                )
+        self.regional_stack_confirmations_prepared = True
+
     def cleanup_regional_stacks(
         self, context: CleanupContext, region: str
     ) -> None:
-        stacks = self._list_region(
-            region,
-            [
-                "resource-manager",
-                "stack",
-                "list",
-                "--compartment-id",
-                context.compartment_id,
-            ],
-        )
+        if self.regional_stack_confirmations_prepared:
+            stacks = self.regional_stacks_by_region.get(region, [])
+        else:
+            stacks = self._list_matching_regional_stacks(context, region)
         for stack in stacks:
             name = resource_name(stack)
-            if not name.startswith(REGIONAL_STACK_PREFIX):
-                continue
-            if resource_compartment(stack) != context.compartment_id:
-                continue
             if exact_owned(
                 stack,
                 expected_names={name},
@@ -268,19 +315,13 @@ class StacksMixin:
                     requires_confirmation=True,
                 )
                 continue
-            LOGGER.warning(
-                "Regional stack %s (%s) in %s has the expected Datadog name "
-                "but no ownedby=datadog tag",
-                name,
-                resource_id(stack),
-                region,
-            )
-            if self._ask_yes_no(f"Delete this untagged regional stack {name}?"):
+            identifier = resource_id(stack)
+            if self.regional_stack_approvals.get((region, identifier), False):
                 self.destroy_regional_stack(region, stack)
             else:
                 self._record_failure(
                     "Untagged regional stack deletion was not approved",
-                    resource_id=resource_id(stack),
+                    resource_id=identifier,
                     region=region,
                 )
 
@@ -308,30 +349,6 @@ class StacksMixin:
                 self.args.parent_stack_id,
             )
             return
-        if not is_owned(stack):
-            name = resource_name(stack) or self.args.parent_stack_id
-            if not self.execute:
-                self._destroy_stack(
-                    context.home_region,
-                    stack,
-                    action_prefix="parent-stack",
-                    stack_kind="parent",
-                    requires_confirmation=True,
-                )
-                return
-            LOGGER.warning(
-                "Explicitly supplied parent stack %s (%s) has no "
-                "ownedby=datadog tag",
-                name,
-                self.args.parent_stack_id,
-            )
-            if not self._ask_yes_no(f"Delete this untagged parent stack {name}?"):
-                self._record_failure(
-                    "Untagged parent stack deletion was not approved",
-                    resource_id=resource_id(stack),
-                    region=context.home_region,
-                )
-                return
         self._destroy_stack(
             context.home_region,
             stack,

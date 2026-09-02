@@ -11,6 +11,7 @@ failures and flattens OCI pagination payloads into resource dictionaries.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import time
 from typing import Any, Optional
@@ -19,16 +20,25 @@ from .errors import CommandError, _oci_payload
 from .resources import data_items
 
 
+DEFAULT_COMMAND_TIMEOUT_SECONDS = 3 * 60
+DELETE_COMMAND_TIMEOUT_SECONDS = 10 * 60
+
+
 def _is_not_found(stderr: str, stdout: str) -> bool:
     payload = _oci_payload(stderr) or _oci_payload(stdout)
     code = str(payload.get("code") or "")
     status = int(payload.get("status") or 0)
     message = str(payload.get("message") or "").lower()
+    raw_output = f"{stderr}\n{stdout}".lower()
     return (
         code in {"NotAuthorizedOrNotFound", "NotFound"}
         or status == 404
         or "does not exist" in message
         or " is deleted" in message
+        or (
+            "a vnic attachment could not be found for the given vnic id"
+            in raw_output
+        )
     )
 
 
@@ -49,17 +59,32 @@ class OciCli:
         *,
         attempts: int = 1,
         allow_not_found: bool = False,
+        timeout_seconds: Optional[float] = DEFAULT_COMMAND_TIMEOUT_SECONDS,
     ) -> dict[str, Any]:
         command = self.command(args)
         last_error: Optional[CommandError] = None
         for attempt in range(1, attempts + 1):
-            process = subprocess.run(
-                command,
-                check=False,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
+            try:
+                process = subprocess.run(
+                    command,
+                    check=False,
+                    env={
+                        **os.environ,
+                        "OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING": "True",
+                    },
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=timeout_seconds,
+                )
+            except subprocess.TimeoutExpired as error:
+                message = (
+                    f"OCI CLI command timed out after {timeout_seconds:g} seconds"
+                )
+                output = str(error.stderr or error.stdout or "").strip()
+                if output:
+                    message = f"{message}: {output}"
+                raise CommandError(command, 124, message) from error
             if process.returncode == 0:
                 output = process.stdout.strip()
                 if not output:
@@ -94,5 +119,16 @@ class OciCli:
         assert last_error is not None
         raise last_error
 
-    def list(self, args: list[str]) -> list[dict[str, Any]]:
-        return data_items(self.run([*args, "--all"], attempts=2))
+    def list(
+        self,
+        args: list[str],
+        *,
+        timeout_seconds: Optional[float] = DEFAULT_COMMAND_TIMEOUT_SECONDS,
+    ) -> list[dict[str, Any]]:
+        return data_items(
+            self.run(
+                [*args, "--all"],
+                attempts=2,
+                timeout_seconds=timeout_seconds,
+            )
+        )

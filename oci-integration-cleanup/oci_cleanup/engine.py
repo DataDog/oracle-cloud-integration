@@ -1,6 +1,6 @@
 """Responsibility: coordinate the complete cleanup sequence for the assembled engine.
 
-Safety boundary: withholds IAM and container teardown whenever regional or confirmation failures remain.
+Safety boundary: withholds container teardown whenever regional or confirmation failures remain.
 Cleanup sequence role: drives discovery, confirmations, regional work, IAM, tags, stacks, and compartment cleanup.
 
 ``EngineMixin.run`` is the stage orchestrator, including concurrent regional jobs
@@ -38,6 +38,8 @@ class EngineMixin:
         )
         context = self.discover()
         self.prepare_extra_resource_cleanup(context)
+        self.prepare_dynamic_group_cleanup(context)
+        self.prepare_regional_stack_cleanup(context)
 
         worker_count = min(self.args.region_workers, len(context.regions))
         LOGGER.info(
@@ -64,18 +66,9 @@ class EngineMixin:
                 for future in as_completed(futures):
                     future.result()
 
-        if self.failures:
-            # Keep IAM and credentials so failed child-stack destroy jobs can be
-            # retried and declined extra resources remain usable. This is safer
-            # than partially removing authorization.
-            self._preserve(
-                "home-identity",
-                "Preserve IAM because cleanup has unresolved failures",
-            )
-        else:
-            self.cleanup_home_identity(context)
-            if not self.failures:
-                self.cleanup_tags(context)
+        self.cleanup_home_identity(context)
+        if not self.failures:
+            self.cleanup_tags(context)
 
         if not self.failures:
             self.cleanup_parent_stack(context)

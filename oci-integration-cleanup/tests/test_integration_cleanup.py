@@ -5,6 +5,7 @@ import io
 import json
 import os
 import pathlib
+import subprocess
 import sys
 import tempfile
 import threading
@@ -21,6 +22,7 @@ from oci_cleanup.resources import resource_field, resource_management_endpoint
 
 
 TENANCY = "ocid1.tenancy.oc1..test"
+DOMAIN = "ocid1.domain.oc1..datadog"
 COMPARTMENT = "ocid1.compartment.oc1..datadog"
 HOME_REGION = "us-ashburn-1"
 
@@ -38,6 +40,7 @@ def parse_cleanup_args(argv, *, config: str = ""):
                 "OCI_CLI_CONFIG_FILE": str(config_path),
                 "OCI_CLI_PROFILE": "",
                 "OCI_CLI_TENANCY": "",
+                "OCI_CLI_USER": "",
             },
         ):
             return cleanup.parse_args(argv)
@@ -48,6 +51,7 @@ class FakeOci:
         self.list_responses = {}
         self.run_responses = {}
         self.list_calls = []
+        self.list_kwargs = []
         self.run_calls = []
         self.run_kwargs = []
 
@@ -61,9 +65,10 @@ class FakeOci:
     def add_run(self, contains, response):
         self.run_responses[contains] = response
 
-    def list(self, args):
+    def list(self, args, **kwargs):
         key = self._key(args)
         self.list_calls.append(args)
+        self.list_kwargs.append(kwargs)
         for contains, response in self.list_responses.items():
             if contains in key:
                 if isinstance(response, Exception):
@@ -85,6 +90,25 @@ class FakeOci:
 
 def owned(resource):
     return {**resource, "freeform-tags": {"ownedby": "datadog"}}
+
+
+def add_profile_domain(
+    oci,
+    *,
+    replicas=None,
+):
+    domain = {
+        "id": DOMAIN,
+        "display-name": "Datadog",
+        "url": "https://datadog.identity.example",
+        "home-region": HOME_REGION,
+        "replica-regions": [
+            {"region": region} for region in (replicas or [])
+        ],
+        "lifecycle-state": "ACTIVE",
+    }
+    oci.add_list("iam domain list", [domain])
+    return domain
 
 
 def context(**overrides):
@@ -322,18 +346,52 @@ class CleanupTestCase(unittest.TestCase):
         self.assertEqual([], invoked)
         self.assertEqual("planned", cleaner.planned[0]["status"])
 
+    def test_execute_action_uses_extended_deletion_timeout(self):
+        cleaner = self.make_cleaner(execute=True, oci=cleanup.OciCli())
+        with patch(
+            "oci_cleanup.oci.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(["oci"], 600),
+        ) as run:
+            result = cleaner.action(
+                "delete:test",
+                "Delete test",
+                command=["compute", "instance", "terminate"],
+            )
+
+        self.assertFalse(result)
+        self.assertEqual(600, run.call_args.kwargs["timeout"])
+        self.assertIn("timed out after 600 seconds", cleaner.failures[0]["message"])
+
     def test_oci_command_error_includes_stdout_when_stderr_is_empty(self):
         process = SimpleNamespace(
             returncode=2,
             stdout="Invalid value for --wait-for-state: TERMINATED",
             stderr="",
         )
-        with patch("oci_cleanup.oci.subprocess.run", return_value=process):
+        with patch(
+            "oci_cleanup.oci.subprocess.run",
+            return_value=process,
+        ) as run:
             with self.assertRaises(cleanup.CommandError) as raised:
                 cleanup.OciCli().run(["compute", "instance", "terminate"])
 
         self.assertIn("Invalid value", str(raised.exception))
         self.assertEqual(process.stdout, raised.exception.stdout)
+        self.assertEqual(180, run.call_args.kwargs["timeout"])
+
+    def test_oci_command_timeout_is_reported(self):
+        with patch(
+            "oci_cleanup.oci.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(["oci"], 60),
+        ) as run:
+            with self.assertRaises(cleanup.CommandError) as raised:
+                cleanup.OciCli().run(
+                    ["identity-domains", "users", "list"],
+                    timeout_seconds=60,
+                )
+
+        self.assertIn("timed out after 60 seconds", str(raised.exception))
+        self.assertEqual(60, run.call_args.kwargs["timeout"])
 
     def test_extra_resource_dry_run_reports_without_prompting(self):
         cleaner = self.make_cleaner()
@@ -447,6 +505,7 @@ class CleanupTestCase(unittest.TestCase):
             for kind in [
                 "service-gateway",
                 "route-table",
+                "security-list",
                 "subnet",
                 "secondary-vnic",
             ]
@@ -465,6 +524,7 @@ class CleanupTestCase(unittest.TestCase):
             [
                 "delete secondary-vnic",
                 "delete subnet",
+                "delete security-list",
                 "delete route-table",
                 "delete service-gateway",
             ],
@@ -530,7 +590,7 @@ class CleanupTestCase(unittest.TestCase):
                 }
             ],
         )
-        oci.add_list("iam domain list", [])
+        add_profile_domain(oci)
         oci.add_run(
             "freeformTags.key = 'ownedby'",
             {
@@ -566,12 +626,105 @@ class CleanupTestCase(unittest.TestCase):
                 }
             ],
         )
-        oci.add_list("iam domain list", [])
+        add_profile_domain(oci)
         cleaner = self.make_cleaner(oci=oci)
 
         discovered = cleaner.discover()
 
         self.assertEqual(COMPARTMENT, discovered.compartment_id)
+
+    def test_discovery_keeps_subscribed_regions_and_all_active_domains(self):
+        oci = FakeOci()
+        oci.add_list(
+            "iam region-subscription list",
+            [
+                {
+                    "region-name": HOME_REGION,
+                    "is-home-region": True,
+                    "status": "READY",
+                },
+                {
+                    "region-name": "sa-saopaulo-1",
+                    "is-home-region": False,
+                    "status": "READY",
+                },
+            ],
+        )
+        first_domain = add_profile_domain(oci)
+        other_domain = {
+            "id": "other-domain",
+            "display-name": "Other",
+            "url": "https://other.identity.example",
+            "home-region": "sa-saopaulo-1",
+            "replica-regions": [],
+            "lifecycle-state": "ACTIVE",
+        }
+        oci.add_list("iam domain list", [first_domain, other_domain])
+        cleaner = self.make_cleaner(oci=oci)
+
+        discovered = cleaner.discover()
+
+        self.assertEqual(["sa-saopaulo-1", HOME_REGION], discovered.regions)
+        self.assertEqual(
+            [DOMAIN, "other-domain"],
+            [cleanup.resource_id(domain) for domain in discovered.domains],
+        )
+        self.assertFalse(
+            any(
+                "identity-domains" in " ".join(call)
+                for call in oci.list_calls
+            )
+        )
+
+    def test_discovery_skips_unauthorized_subscribed_regions(self):
+        oci = FakeOci()
+        oci.add_list(
+            "iam region-subscription list",
+            [
+                {
+                    "region-name": HOME_REGION,
+                    "is-home-region": True,
+                    "status": "READY",
+                },
+                {
+                    "region-name": "sa-saopaulo-1",
+                    "is-home-region": False,
+                    "status": "READY",
+                },
+            ],
+        )
+        oci.add_list(
+            "iam domain list",
+            [
+                {
+                    "id": DOMAIN,
+                    "display-name": "Datadog",
+                    "url": "https://datadog.identity.example",
+                    "home-region": HOME_REGION,
+                    "replica-regions": [],
+                    "lifecycle-state": "ACTIVE",
+                }
+            ],
+        )
+        oci.add_run(
+            "--region sa-saopaulo-1 search resource",
+            cleanup.CommandError(
+                ["oci", "--region", "sa-saopaulo-1", "search"],
+                1,
+                json.dumps(
+                    {
+                        "code": "NotAuthorized",
+                        "status": 401,
+                        "message": "Region is not available",
+                    }
+                ),
+            ),
+        )
+        cleaner = self.make_cleaner(oci=oci)
+
+        discovered = cleaner.discover()
+
+        self.assertEqual([HOME_REGION], discovered.regions)
 
     def test_discovery_aborts_on_ambiguous_tagged_compartments(self):
         oci = FakeOci()
@@ -585,7 +738,7 @@ class CleanupTestCase(unittest.TestCase):
                 }
             ],
         )
-        oci.add_list("iam domain list", [])
+        add_profile_domain(oci)
         oci.add_run(
             "freeformTags.key = 'ownedby'",
             {
@@ -646,7 +799,11 @@ class CleanupTestCase(unittest.TestCase):
         )
 
         self.assertEqual(
-            {"attempts": 3, "allow_not_found": True},
+            {
+                "attempts": 3,
+                "allow_not_found": True,
+                "timeout_seconds": 10 * 60,
+            },
             cleaner.oci.run_kwargs[0],
         )
 
@@ -729,11 +886,57 @@ class CleanupTestCase(unittest.TestCase):
         )
         self.assertEqual(1, len(validated))
         self.assertEqual(cleanup.CONNECTOR_GROUP_NAME, cleanup.resource_name(validated[0][1]))
+        dynamic_group_args = next(
+            call for call in oci.list_calls if "dynamic-resource-groups" in call
+        )
+        dynamic_group_call = " ".join(dynamic_group_args)
+        self.assertIn(
+            f'displayName eq "{cleanup.CONNECTOR_GROUP_NAME}"',
+            dynamic_group_call,
+        )
+        self.assertIn(
+            f'displayName eq "{cleanup.FUNCTION_GROUP_NAME}"',
+            dynamic_group_call,
+        )
         self.assertTrue(
             any(
                 "manual review required" in failure["message"]
                 for failure in cleaner.failures
             )
+        )
+        orphaned = cleaner._validated_dynamic_groups(
+            context(domains=[{"url": "https://identity.example"}]), []
+        )
+        self.assertEqual(1, len(orphaned))
+        self.assertEqual(
+            cleanup.CONNECTOR_GROUP_NAME,
+            cleanup.resource_name(orphaned[0][1]),
+        )
+        oci.add_list("iam policy list", [policy])
+        prompted = self.make_cleaner(execute=True, oci=oci)
+        prompts = []
+        prompted._ask_yes_no = lambda prompt: prompts.append(prompt) or True
+        identity_context = context(
+            domains=[{"url": "https://identity.example"}]
+        )
+
+        prompted.prepare_dynamic_group_cleanup(identity_context)
+        prompted._ask_yes_no = lambda _prompt: self.fail(
+            "identity cleanup prompted after serial preparation"
+        )
+        prompted.cleanup_home_identity(identity_context)
+
+        self.assertEqual(1, len(prompts))
+        self.assertIn(cleanup.FUNCTION_GROUP_NAME, prompts[0])
+        action_ids = [action["id"] for action in prompted.planned]
+        policy_index = action_ids.index("policy:policy")
+        self.assertLess(
+            action_ids.index("dynamic-group:connector-scim"),
+            policy_index,
+        )
+        self.assertLess(
+            action_ids.index("dynamic-group:function-scim"),
+            policy_index,
         )
 
     def test_functions_cleanup_preserves_customer_application(self):
@@ -1010,6 +1213,87 @@ class CleanupTestCase(unittest.TestCase):
         self.assertEqual("unverified-secondary-vnic", candidate.kind)
         self.assertIn("detach-vnic", candidate.command or ())
         self.assertIn("instance-compartment", candidate.command or ())
+
+    def test_discovers_cross_compartment_subnet_and_nondefault_security_list(self):
+        oci = FakeOci()
+        oci.add_list(
+            "network vcn list",
+            [
+                owned(
+                    {
+                        "id": "dd-vcn",
+                        "display-name": cleanup.VCN_NAME,
+                        "compartment-id": COMPARTMENT,
+                        "default-security-list-id": "default-security-list",
+                    }
+                )
+            ],
+        )
+        oci.add_list("network subnet list", [])
+        oci.add_list(
+            "network security-list list",
+            [{"id": "default-security-list", "display-name": "Default"}],
+        )
+        oci.add_list("network route-table list", [])
+        oci.add_list("network nat-gateway list", [])
+        oci.add_list("network service-gateway list", [])
+        oci.add_list("network internet-gateway list", [])
+        oci.add_list("network local-peering-gateway list", [])
+        oci.add_run(
+            "query Subnet resources",
+            {"data": {"items": [{"identifier": "cross-compartment-subnet"}]}},
+        )
+        oci.add_run(
+            "network subnet get",
+            {
+                "data": {
+                    "id": "cross-compartment-subnet",
+                    "display-name": "customer-subnet",
+                    "compartment-id": "other-compartment",
+                }
+            },
+        )
+        oci.add_run(
+            "query SecurityList resources",
+            {
+                "data": {
+                    "items": [
+                        {"identifier": "default-security-list"},
+                        {"identifier": "custom-security-list"},
+                    ]
+                }
+            },
+        )
+        oci.add_run(
+            "network security-list get",
+            {
+                "data": {
+                    "id": "custom-security-list",
+                    "display-name": "customer-security-list",
+                    "compartment-id": "other-compartment",
+                }
+            },
+        )
+
+        candidates = self.make_cleaner(oci=oci)._discover_network_extras(
+            context(), HOME_REGION
+        )
+        by_kind = {candidate.kind: candidate for candidate in candidates}
+
+        self.assertEqual(
+            "cross-compartment-subnet", by_kind["subnet"].resource_id
+        )
+        self.assertEqual(
+            "custom-security-list", by_kind["security-list"].resource_id
+        )
+        self.assertIn(
+            "security-list delete",
+            " ".join(by_kind["security-list"].command or ()),
+        )
+        self.assertNotIn(
+            "default-security-list",
+            [candidate.resource_id for candidate in candidates],
+        )
 
     def test_discovers_primary_vnic_attachment_in_another_compartment(self):
         oci = FakeOci()
@@ -1398,6 +1682,7 @@ class CleanupTestCase(unittest.TestCase):
         self.assertIn("SUCCEEDED", delete)
         self.assertIn("FAILED", delete)
         self.assertNotIn("DELETED", delete)
+        self.assertIn("(connector)", cleaner.planned[0]["description"])
 
     def test_marker_proven_event_rule_outside_target_compartment_is_deleted(self):
         oci = FakeOci()
@@ -1437,6 +1722,10 @@ class CleanupTestCase(unittest.TestCase):
         )
         self.assertEqual("DELETED", event_delete[-1])
         self.assertEqual("DELETED", stream_delete[-1])
+        self.assertTrue(all(
+            action["id"].rsplit(":", 1)[-1] in action["description"]
+            for action in cleaner.planned
+        ))
 
     def test_identity_cleanup_deletes_keys_only_for_tagged_user(self):
         oci = FakeOci()
@@ -1456,7 +1745,7 @@ class CleanupTestCase(unittest.TestCase):
             "identity-domains api-keys list",
             [{"id": "key-1"}, {"id": "key-2"}],
         )
-        cleaner = self.make_cleaner(oci=oci)
+        cleaner = self.make_cleaner(oci=oci, execute=True)
         cleaner.cleanup_home_identity(
             context(domains=[{"url": "https://identity.example"}])
         )
@@ -1472,8 +1761,42 @@ class CleanupTestCase(unittest.TestCase):
         ]
         self.assertEqual(1, len(api_key_calls))
         self.assertIn('user.value eq "scim-user"', api_key_calls[0])
+        user_call = next(
+            " ".join(call)
+            for call in oci.list_calls
+            if "identity-domains users list" in " ".join(call)
+        )
+        group_call = next(
+            " ".join(call)
+            for call in oci.list_calls
+            if "identity-domains groups list" in " ".join(call)
+        )
+        self.assertIn(f'userName eq "{cleanup.USER_NAME}"', user_call)
+        self.assertIn(f'displayName eq "{cleanup.GROUP_NAME}"', group_call)
+        policy_calls = [
+            " ".join(call)
+            for call in oci.list_calls
+            if "iam policy list" in " ".join(call)
+        ]
+        self.assertEqual(2, len(policy_calls))
+        self.assertTrue(
+            any(f"--name {cleanup.USER_POLICY_NAME}" in call for call in policy_calls)
+        )
+        self.assertTrue(
+            any(
+                f"--name {cleanup.DYNAMIC_POLICY_NAME}" in call
+                for call in policy_calls
+            )
+        )
+        identity_deletes = [
+            call
+            for call in oci.run_calls
+            if "identity-domains" in call and "delete" in call
+        ]
+        self.assertTrue(identity_deletes)
+        self.assertTrue(all("--force" in call for call in identity_deletes))
 
-    def test_failed_regional_destroy_records_structured_failure(self):
+    def test_failed_regional_destroy_still_deletes_stack_record(self):
         oci = FakeOci()
         oci.add_list("resource-manager job list", [])
         oci.add_run(
@@ -1497,24 +1820,21 @@ class CleanupTestCase(unittest.TestCase):
                 "display-name": "datadog-regional-stack-test",
             },
         )
-        self.assertFalse(result)
-        self.assertFalse(
+        self.assertTrue(result)
+        self.assertTrue(
             any("stack delete" in " ".join(call) for call in oci.run_calls)
         )
-        self.assertEqual("failed", cleaner.planned[0]["status"])
+        self.assertEqual("completed", cleaner.planned[0]["status"])
+        self.assertEqual("FAILED", cleaner.planned[0]["destroy_job_state"])
         self.assertEqual(
-            {
-                "message": (
-                    "Regional destroy job for ocid1.ormstack.oc1..stack "
-                    "ended in FAILED"
-                ),
-                "resource_id": "ocid1.ormstack.oc1..stack",
-                "region": HOME_REGION,
-                "error_code": "TerraformError",
-                "deletion_message": "provider failed",
-            },
-            cleaner.failures[0],
+            "TerraformError",
+            cleaner.planned[0]["destroy_error_code"],
         )
+        self.assertEqual(
+            "provider failed",
+            cleaner.planned[0]["destroy_error_message"],
+        )
+        self.assertEqual([], cleaner.failures)
 
     def test_dry_run_stack_teardown_does_not_mutate_or_reconcile_jobs(self):
         oci = FakeOci()
@@ -1761,6 +2081,10 @@ class CleanupTestCase(unittest.TestCase):
             lambda region, stack: destroyed.append((region, stack["id"]))
         )
 
+        cleaner.prepare_regional_stack_cleanup(context())
+        cleaner._ask_yes_no = lambda _prompt: self.fail(
+            "worker cleanup prompted after serial preparation"
+        )
         cleaner.cleanup_regional_stacks(context(), HOME_REGION)
 
         self.assertEqual(
@@ -1787,6 +2111,7 @@ class CleanupTestCase(unittest.TestCase):
             "declined stack was destroyed"
         )
 
+        cleaner.prepare_regional_stack_cleanup(context())
         cleaner.cleanup_regional_stacks(context(), HOME_REGION)
 
         self.assertEqual("untagged-stack", cleaner.failures[0]["resource_id"])
@@ -1875,7 +2200,7 @@ class CleanupTestCase(unittest.TestCase):
             any("create-destroy-job" in call for call in oci.run_calls)
         )
 
-    def test_parent_stack_cleanup_plans_confirmation_for_untagged_stack(self):
+    def test_parent_stack_cleanup_plans_explicit_untagged_stack(self):
         oci = FakeOci()
         oci.add_run(
             "resource-manager stack get",
@@ -1898,9 +2223,9 @@ class CleanupTestCase(unittest.TestCase):
             [f"parent-stack:{HOME_REGION}:customer-stack"],
             [action["id"] for action in cleaner.planned],
         )
-        self.assertTrue(cleaner.planned[0]["requires_confirmation"])
+        self.assertNotIn("requires_confirmation", cleaner.planned[0])
 
-    def test_parent_stack_cleanup_prompts_for_untagged_stack(self):
+    def test_parent_stack_cleanup_does_not_prompt_for_explicit_stack(self):
         oci = FakeOci()
         oci.add_run(
             "resource-manager stack get",
@@ -1916,9 +2241,10 @@ class CleanupTestCase(unittest.TestCase):
             oci=oci,
             args=argparse.Namespace(parent_stack_id="parent-stack"),
         )
-        prompts = []
         destroyed = []
-        cleaner._ask_yes_no = lambda prompt: prompts.append(prompt) or True
+        cleaner._ask_yes_no = lambda _prompt: self.fail(
+            "explicit parent stack prompted"
+        )
         cleaner._destroy_stack = (
             lambda region, stack, **kwargs: destroyed.append(
                 (region, stack["id"], kwargs["stack_kind"])
@@ -1931,7 +2257,6 @@ class CleanupTestCase(unittest.TestCase):
             [(HOME_REGION, "parent-stack", "parent")],
             destroyed,
         )
-        self.assertIn("Datadog Forwarding Infrastructure", prompts[0])
 
     def test_compartment_deletion_refuses_residual_or_child_resources(self):
         oci = FakeOci()

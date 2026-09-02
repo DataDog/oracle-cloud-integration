@@ -182,8 +182,6 @@ class KmsMixin:
                     "management",
                     "vault",
                     "schedule-deletion",
-                    "--endpoint",
-                    endpoint,
                     "--vault-id",
                     vault_id,
                     "--time-of-deletion",

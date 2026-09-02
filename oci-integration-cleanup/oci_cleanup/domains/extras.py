@@ -426,7 +426,10 @@ class ExtrasMixin:
             default_route_table_id = str(
                 resource_field(vcn, "default-route-table-id", "")
             )
-            subnets = self._list_region(
+            default_security_list_id = str(
+                resource_field(vcn, "default-security-list-id", "")
+            )
+            listed_subnets = self._list_region(
                 region,
                 [
                     "network",
@@ -437,6 +440,14 @@ class ExtrasMixin:
                     "--vcn-id",
                     vcn_id,
                 ],
+            )
+            subnets = self._merge_vcn_resource_search(
+                region=region,
+                vcn_id=vcn_id,
+                resource_type="Subnet",
+                listed_resources=listed_subnets,
+                get_kind="subnet",
+                id_flag="--subnet-id",
             )
             for subnet in subnets:
                 if is_deleted_or_deleting(subnet):
@@ -469,6 +480,58 @@ class ExtrasMixin:
                             "delete",
                             "--subnet-id",
                             resource_id(subnet),
+                            "--force",
+                            "--wait-for-state",
+                            "TERMINATED",
+                        ],
+                    )
+                )
+            listed_security_lists = self._list_region(
+                region,
+                [
+                    "network",
+                    "security-list",
+                    "list",
+                    "--compartment-id",
+                    context.compartment_id,
+                    "--vcn-id",
+                    vcn_id,
+                ],
+            )
+            security_lists = self._merge_vcn_resource_search(
+                region=region,
+                vcn_id=vcn_id,
+                resource_type="SecurityList",
+                listed_resources=listed_security_lists,
+                get_kind="security-list",
+                id_flag="--security-list-id",
+            )
+            for security_list in security_lists:
+                if is_deleted_or_deleting(security_list):
+                    continue
+                identifier = resource_id(security_list)
+                if identifier == default_security_list_id:
+                    continue
+                candidates.append(
+                    self._extra_candidate(
+                        kind="security-list",
+                        resource=security_list,
+                        region=region,
+                        container_id=vcn_id,
+                        container_name=VCN_NAME,
+                        impact=(
+                            "Deleting this non-default security list is required "
+                            "before the owned VCN can be deleted. Any subnet using "
+                            "it must be deleted first."
+                        ),
+                        command=[
+                            "--region",
+                            region,
+                            "network",
+                            "security-list",
+                            "delete",
+                            "--security-list-id",
+                            identifier,
                             "--force",
                             "--wait-for-state",
                             "TERMINATED",
@@ -594,6 +657,54 @@ class ExtrasMixin:
                         )
                     )
         return candidates
+
+    def _merge_vcn_resource_search(
+        self,
+        *,
+        region: str,
+        vcn_id: str,
+        resource_type: str,
+        listed_resources: list[dict[str, Any]],
+        get_kind: str,
+        id_flag: str,
+    ) -> list[dict[str, Any]]:
+        resources_by_id = {
+            resource_id(resource): resource
+            for resource in listed_resources
+            if resource_id(resource)
+        }
+        payload = self.oci.run(
+            [
+                "--region",
+                region,
+                "search",
+                "resource",
+                "structured-search",
+                "--query-text",
+                f"query {resource_type} resources where vcnId = '{vcn_id}'",
+            ],
+            attempts=2,
+        )
+        for summary in data_items(payload):
+            identifier = resource_id(summary)
+            if not identifier or identifier in resources_by_id:
+                continue
+            detail_payload = self.oci.run(
+                [
+                    "--region",
+                    region,
+                    "network",
+                    get_kind,
+                    "get",
+                    id_flag,
+                    identifier,
+                ],
+                attempts=2,
+            )
+            details = data_items(detail_payload)
+            if details:
+                resources_by_id[identifier] = details[0]
+        return list(resources_by_id.values())
 
     def discover_extra_resources(
         self, context: CleanupContext
@@ -747,11 +858,12 @@ class ExtrasMixin:
             "compute-instance": 0,
             "function": 0,
             "subnet": 1,
-            "route-table": 2,
-            "nat-gateway": 3,
-            "service-gateway": 3,
-            "internet-gateway": 3,
-            "local-peering-gateway": 3,
+            "security-list": 2,
+            "route-table": 3,
+            "nat-gateway": 4,
+            "service-gateway": 4,
+            "internet-gateway": 4,
+            "local-peering-gateway": 4,
         }
         candidates = sorted(
             (
