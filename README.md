@@ -18,3 +18,7 @@ The setup creates an OCI Resource Manager (ORM) stack which uses Terraform to:
 **Important:** The stack must be deployed in the **home region** of your OCI tenancy.
 
 [![Deploy to Oracle Cloud](https://oci-resourcemanager-plugin.plugins.oci.oraclecloud.com/latest/deploy-to-oracle-cloud.svg)](https://cloud.oracle.com/resourcemanager/stacks/create?zipUrl=https://github.com/Datadog/oracle-cloud-integration/releases/latest/download/datadog-integration.zip)
+
+### Deployment
+
+Use [workflow](https://github.com/DataDog/oracle-cloud-integration/actions/workflows/release.yml) to create a new release after the change in `datadog-integration` is merged. You can optionally do dry-run to validate artifact creation.
