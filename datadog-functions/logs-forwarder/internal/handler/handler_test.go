@@ -12,6 +12,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestMyHandler_VersionCheck(t *testing.T) {
+	original := Version
+	Version = "v1.2.3-test"
+	t.Cleanup(func() { Version = original })
+
+	// Deliberately no env vars set: a version check must never touch the
+	// Datadog client, so this must succeed without DD_SITE/API_KEY_SECRET_OCID.
+	in := bytes.NewBufferString(`{"version_check":"true"}`)
+	out := &bytes.Buffer{}
+	MyHandler(context.Background(), in, out)
+
+	assert.Contains(t, out.String(), `"status":"success"`)
+	assert.Contains(t, out.String(), `"version":"v1.2.3-test"`)
+}
+
 func TestMyHandler_Success(t *testing.T) {
 	// Mock environment variables
 	os.Setenv("DD_SITE", "datadoghq.com")

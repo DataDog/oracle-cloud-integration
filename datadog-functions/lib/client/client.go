@@ -307,6 +307,21 @@ func IsBackfillTrigger(raw []byte) bool {
 	return json.Unmarshal(raw, &t) == nil && t.BackfillMode == "true"
 }
 
+// versionCheckTrigger is the control message hubmanager sends to ask a forwarder
+// what version it's actually running, independent of what OCI's function record
+// reports the deployed image tag to be (the two can diverge under registry/
+// image-cache propagation lag after hubmanager applies an update).
+type versionCheckTrigger struct {
+	VersionCheck string `json:"version_check"`
+}
+
+// IsVersionCheckTrigger reports whether the invocation input is hubmanager's
+// {"version_check":"true"} control message rather than normal telemetry to forward.
+func IsVersionCheckTrigger(raw []byte) bool {
+	var t versionCheckTrigger
+	return json.Unmarshal(raw, &t) == nil && t.VersionCheck == "true"
+}
+
 // BackfillSummary reports what a backfill run accomplished, so the outcome is
 // visible in the function's response and not only in logs.
 type BackfillSummary struct {
