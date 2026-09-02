@@ -4,8 +4,8 @@ Safety boundary: preserves failed stacks for retry and only accepts constrained 
 Cleanup sequence role: handles regional stacks before orphan services and the parent near the end.
 
 ``StacksMixin`` validates region-prefixed child stacks and the selected parent stack,
-reconciles Resource Manager destroy jobs, and deletes a stack record only after
-OCI reports a successful destroy.
+reconciles Resource Manager destroy jobs, and removes stack records even when
+legacy Terraform state prevents a successful destroy.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from typing import Any
 from ..constants import LOGGER, REGIONAL_STACK_PREFIX
 from ..errors import CleanupError
 from ..models import CleanupContext
+from ..oci import DELETE_COMMAND_TIMEOUT_SECONDS
 from ..resources import (
     exact_owned,
     is_owned,
@@ -25,7 +26,6 @@ from ..resources import (
     resource_id,
     resource_name,
 )
-
 
 class StacksMixin:
     """Destroy validated regional and parent Resource Manager stacks."""
@@ -82,6 +82,7 @@ class StacksMixin:
                 "CANCELED",
             ],
             attempts=2,
+            timeout_seconds=DELETE_COMMAND_TIMEOUT_SECONDS,
         )
         return result.get("data", result)
 
@@ -107,6 +108,7 @@ class StacksMixin:
                 "FAILED",
             ],
             attempts=2,
+            timeout_seconds=DELETE_COMMAND_TIMEOUT_SECONDS,
         )
         return result.get("data", result)
 
@@ -139,6 +141,7 @@ class StacksMixin:
         if not self.execute:
             return True
 
+        job: dict[str, Any] = {}
         try:
             destroy_jobs = [
                 job
@@ -175,20 +178,29 @@ class StacksMixin:
             final_state = lifecycle_state(job)
             if final_state != "SUCCEEDED":
                 error_code, deletion_message = self._job_failure(job)
-                failure = self._record_failure(
-                    f"{stack_kind.capitalize()} destroy job for {stack_id} "
-                    f"ended in {final_state or 'UNKNOWN'}",
-                    resource_id=stack_id,
-                    region=region,
-                    error_code=error_code,
-                    deletion_message=deletion_message,
+                LOGGER.warning(
+                    "%s destroy job for %s ended in %s%s; deleting the stack "
+                    "record anyway",
+                    stack_kind.capitalize(),
+                    stack_id,
+                    final_state or "UNKNOWN",
+                    f": {deletion_message}" if deletion_message else "",
                 )
-                action["status"] = "failed"
-                action["error"] = failure["message"]
-                action["error_code"] = failure["error_code"]
-                action["deletion_message"] = failure["deletion_message"]
-                return False
+                action["destroy_job_state"] = final_state or "UNKNOWN"
+                action["destroy_error_code"] = error_code
+                action["destroy_error_message"] = deletion_message
+        except Exception as error:
+            LOGGER.warning(
+                "%s destroy attempt for %s failed: %s; deleting the stack "
+                "record anyway",
+                stack_kind.capitalize(),
+                stack_id,
+                error,
+            )
+            action["destroy_job_state"] = "ERROR"
+            action["destroy_error"] = str(error)
 
+        try:
             self.oci.run(
                 [
                     "--region",
@@ -204,15 +216,14 @@ class StacksMixin:
                 ],
                 attempts=2,
                 allow_not_found=True,
+                timeout_seconds=DELETE_COMMAND_TIMEOUT_SECONDS,
             )
             action["status"] = "completed"
             action["destroy_job_id"] = resource_id(job)
             return True
         except Exception as error:
-            # Preserve the stack and its state. Direct orphan cleanup can still
-            # proceed, but the failure remains visible and prevents IAM teardown.
             failure = self._record_failure(
-                f"{description}: {error}",
+                f"Delete {stack_kind} stack record {name} ({stack_id}): {error}",
                 resource_id=stack_id,
                 region=region,
                 error=error,

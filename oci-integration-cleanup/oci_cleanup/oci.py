@@ -11,6 +11,7 @@ failures and flattens OCI pagination payloads into resource dictionaries.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import time
 from typing import Any, Optional
@@ -20,6 +21,7 @@ from .resources import data_items
 
 
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 3 * 60
+DELETE_COMMAND_TIMEOUT_SECONDS = 10 * 60
 
 
 def _is_not_found(stderr: str, stdout: str) -> bool:
@@ -27,11 +29,16 @@ def _is_not_found(stderr: str, stdout: str) -> bool:
     code = str(payload.get("code") or "")
     status = int(payload.get("status") or 0)
     message = str(payload.get("message") or "").lower()
+    raw_output = f"{stderr}\n{stdout}".lower()
     return (
         code in {"NotAuthorizedOrNotFound", "NotFound"}
         or status == 404
         or "does not exist" in message
         or " is deleted" in message
+        or (
+            "a vnic attachment could not be found for the given vnic id"
+            in raw_output
+        )
     )
 
 
@@ -61,6 +68,10 @@ class OciCli:
                 process = subprocess.run(
                     command,
                     check=False,
+                    env={
+                        **os.environ,
+                        "OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING": "True",
+                    },
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,

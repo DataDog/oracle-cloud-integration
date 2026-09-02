@@ -10,11 +10,17 @@ Its methods keep producer/consumer and child/application ordering explicit.
 
 from __future__ import annotations
 
-from ..constants import BACKFILL_BUCKET_NAMES, FUNCTION_APP_NAME, FUNCTION_NAMES
+from ..constants import (
+    BACKFILL_BUCKET_NAMES,
+    FUNCTION_APP_NAME,
+    FUNCTION_NAMES,
+    LOGGER,
+)
 from ..errors import CleanupError
 from ..models import CleanupContext
 from ..resources import (
     defined_marker,
+    is_deleted_or_deleting,
     is_owned,
     resource_compartment,
     resource_id,
@@ -356,6 +362,27 @@ class ServicesMixin:
                 and identifier.startswith("ocid1.fnfunc.")
                 and identifier not in handled_function_ids
             ):
+                payload = self.oci.run(
+                    [
+                        "--region",
+                        region,
+                        "fn",
+                        "function",
+                        "get",
+                        "--function-id",
+                        identifier,
+                    ],
+                    attempts=2,
+                    allow_not_found=True,
+                )
+                function = payload.get("data", payload)
+                if not resource_id(function) or is_deleted_or_deleting(function):
+                    LOGGER.info(
+                        "Skipping already absent Datadog function %s in %s",
+                        identifier,
+                        region,
+                    )
+                    continue
                 message = (
                     "Marker-proven Datadog function was not found under the "
                     f"owned {FUNCTION_APP_NAME} application: {identifier} in "

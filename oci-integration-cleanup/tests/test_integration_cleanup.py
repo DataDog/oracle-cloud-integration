@@ -346,11 +346,11 @@ class CleanupTestCase(unittest.TestCase):
         self.assertEqual([], invoked)
         self.assertEqual("planned", cleaner.planned[0]["status"])
 
-    def test_execute_action_uses_default_command_timeout(self):
+    def test_execute_action_uses_extended_deletion_timeout(self):
         cleaner = self.make_cleaner(execute=True, oci=cleanup.OciCli())
         with patch(
             "oci_cleanup.oci.subprocess.run",
-            side_effect=subprocess.TimeoutExpired(["oci"], 180),
+            side_effect=subprocess.TimeoutExpired(["oci"], 600),
         ) as run:
             result = cleaner.action(
                 "delete:test",
@@ -359,8 +359,8 @@ class CleanupTestCase(unittest.TestCase):
             )
 
         self.assertFalse(result)
-        self.assertEqual(180, run.call_args.kwargs["timeout"])
-        self.assertIn("timed out after 180 seconds", cleaner.failures[0]["message"])
+        self.assertEqual(600, run.call_args.kwargs["timeout"])
+        self.assertIn("timed out after 600 seconds", cleaner.failures[0]["message"])
 
     def test_oci_command_error_includes_stdout_when_stderr_is_empty(self):
         process = SimpleNamespace(
@@ -505,6 +505,7 @@ class CleanupTestCase(unittest.TestCase):
             for kind in [
                 "service-gateway",
                 "route-table",
+                "security-list",
                 "subnet",
                 "secondary-vnic",
             ]
@@ -523,6 +524,7 @@ class CleanupTestCase(unittest.TestCase):
             [
                 "delete secondary-vnic",
                 "delete subnet",
+                "delete security-list",
                 "delete route-table",
                 "delete service-gateway",
             ],
@@ -797,7 +799,11 @@ class CleanupTestCase(unittest.TestCase):
         )
 
         self.assertEqual(
-            {"attempts": 3, "allow_not_found": True},
+            {
+                "attempts": 3,
+                "allow_not_found": True,
+                "timeout_seconds": 10 * 60,
+            },
             cleaner.oci.run_kwargs[0],
         )
 
@@ -897,6 +903,40 @@ class CleanupTestCase(unittest.TestCase):
                 "manual review required" in failure["message"]
                 for failure in cleaner.failures
             )
+        )
+        orphaned = cleaner._validated_dynamic_groups(
+            context(domains=[{"url": "https://identity.example"}]), []
+        )
+        self.assertEqual(1, len(orphaned))
+        self.assertEqual(
+            cleanup.CONNECTOR_GROUP_NAME,
+            cleanup.resource_name(orphaned[0][1]),
+        )
+        oci.add_list("iam policy list", [policy])
+        prompted = self.make_cleaner(execute=True, oci=oci)
+        prompts = []
+        prompted._ask_yes_no = lambda prompt: prompts.append(prompt) or True
+        identity_context = context(
+            domains=[{"url": "https://identity.example"}]
+        )
+
+        prompted.prepare_dynamic_group_cleanup(identity_context)
+        prompted._ask_yes_no = lambda _prompt: self.fail(
+            "identity cleanup prompted after serial preparation"
+        )
+        prompted.cleanup_home_identity(identity_context)
+
+        self.assertEqual(1, len(prompts))
+        self.assertIn(cleanup.FUNCTION_GROUP_NAME, prompts[0])
+        action_ids = [action["id"] for action in prompted.planned]
+        policy_index = action_ids.index("policy:policy")
+        self.assertLess(
+            action_ids.index("dynamic-group:connector-scim"),
+            policy_index,
+        )
+        self.assertLess(
+            action_ids.index("dynamic-group:function-scim"),
+            policy_index,
         )
 
     def test_functions_cleanup_preserves_customer_application(self):
@@ -1173,6 +1213,87 @@ class CleanupTestCase(unittest.TestCase):
         self.assertEqual("unverified-secondary-vnic", candidate.kind)
         self.assertIn("detach-vnic", candidate.command or ())
         self.assertIn("instance-compartment", candidate.command or ())
+
+    def test_discovers_cross_compartment_subnet_and_nondefault_security_list(self):
+        oci = FakeOci()
+        oci.add_list(
+            "network vcn list",
+            [
+                owned(
+                    {
+                        "id": "dd-vcn",
+                        "display-name": cleanup.VCN_NAME,
+                        "compartment-id": COMPARTMENT,
+                        "default-security-list-id": "default-security-list",
+                    }
+                )
+            ],
+        )
+        oci.add_list("network subnet list", [])
+        oci.add_list(
+            "network security-list list",
+            [{"id": "default-security-list", "display-name": "Default"}],
+        )
+        oci.add_list("network route-table list", [])
+        oci.add_list("network nat-gateway list", [])
+        oci.add_list("network service-gateway list", [])
+        oci.add_list("network internet-gateway list", [])
+        oci.add_list("network local-peering-gateway list", [])
+        oci.add_run(
+            "query Subnet resources",
+            {"data": {"items": [{"identifier": "cross-compartment-subnet"}]}},
+        )
+        oci.add_run(
+            "network subnet get",
+            {
+                "data": {
+                    "id": "cross-compartment-subnet",
+                    "display-name": "customer-subnet",
+                    "compartment-id": "other-compartment",
+                }
+            },
+        )
+        oci.add_run(
+            "query SecurityList resources",
+            {
+                "data": {
+                    "items": [
+                        {"identifier": "default-security-list"},
+                        {"identifier": "custom-security-list"},
+                    ]
+                }
+            },
+        )
+        oci.add_run(
+            "network security-list get",
+            {
+                "data": {
+                    "id": "custom-security-list",
+                    "display-name": "customer-security-list",
+                    "compartment-id": "other-compartment",
+                }
+            },
+        )
+
+        candidates = self.make_cleaner(oci=oci)._discover_network_extras(
+            context(), HOME_REGION
+        )
+        by_kind = {candidate.kind: candidate for candidate in candidates}
+
+        self.assertEqual(
+            "cross-compartment-subnet", by_kind["subnet"].resource_id
+        )
+        self.assertEqual(
+            "custom-security-list", by_kind["security-list"].resource_id
+        )
+        self.assertIn(
+            "security-list delete",
+            " ".join(by_kind["security-list"].command or ()),
+        )
+        self.assertNotIn(
+            "default-security-list",
+            [candidate.resource_id for candidate in candidates],
+        )
 
     def test_discovers_primary_vnic_attachment_in_another_compartment(self):
         oci = FakeOci()
@@ -1667,8 +1788,15 @@ class CleanupTestCase(unittest.TestCase):
                 for call in policy_calls
             )
         )
+        identity_deletes = [
+            call
+            for call in oci.run_calls
+            if "identity-domains" in call and "delete" in call
+        ]
+        self.assertTrue(identity_deletes)
+        self.assertTrue(all("--force" in call for call in identity_deletes))
 
-    def test_failed_regional_destroy_records_structured_failure(self):
+    def test_failed_regional_destroy_still_deletes_stack_record(self):
         oci = FakeOci()
         oci.add_list("resource-manager job list", [])
         oci.add_run(
@@ -1692,24 +1820,21 @@ class CleanupTestCase(unittest.TestCase):
                 "display-name": "datadog-regional-stack-test",
             },
         )
-        self.assertFalse(result)
-        self.assertFalse(
+        self.assertTrue(result)
+        self.assertTrue(
             any("stack delete" in " ".join(call) for call in oci.run_calls)
         )
-        self.assertEqual("failed", cleaner.planned[0]["status"])
+        self.assertEqual("completed", cleaner.planned[0]["status"])
+        self.assertEqual("FAILED", cleaner.planned[0]["destroy_job_state"])
         self.assertEqual(
-            {
-                "message": (
-                    "Regional destroy job for ocid1.ormstack.oc1..stack "
-                    "ended in FAILED"
-                ),
-                "resource_id": "ocid1.ormstack.oc1..stack",
-                "region": HOME_REGION,
-                "error_code": "TerraformError",
-                "deletion_message": "provider failed",
-            },
-            cleaner.failures[0],
+            "TerraformError",
+            cleaner.planned[0]["destroy_error_code"],
         )
+        self.assertEqual(
+            "provider failed",
+            cleaner.planned[0]["destroy_error_message"],
+        )
+        self.assertEqual([], cleaner.failures)
 
     def test_dry_run_stack_teardown_does_not_mutate_or_reconcile_jobs(self):
         oci = FakeOci()
