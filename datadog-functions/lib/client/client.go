@@ -147,6 +147,33 @@ func NewDatadogClientWithSite() (DatadogClient, string, error) {
 	return client, site, err
 }
 
+// IntakeURL builds the Datadog intake URL for the given host prefix (e.g.
+// "cloudplatform-intake", "http-intake.logs", "ocimetrics-intake") and API path
+// (e.g. "/api/v2/logs"). site is the value resolved from DD_SITE by the caller.
+//
+// When CUSTOM_DD_SITE is set, it provides the full host base that follows the
+// (dashed) prefix; the prefix's dots become dashes so the whole host stays under
+// a single wildcard certificate (e.g. *.mrf.datadoghq.com) without provisioning a
+// per-customer certificate:
+//
+//	{prefix-with-dashes}-{CUSTOM_DD_SITE}{path}
+//
+// e.g. CUSTOM_DD_SITE=customerA.mrf.datadoghq.com:
+//
+//	cloudplatform-intake-customerA.mrf.datadoghq.com/api/v2/cloudchanges
+//	http-intake-logs-customerA.mrf.datadoghq.com/api/v2/logs
+//
+// Otherwise the standard dot-joined form is used:
+//
+//	{prefix}.{DD_SITE}{path}
+func IntakeURL(prefix, path, site string) string {
+	if custom := os.Getenv("CUSTOM_DD_SITE"); custom != "" {
+		dashed := strings.ReplaceAll(prefix, ".", "-")
+		return fmt.Sprintf("https://%s-%s%s", dashed, custom, path)
+	}
+	return fmt.Sprintf("https://%s.%s%s", prefix, site, path)
+}
+
 func NewDatadogClientWithTenancyAndSite() (DatadogClient, string, string, error) {
 	tenancyOCID := os.Getenv("TENANCY_OCID")
 	if tenancyOCID == "" {
