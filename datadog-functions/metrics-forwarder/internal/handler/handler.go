@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 
@@ -40,7 +39,7 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 		writeResponse(out, "error", "", err)
 		return
 	}
-	url := fmt.Sprintf("https://ocimetrics-intake.%s/api/v2/ocimetrics", site)
+	url := client.IntakeURL("ocimetrics-intake", "/api/v2/ocimetrics", site)
 
 	// Backfill mode: drain this region's bucket instead of forwarding new metrics.
 	if client.IsBackfillTrigger(raw) {
