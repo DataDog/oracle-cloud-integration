@@ -3,7 +3,6 @@ package handler
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"log"
 
@@ -27,7 +26,7 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 		writeResponse(out, "error", "", err)
 		return
 	}
-	url := fmt.Sprintf("https://cloudplatform-intake.%s/api/v2/cloudchanges", site)
+	url := client.IntakeURL("cloudplatform-intake", "/api/v2/cloudchanges", site)
 	ociHeaders := map[string]string{"Dd-Oci-Tenancy-Id": tenancyOCID}
 
 	// Backfill mode: drain this region's bucket instead of forwarding new events.

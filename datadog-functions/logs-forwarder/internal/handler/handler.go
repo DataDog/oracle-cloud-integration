@@ -55,7 +55,7 @@ func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 		writeResponse(out, "error", "", err)
 		return
 	}
-	url := fmt.Sprintf("https://http-intake.logs.%s/api/v2/logs", site)
+	url := client.IntakeURL("http-intake.logs", "/api/v2/logs", site)
 
 	// Backfill mode: drain this region's bucket instead of forwarding new logs.
 	if client.IsBackfillTrigger(raw) {

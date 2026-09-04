@@ -42,6 +42,12 @@ variable "datadog_site" {
   description = "The Datadog site to send data to (e.g., datadoghq.com, datadoghq.eu)"
 }
 
+variable "custom_datadog_site" {
+  type        = string
+  description = "Optional custom intake host base (e.g. customerA.mrf.datadoghq.com). When set, forwarders send to https://{prefix-with-dashes}-{custom_datadog_site}{path} instead of the standard https://{prefix}.{datadog_site}{path}, keeping the host under a single wildcard certificate so no per-customer certificate is needed. Leave empty for the default dot-joined form."
+  default     = ""
+}
+
 #*************************************
 #         Advanced Usage Variables
 #*************************************
