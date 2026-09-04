@@ -167,7 +167,13 @@ func NewDatadogClientWithSite() (DatadogClient, string, error) {
 //
 //	{prefix}.{DD_SITE}{path}
 func IntakeURL(prefix, path, site string) string {
-	if custom := os.Getenv("CUSTOM_DD_SITE"); custom != "" {
+	if custom := strings.TrimSpace(os.Getenv("CUSTOM_DD_SITE")); custom != "" {
+		// CUSTOM_DD_SITE is a host base, not a URL. Strip any scheme a user may
+		// have pasted (e.g. "https://...") and any trailing slashes so the result
+		// is a well-formed host, not a malformed URL.
+		custom = strings.TrimPrefix(custom, "https://")
+		custom = strings.TrimPrefix(custom, "http://")
+		custom = strings.Trim(custom, "/")
 		dashed := strings.ReplaceAll(prefix, ".", "-")
 		return fmt.Sprintf("https://%s-%s%s", dashed, custom, path)
 	}
@@ -224,11 +230,11 @@ var handleServerErrorPayload = func(ctx context.Context, message []byte, intakeU
 // data type, returning an error if the type cannot be determined.
 func backfillBucketName(intakeURL string) (string, error) {
 	switch {
-	case strings.Contains(intakeURL, "ocimetrics"):
+	case strings.Contains(intakeURL, "/api/v2/ocimetrics"):
 		return "dd-metrics-backfill", nil
-	case strings.Contains(intakeURL, "cloudchanges"):
+	case strings.Contains(intakeURL, "/api/v2/cloudchanges"):
 		return "dd-events-backfill", nil
-	case strings.Contains(intakeURL, "logs"):
+	case strings.Contains(intakeURL, "/api/v2/logs"):
 		return "dd-logs-backfill", nil
 	default:
 		return "", fmt.Errorf("unrecognized intake url %q", intakeURL)
