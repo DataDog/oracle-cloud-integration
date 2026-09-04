@@ -58,12 +58,66 @@ func TestIntakeURL(t *testing.T) {
 			customSite: "customerA.mrf.datadoghq.com",
 			want:       "https://ocimetrics-intake-customerA.mrf.datadoghq.com/api/v2/ocimetrics",
 		},
+		{
+			name:       "custom site with https scheme stripped",
+			prefix:     "cloudplatform-intake",
+			path:       "/api/v2/cloudchanges",
+			site:       "datadoghq.com",
+			customSite: "https://customerA.mrf.datadoghq.com",
+			want:       "https://cloudplatform-intake-customerA.mrf.datadoghq.com/api/v2/cloudchanges",
+		},
+		{
+			name:       "custom site with trailing slash stripped",
+			prefix:     "http-intake.logs",
+			path:       "/api/v2/logs",
+			site:       "datadoghq.com",
+			customSite: "customerA.mrf.datadoghq.com/",
+			want:       "https://http-intake-logs-customerA.mrf.datadoghq.com/api/v2/logs",
+		},
+		{
+			name:       "custom site with surrounding whitespace trimmed",
+			prefix:     "ocimetrics-intake",
+			path:       "/api/v2/ocimetrics",
+			site:       "datadoghq.com",
+			customSite: "  customerA.mrf.datadoghq.com  ",
+			want:       "https://ocimetrics-intake-customerA.mrf.datadoghq.com/api/v2/ocimetrics",
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("CUSTOM_DD_SITE", tc.customSite)
 			assert.Equal(t, tc.want, IntakeURL(tc.prefix, tc.path, tc.site))
+		})
+	}
+}
+
+func TestBackfillBucketName(t *testing.T) {
+	cases := []struct {
+		name    string
+		url     string
+		want    string
+		wantErr bool
+	}{
+		{"default metrics", "https://ocimetrics-intake.datadoghq.com/api/v2/ocimetrics", "dd-metrics-backfill", false},
+		{"default events", "https://cloudplatform-intake.datadoghq.com/api/v2/cloudchanges", "dd-events-backfill", false},
+		{"default logs", "https://http-intake.logs.datadoghq.com/api/v2/logs", "dd-logs-backfill", false},
+		// CUSTOM_DD_SITE in the host must not cause misclassification — the path,
+		// not the host, determines the bucket.
+		{"custom host with ocimetrics label, events path", "https://cloudplatform-intake-ocimetrics.mrf.datadoghq.com/api/v2/cloudchanges", "dd-events-backfill", false},
+		{"custom host with cloudchanges label, logs path", "https://http-intake-logs-cloudchanges.mrf.datadoghq.com/api/v2/logs", "dd-logs-backfill", false},
+		{"custom host with logs label, metrics path", "https://ocimetrics-intake-logs.mrf.datadoghq.com/api/v2/ocimetrics", "dd-metrics-backfill", false},
+		{"unrecognized path", "https://example.com/api/v2/unknown", "", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := backfillBucketName(tc.url)
+			if tc.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.want, got)
+			}
 		})
 	}
 }

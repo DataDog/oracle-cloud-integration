@@ -20,7 +20,7 @@ variable "datadog_site" {
 
 variable "custom_datadog_site" {
   type        = string
-  description = "Optional custom intake host base (e.g. customerA.mrf.datadoghq.com). When set, forwarders send to https://{prefix-with-dashes}-{custom_datadog_site}{path} instead of the standard https://{prefix}.{datadog_site}{path}. Leave empty for the default dot-joined form."
+  description = "Optional custom intake host base (e.g. customerA.mrf.datadoghq.com). When set, forwarders send to https://{prefix-with-dashes}-{custom_datadog_site}{path} instead of the standard https://{prefix}.{datadog_site}{path}, keeping the host under a single wildcard certificate so no per-customer certificate is needed. Leave empty for the default dot-joined form."
   default     = ""
 }
 
