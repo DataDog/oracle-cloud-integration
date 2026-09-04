@@ -44,6 +44,7 @@ variableGroups:
       - ${domain_id}
       - ${user_email}
       - ${defined_tags}
+      - ${custom_datadog_site}
 
 variables:
   choose_subnet:
@@ -126,6 +127,18 @@ variables:
       The site name for your Organization's Datadog endpoint (e.g. datadoghq.com, datadoghq.eu, etc.)
       This is the "Site Parameter" in the following <a href="https://docs.datadoghq.com/getting_started/site/#access-the-datadog-site" target="_blank">table from the Datadog documentation</a> .
     required: true
+
+  custom_datadog_site:
+    title: Custom Datadog intake host base
+    type: string
+    description: |
+      <strong>This is uncommon.</strong> Override the intake endpoint the forwarders send to.
+      When set, the forwarders use <code>https://{prefix-with-dashes}-{custom_datadog_site}{path}</code> instead of the default <code>https://{prefix}.{datadog_site}{path}</code>, keeping the whole host under a single wildcard certificate (e.g. <code>*.mrf.datadoghq.com</code>) so no per-customer certificate is needed.
+      Provide the full host base that follows the dashed prefix, e.g. <code>customerA.mrf.datadoghq.com</code>.
+      <strong>(Recommended): If left blank, the standard dot-joined form using the Datadog Site above is used.</strong>
+    required: false
+    default: ""
+    visible: ${show_advanced_options}
 
   logs_enabled:
     title: Logs Enabled

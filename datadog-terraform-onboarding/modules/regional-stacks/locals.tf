@@ -35,6 +35,7 @@ locals {
 locals {
   config = {
     "DD_SITE"                  = var.datadog_site,
+    "CUSTOM_DD_SITE"           = var.custom_datadog_site,
     "HOME_REGION"              = local.vault_region,
     "API_KEY_SECRET_OCID"      = local.api_key_secret_id
     "DATADOG_TAGS"             = "",
