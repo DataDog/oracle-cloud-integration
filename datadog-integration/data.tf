@@ -9,6 +9,8 @@ data "external" "supported_regions" {
   query = {
     region    = each.key
     regionKey = each.value.region_key
+    namespace = local.datadog_image_namespace
+    realm     = local.datadog_realm
   }
 }
 

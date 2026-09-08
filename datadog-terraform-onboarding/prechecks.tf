@@ -109,7 +109,13 @@ data "external" "check_resources_in_state" {
 }
 
 # Data source: Check vault quota availability
+# The virtual-vault-count limit is not exposed in the limits API for US Gov
+# (OC2) and US DoD (OC3) realms, so the data source is skipped (count=0) for
+# those realms; the precondition below treats a missing data source as "quota
+# unknown — allow" so vault creation proceeds and any real failure surfaces at
+# apply time.
 data "oci_limits_resource_availability" "vault_quota" {
+  count               = local.datadog_realm == "oc1" ? 1 : 0
   compartment_id      = var.tenancy_ocid
   limit_name          = "virtual-vault-count"
   service_name        = "kms"
@@ -126,14 +132,14 @@ resource "terraform_data" "validate_vault_quota" {
       # module's reuse_vault predicate so that
       # existing_home_region_vault_id="" does NOT bypass this check while still
       # taking the create path.
-      condition     = (var.existing_home_region_vault_id != null && var.existing_home_region_vault_id != "") || try(data.oci_limits_resource_availability.vault_quota.available, 0) >= 1 || data.external.check_resources_in_state.result.vault_exists == "true"
+      condition     = (var.existing_home_region_vault_id != null && var.existing_home_region_vault_id != "") || local.datadog_realm != "oc1" || try(data.oci_limits_resource_availability.vault_quota[0].available, 0) >= 1 || data.external.check_resources_in_state.result.vault_exists == "true"
       error_message = <<-EOF
         ╔═══════════════════════════════════════════════════════════════════════════════════╗
         ║                         VAULT QUOTA EXHAUSTED ERROR                               ║
         ╠═══════════════════════════════════════════════════════════════════════════════════╣
         ║ No vaults can be created in ${local.home_region_name}: vault quota exhausted.     ║
         ║                                                                                   ║
-        ║ Available: ${try(data.oci_limits_resource_availability.vault_quota.available, 0)} ║
+        ║ Available: ${try(data.oci_limits_resource_availability.vault_quota[0].available, 0)} ║
         ║ Required: 1                                                                       ║
         ║                                                                                   ║
         ║ Please increase your vault quota or delete existing vaults.                       ║

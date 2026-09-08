@@ -1,12 +1,20 @@
 locals {
-  defined_tags_map   = jsondecode(var.defined_tags)
-  registry_host      = lower("${var.region_key}.ocir.io/iddfxd5j9l2o")
+  defined_tags_map = jsondecode(var.defined_tags)
+
+  # OCIR registry host (without namespace). Commercial (OC1) uses the short
+  # 3-letter region key on ocir.io; US Gov (OC2) and US DoD (OC3) use the full
+  # region identifier on the oraclegovcloud.com domain. The realm is detected
+  # from the tenancy OCID prefix by the parent stack (var.image_realm) and the
+  # Datadog-published image namespace is passed in as var.image_namespace.
+  ocir_host = var.image_realm == "oc1" ? lower("${var.region_key}.ocir.io") : "ocir.${var.region}.oci.oraclegovcloud.com"
+
+  registry_host      = "${local.ocir_host}/${var.image_namespace}"
   metrics_image_path = "${local.registry_host}/oci-datadog-forwarder/metrics:latest"
   logs_image_path    = "${local.registry_host}/oci-datadog-forwarder/logs:latest"
-  token_base_path    = "https://${var.region_key}.ocir.io/20180419/docker/token?service=${var.region_key}.ocir.io&scope=repository:iddfxd5j9l2o/oci-datadog-forwarder"
+  token_base_path    = "https://${local.ocir_host}/20180419/docker/token?service=${local.ocir_host}&scope=repository:${var.image_namespace}/oci-datadog-forwarder"
   token_logs         = "${local.token_base_path}/logs:pull"
   token_metrics      = "${local.token_base_path}/metrics:pull"
-  image_base_path    = "https://${var.region_key}.ocir.io/v2/iddfxd5j9l2o/oci-datadog-forwarder"
+  image_base_path    = "https://${local.ocir_host}/v2/${var.image_namespace}/oci-datadog-forwarder"
   image_url_logs     = "${local.image_base_path}/logs/manifests/latest"
   image_url_metrics  = "${local.image_base_path}/metrics/manifests/latest"
 
@@ -17,8 +25,14 @@ locals {
   # later drops to 0 (the vault itself consumes a quota unit) so re-applies
   # never flap and destroy/recreate it.
   create_regional_vault = var.enable_regional_vaults && var.region != var.home_region && (
-    data.oci_limits_resource_availability.vault_quota.available > 0 ||
-    data.external.check_regional_vault_in_state.result.vault_exists == "true"
+    # OC1: check the limits API for spare quota (or keep an existing vault sticky).
+    # OC2/OC3: the virtual-vault-count limit isn't exposed in the limits API, so
+    # the data source is absent (count=0) and we allow creation; a real quota
+    # failure surfaces at apply time.
+    var.image_realm != "oc1" ? true : (
+      length(data.oci_limits_resource_availability.vault_quota) > 0 && data.oci_limits_resource_availability.vault_quota[0].available > 0 ||
+      data.external.check_regional_vault_in_state.result.vault_exists == "true"
+    )
   )
 
   # The region/secret actually backing this function's Datadog API key: this

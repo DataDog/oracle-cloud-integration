@@ -69,3 +69,20 @@ variable "enable_regional_vaults" {
   description = "Create a regional Vault, Key, and Secret in this region. When false the forwarder falls back to the home-region vault."
   default     = false
 }
+
+variable "image_namespace" {
+  type        = string
+  description = "OCIR object namespace hosting the Datadog forwarder images. Defaults to Datadog's commercial namespace (iddfxd5j9l2o); the parent stack overrides this with the realm-specific namespace for US Gov (OC2) and US DoD (OC3) tenancies."
+  default     = "iddfxd5j9l2o"
+}
+
+variable "image_realm" {
+  type        = string
+  description = "OCI realm the images are pulled from. oc1 = commercial (<region-key>.ocir.io); oc2 = US Gov / oc3 = US DoD (ocir.<region>.oci.oraclegovcloud.com). Detected from the tenancy OCID prefix by the parent stack."
+  default     = "oc1"
+
+  validation {
+    condition     = contains(["oc1", "oc2", "oc3"], var.image_realm)
+    error_message = "image_realm must be one of: oc1, oc2, oc3."
+  }
+}

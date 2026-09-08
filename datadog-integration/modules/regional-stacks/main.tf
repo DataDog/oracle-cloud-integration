@@ -28,7 +28,13 @@ provider "oci" {
 
 # Checks whether this region has spare KMS virtual-vault quota to create its
 # own vault; otherwise this region falls back to the home-region vault.
+# The virtual-vault-count limit is not exposed in the limits API for US Gov
+# (OC2) and US DoD (OC3) realms, so the data source is skipped (count=0) for
+# those realms; create_regional_vault treats a missing data source as "quota
+# unknown — allow" so vault creation proceeds and any real failure surfaces at
+# apply time.
 data "oci_limits_resource_availability" "vault_quota" {
+  count          = var.image_realm == "oc1" ? 1 : 0
   compartment_id = var.tenancy_ocid
   service_name   = "kms"
   limit_name     = "virtual-vault-count"

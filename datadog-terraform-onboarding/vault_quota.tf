@@ -31,7 +31,7 @@ data "external" "vault_state" {
 }
 
 data "external" "vault_quota" {
-  for_each = var.enable_regional_vaults ? {
+  for_each = var.enable_regional_vaults && local.datadog_realm == "oc1" ? {
     for region in local.final_regions_for_stacks :
     region => region
     if region != local.home_region_name && data.external.vault_state[region].result.vault_exists != "true"
