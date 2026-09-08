@@ -26,29 +26,26 @@ read -p "Enter regions (comma-separated, e.g., us-phoenix-1,us-ashburn-1) or pre
 # Realm -> OCIR registry host mapping.
 # Commercial (OC1) registries use the short 3-letter region key:
 #   <region-key>.ocir.io   e.g. iad.ocir.io
-# Government / Defense / Sovereign realms use the full region identifier:
-#   ocir.<region-identifier>.<realm-domain>
+# Government / Defense realms use the full region identifier:
+#   ocir.<region-identifier>.oci.oraclegovcloud.com
 #   e.g. ocir.us-langley-1.oci.oraclegovcloud.com        (OC2)
 #        ocir.us-gov-ashburn-1.oci.oraclegovcloud.com    (OC3)
+# Uses a case statement (not an associative array) so it works on macOS bash 3.2.
 # ---------------------------------------------------------------------------
-declare -A GOV_REGION_DOMAIN=(
-  ["us-langley-1"]="oci.oraclegovcloud.com"
-  ["us-luke-1"]="oci.oraclegovcloud.com"
-  ["us-gov-ashburn-1"]="oci.oraclegovcloud.com"
-  ["us-gov-chicago-1"]="oci.oraclegovcloud.com"
-  ["us-gov-phoenix-1"]="oci.oraclegovcloud.com"
-)
 
 # registry_host_for <region_identifier> <region_key>
 # Echoes the OCIR registry host (no trailing slash, lowercase) for the region.
 registry_host_for() {
   local region_id="$1"
   local region_key="$2"
-  if [[ -n "${GOV_REGION_DOMAIN[$region_id]}" ]]; then
-    echo "ocir.${region_id}.${GOV_REGION_DOMAIN[$region_id]}"
-  else
-    echo "$(echo "$region_key" | tr '[:upper:]' '[:lower:]').ocir.io"
-  fi
+  case "$region_id" in
+    us-langley-1|us-luke-1|us-gov-ashburn-1|us-gov-chicago-1|us-gov-phoenix-1)
+      echo "ocir.${region_id}.oci.oraclegovcloud.com"
+      ;;
+    *)
+      echo "$(echo "$region_key" | tr '[:upper:]' '[:lower:]').ocir.io"
+      ;;
+  esac
 }
 
 # Process region input and fetch region subscriptions from OCI.
