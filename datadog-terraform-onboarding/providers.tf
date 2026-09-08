@@ -315,3 +315,42 @@ provider "oci" {
   region              = "ap-kulai-2"
   config_file_profile = var.config_file_profile
 }
+
+#*************************************
+#   US Government Cloud (OC2) & US Defense Cloud (OC3) Provider Aliases
+#*************************************
+# These enable deployment to Gov/DoD tenancies (tenancy OCID prefixed with
+# ocid1.tenancy.oc2. or ocid1.tenancy.oc3.). Only regions that are subscribed
+# will actually be deployed (count = 0 for others), so declaring these aliases
+# is safe for commercial tenancies too — they simply go unused.
+# Regions: https://docs.oracle.com/iaas/Content/gov-cloud/govfedramp.htm
+
+provider "oci" {
+  alias               = "us-langley-1"
+  region              = "us-langley-1"
+  config_file_profile = var.config_file_profile
+}
+
+provider "oci" {
+  alias               = "us-luke-1"
+  region              = "us-luke-1"
+  config_file_profile = var.config_file_profile
+}
+
+provider "oci" {
+  alias               = "us-gov-ashburn-1"
+  region              = "us-gov-ashburn-1"
+  config_file_profile = var.config_file_profile
+}
+
+provider "oci" {
+  alias               = "us-gov-chicago-1"
+  region              = "us-gov-chicago-1"
+  config_file_profile = var.config_file_profile
+}
+
+provider "oci" {
+  alias               = "us-gov-phoenix-1"
+  region              = "us-gov-phoenix-1"
+  config_file_profile = var.config_file_profile
+}

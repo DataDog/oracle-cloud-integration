@@ -3,6 +3,19 @@ locals {
     ownedby = "datadog"
   }
 
+  # Detect the OCI realm from the tenancy OCID prefix. This drives realm-specific
+  # behavior: the OCIR registry host format and Datadog's published image
+  # namespace (OCIR is realm-isolated, so each realm has its own namespace).
+  #   ocid1.tenancy.oc1... -> OC1 commercial
+  #   ocid1.tenancy.oc2... -> OC2 US Government (FedRAMP)
+  #   ocid1.tenancy.oc3... -> OC3 US Department of Defense
+  datadog_realm = startswith(var.tenancy_ocid, "ocid1.tenancy.oc2.") ? "oc2" : startswith(var.tenancy_ocid, "ocid1.tenancy.oc3.") ? "oc3" : "oc1"
+
+  # Datadog's published OCIR namespace per realm (where the forwarder images
+  # live). Commercial tenancies pull from iddfxd5j9l2o; US Gov and US DoD have
+  # their own realm-isolated namespaces.
+  datadog_image_namespace = local.datadog_realm == "oc2" ? "axnu2nwmcbsr" : local.datadog_realm == "oc3" ? "ax8ew96ycvtn" : "iddfxd5j9l2o"
+
   # Defined tags: parsed from user input (multiline namespace.key:value per line)
   defined_tags_raw = [
     for line in split("\n", var.defined_tags != null ? var.defined_tags : "") :

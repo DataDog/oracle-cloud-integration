@@ -1369,3 +1369,173 @@ module "regional_deployment_ap_kulai_2" {
     module.kms
   ]
 }
+
+#*************************************
+#   US Government Cloud (OC2) & US Defense Cloud (OC3) Regional Deployments
+#*************************************
+# These module blocks deploy to Gov/DoD tenancies (tenancy OCID prefixed with
+# ocid1.tenancy.oc2. or ocid1.tenancy.oc3.). They pass the realm-specific image
+# namespace and realm so the regional-stacks module builds the correct OCIR
+# host (ocir.<region>.oci.oraclegovcloud.com) and pulls from Datadog's
+# realm-isolated namespace. For commercial tenancies these regions are never
+# subscribed, so count = 0 and the blocks are inert.
+
+module "regional_deployment_us_langley_1" {
+  count  = contains(local.final_regions_for_stacks, "us-langley-1") ? 1 : 0
+  source = "./modules/regional-stacks"
+
+  providers = {
+    oci = oci.us-langley-1
+  }
+
+  tenancy_ocid                   = var.tenancy_ocid
+  region                         = "us-langley-1"
+  region_key                     = local.subscribed_regions_map["us-langley-1"].region_key
+  image_namespace                = local.datadog_image_namespace
+  image_realm                    = local.datadog_realm
+  compartment_ocid               = module.compartment.id
+  subnet_ocid                    = lookup(local.region_to_subnet_ocid_map, "us-langley-1", "")
+  datadog_site                   = var.datadog_site
+  api_key_secret_id              = local.api_key_secret_id
+  datadog_api_key                = var.datadog_api_key
+  create_regional_vault          = var.enable_regional_vaults && "us-langley-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "us-langley-1") ? tonumber(data.external.vault_quota["us-langley-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["us-langley-1"].result.vault_exists
+  home_region                    = local.home_region_name
+  tags                           = local.tags
+  defined_tags                   = local.defined_tags
+
+  depends_on = [
+    terraform_data.prechecks_complete,
+    module.compartment,
+    module.auth,
+    module.kms
+  ]
+}
+
+module "regional_deployment_us_luke_1" {
+  count  = contains(local.final_regions_for_stacks, "us-luke-1") ? 1 : 0
+  source = "./modules/regional-stacks"
+
+  providers = {
+    oci = oci.us-luke-1
+  }
+
+  tenancy_ocid                   = var.tenancy_ocid
+  region                         = "us-luke-1"
+  region_key                     = local.subscribed_regions_map["us-luke-1"].region_key
+  image_namespace                = local.datadog_image_namespace
+  image_realm                    = local.datadog_realm
+  compartment_ocid               = module.compartment.id
+  subnet_ocid                    = lookup(local.region_to_subnet_ocid_map, "us-luke-1", "")
+  datadog_site                   = var.datadog_site
+  api_key_secret_id              = local.api_key_secret_id
+  datadog_api_key                = var.datadog_api_key
+  create_regional_vault          = var.enable_regional_vaults && "us-luke-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "us-luke-1") ? tonumber(data.external.vault_quota["us-luke-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["us-luke-1"].result.vault_exists
+  home_region                    = local.home_region_name
+  tags                           = local.tags
+  defined_tags                   = local.defined_tags
+
+  depends_on = [
+    terraform_data.prechecks_complete,
+    module.compartment,
+    module.auth,
+    module.kms
+  ]
+}
+
+module "regional_deployment_us_gov_ashburn_1" {
+  count  = contains(local.final_regions_for_stacks, "us-gov-ashburn-1") ? 1 : 0
+  source = "./modules/regional-stacks"
+
+  providers = {
+    oci = oci.us-gov-ashburn-1
+  }
+
+  tenancy_ocid                   = var.tenancy_ocid
+  region                         = "us-gov-ashburn-1"
+  region_key                     = local.subscribed_regions_map["us-gov-ashburn-1"].region_key
+  image_namespace                = local.datadog_image_namespace
+  image_realm                    = local.datadog_realm
+  compartment_ocid               = module.compartment.id
+  subnet_ocid                    = lookup(local.region_to_subnet_ocid_map, "us-gov-ashburn-1", "")
+  datadog_site                   = var.datadog_site
+  api_key_secret_id              = local.api_key_secret_id
+  datadog_api_key                = var.datadog_api_key
+  create_regional_vault          = var.enable_regional_vaults && "us-gov-ashburn-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "us-gov-ashburn-1") ? tonumber(data.external.vault_quota["us-gov-ashburn-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["us-gov-ashburn-1"].result.vault_exists
+  home_region                    = local.home_region_name
+  tags                           = local.tags
+  defined_tags                   = local.defined_tags
+
+  depends_on = [
+    terraform_data.prechecks_complete,
+    module.compartment,
+    module.auth,
+    module.kms
+  ]
+}
+
+module "regional_deployment_us_gov_chicago_1" {
+  count  = contains(local.final_regions_for_stacks, "us-gov-chicago-1") ? 1 : 0
+  source = "./modules/regional-stacks"
+
+  providers = {
+    oci = oci.us-gov-chicago-1
+  }
+
+  tenancy_ocid                   = var.tenancy_ocid
+  region                         = "us-gov-chicago-1"
+  region_key                     = local.subscribed_regions_map["us-gov-chicago-1"].region_key
+  image_namespace                = local.datadog_image_namespace
+  image_realm                    = local.datadog_realm
+  compartment_ocid               = module.compartment.id
+  subnet_ocid                    = lookup(local.region_to_subnet_ocid_map, "us-gov-chicago-1", "")
+  datadog_site                   = var.datadog_site
+  api_key_secret_id              = local.api_key_secret_id
+  datadog_api_key                = var.datadog_api_key
+  create_regional_vault          = var.enable_regional_vaults && "us-gov-chicago-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "us-gov-chicago-1") ? tonumber(data.external.vault_quota["us-gov-chicago-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["us-gov-chicago-1"].result.vault_exists
+  home_region                    = local.home_region_name
+  tags                           = local.tags
+  defined_tags                   = local.defined_tags
+
+  depends_on = [
+    terraform_data.prechecks_complete,
+    module.compartment,
+    module.auth,
+    module.kms
+  ]
+}
+
+module "regional_deployment_us_gov_phoenix_1" {
+  count  = contains(local.final_regions_for_stacks, "us-gov-phoenix-1") ? 1 : 0
+  source = "./modules/regional-stacks"
+
+  providers = {
+    oci = oci.us-gov-phoenix-1
+  }
+
+  tenancy_ocid                   = var.tenancy_ocid
+  region                         = "us-gov-phoenix-1"
+  region_key                     = local.subscribed_regions_map["us-gov-phoenix-1"].region_key
+  image_namespace                = local.datadog_image_namespace
+  image_realm                    = local.datadog_realm
+  compartment_ocid               = module.compartment.id
+  subnet_ocid                    = lookup(local.region_to_subnet_ocid_map, "us-gov-phoenix-1", "")
+  datadog_site                   = var.datadog_site
+  api_key_secret_id              = local.api_key_secret_id
+  datadog_api_key                = var.datadog_api_key
+  create_regional_vault          = var.enable_regional_vaults && "us-gov-phoenix-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "us-gov-phoenix-1") ? tonumber(data.external.vault_quota["us-gov-phoenix-1"].result.available) > 0 : false)
+  regional_vault_exists_in_state = data.external.vault_state["us-gov-phoenix-1"].result.vault_exists
+  home_region                    = local.home_region_name
+  tags                           = local.tags
+  defined_tags                   = local.defined_tags
+
+  depends_on = [
+    terraform_data.prechecks_complete,
+    module.compartment,
+    module.auth,
+    module.kms
+  ]
+}
