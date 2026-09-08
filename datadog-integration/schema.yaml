@@ -132,9 +132,8 @@ variables:
     title: Custom Datadog intake host base
     type: string
     description: |
-      <strong>This is uncommon.</strong> Override the intake endpoint the forwarders send to.
-      When set, the forwarders use <code>https://{prefix-with-dashes}-{custom_datadog_site}{path}</code> instead of the default <code>https://{prefix}.{datadog_site}{path}</code>, keeping the whole host under a single wildcard certificate (e.g. <code>*.mrf.datadoghq.com</code>) so no per-customer certificate is needed.
-      Provide the full host base that follows the dashed prefix, e.g. <code>customerA.mrf.datadoghq.com</code>.
+      <strong>This is uncommon.</strong> Override the intake endpoint the forwarders send to for DNS-failover enabled customers.
+      Provide the full host base that follows the dashed prefix, e.g. customerA.mrf.datadoghq.com.
       <strong>(Recommended): If left blank, the standard dot-joined form using the Datadog Site above is used.</strong>
     required: false
     default: ""
