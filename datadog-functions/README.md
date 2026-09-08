@@ -35,7 +35,6 @@ The script detects the realm from each region's identifier and builds the correc
 | **OC1 commercial** | `us-ashburn-1`, `us-phoenix-1` | `<region-key>.ocir.io` (e.g. `iad.ocir.io`) |
 | **OC2 US Gov / FedRAMP** | `us-langley-1`, `us-luke-1` | `ocir.<region>.oci.oraclegovcloud.com` |
 | **OC3 US DoD** | `us-gov-ashburn-1`, `us-gov-chicago-1`, `us-gov-phoenix-1` | `ocir.<region>.oci.oraclegovcloud.com` |
-| **OC4 UK Sovereign** | `uk-gov-london-1`, `uk-gov-cardiff-1` | `ocir.<region>.oci.oraclegovcloud.uk` |
 
 Commercial registries use the short 3-letter region key; Gov/DoD/Sovereign registries use the full region identifier. You do **not** need to specify the realm manually — just enter the region identifiers when prompted.
 

@@ -13,7 +13,6 @@ echo "Supported realms (registry host is auto-detected from the region identifie
   - OC1 commercial      (e.g. us-ashburn-1, us-phoenix-1)        -> <region-key>.ocir.io
   - OC2 US Gov/FedRAMP  (e.g. us-langley-1, us-luke-1)             -> ocir.<region>.oci.oraclegovcloud.com
   - OC3 US DoD          (e.g. us-gov-ashburn-1, us-gov-chicago-1)  -> ocir.<region>.oci.oraclegovcloud.com
-  - OC4 UK Sovereign    (e.g. uk-gov-london-1)                     -> ocir.<region>.oci.oraclegovcloud.uk
 "
 
 read -p "Enter Docker username: " USERNAME
@@ -31,7 +30,6 @@ read -p "Enter regions (comma-separated, e.g., us-phoenix-1,us-ashburn-1) or pre
 #   ocir.<region-identifier>.<realm-domain>
 #   e.g. ocir.us-langley-1.oci.oraclegovcloud.com        (OC2)
 #        ocir.us-gov-ashburn-1.oci.oraclegovcloud.com    (OC3)
-#        ocir.uk-gov-london-1.oci.oraclegovcloud.uk      (OC4)
 # ---------------------------------------------------------------------------
 declare -A GOV_REGION_DOMAIN=(
   ["us-langley-1"]="oci.oraclegovcloud.com"
@@ -39,8 +37,6 @@ declare -A GOV_REGION_DOMAIN=(
   ["us-gov-ashburn-1"]="oci.oraclegovcloud.com"
   ["us-gov-chicago-1"]="oci.oraclegovcloud.com"
   ["us-gov-phoenix-1"]="oci.oraclegovcloud.com"
-  ["uk-gov-london-1"]="oci.oraclegovcloud.uk"
-  ["uk-gov-cardiff-1"]="oci.oraclegovcloud.uk"
 )
 
 # registry_host_for <region_identifier> <region_key>
