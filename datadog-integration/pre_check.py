@@ -11,6 +11,14 @@ MIN_AVAILABLE_VAULT = 1
 DATADOG_VAULT_NAME = "datadog-vault"
 DATADOG_COMPARTMENT_NAME = "Datadog"
 
+# The KMS "virtual-vault-count" (Default Vault Count) limit is not exposed in
+# the limits API for US Gov (OC2) and US DoD (OC3) realms — the limit name is
+# rejected as InvalidParameter even though DEFAULT vaults are supported and
+# creatable. So the vault quota precheck is skipped for these realms; vault
+# creation will surface any real quota failure at apply time.
+def _is_gov_realm(tenancy_ocid):
+    return tenancy_ocid and (tenancy_ocid.startswith("ocid1.tenancy.oc2.") or tenancy_ocid.startswith("ocid1.tenancy.oc3."))
+
 class ResourceType(Enum):
     USER = "user"
     GROUP = "group"
@@ -136,6 +144,12 @@ def _policy_owned_by_datadog(name, compartment_id):
 
 def validate_vault_quota(tenancy_ocid, home_region, compartment_id):
     if _vault_exists(tenancy_ocid, home_region, compartment_id):
+        return OK_STATUS
+    # The virtual-vault-count limit is not exposed in the limits API for US Gov
+    # (OC2) and US DoD (OC3) realms, so the quota check can't be performed.
+    # DEFAULT vaults are supported in those realms; any real quota failure will
+    # surface at apply time.
+    if _is_gov_realm(tenancy_ocid):
         return OK_STATUS
     cmd = [
         "oci", "limits", "resource-availability", "get",

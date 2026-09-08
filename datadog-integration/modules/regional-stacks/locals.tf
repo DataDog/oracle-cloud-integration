@@ -25,8 +25,14 @@ locals {
   # later drops to 0 (the vault itself consumes a quota unit) so re-applies
   # never flap and destroy/recreate it.
   create_regional_vault = var.enable_regional_vaults && var.region != var.home_region && (
-    data.oci_limits_resource_availability.vault_quota.available > 0 ||
-    data.external.check_regional_vault_in_state.result.vault_exists == "true"
+    # OC1: check the limits API for spare quota (or keep an existing vault sticky).
+    # OC2/OC3: the virtual-vault-count limit isn't exposed in the limits API, so
+    # the data source is absent (count=0) and we allow creation; a real quota
+    # failure surfaces at apply time.
+    var.image_realm != "oc1" ? true : (
+      length(data.oci_limits_resource_availability.vault_quota) > 0 && data.oci_limits_resource_availability.vault_quota[0].available > 0 ||
+      data.external.check_regional_vault_in_state.result.vault_exists == "true"
+    )
   )
 
   # The region/secret actually backing this function's Datadog API key: this

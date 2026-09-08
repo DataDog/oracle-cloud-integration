@@ -1,0 +1,30 @@
+#
+# Variables for testing the datadog-terraform-onboarding module locally.
+# Copy this file to terraform.tfvars and fill in the placeholders.
+#
+
+tenancy_ocid      = "ocid1.tenancy.oc1.<PLACEHOLDER>" # e.g. ocid1.tenancy.oc2... for US Gov, ocid1.tenancy.oc3... for US DoD
+current_user_ocid = "ocid1.user.oc1.<PLACEHOLDER>"
+
+datadog_api_key = "<PLACEHOLDER>"
+datadog_app_key = "<PLACEHOLDER>"
+datadog_site    = "datadoghq.com" # use ddog-gov.com for Gov/DoD
+
+# The onboarding module auto-discovers the home region from the tenancy, but the
+# OCI provider needs a region to authenticate against. Set it to your home region.
+region              = "<PLACEHOLDER>" # e.g. us-ashburn-1 / us-langley-1 / us-gov-ashburn-1
+config_file_profile = "DEFAULT"
+
+# --- Optional advanced inputs (defaults shown) ---
+# resource_compartment_ocid     = null
+# subnet_ocids                  = ""
+# existing_user_id              = null
+# existing_group_id             = null
+# logs_enabled                  = true
+# logs_only                     = false
+# domain_id                     = null
+# user_email                    = null
+# events_collection_enabled     = false
+# defined_tags                  = ""
+# enable_regional_vaults        = false
+# existing_home_region_vault_id = null
