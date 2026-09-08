@@ -1396,6 +1396,7 @@ module "regional_deployment_us_langley_1" {
   compartment_ocid               = module.compartment.id
   subnet_ocid                    = lookup(local.region_to_subnet_ocid_map, "us-langley-1", "")
   datadog_site                   = var.datadog_site
+  custom_datadog_site            = var.custom_datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
   create_regional_vault          = var.enable_regional_vaults && "us-langley-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "us-langley-1") ? tonumber(data.external.vault_quota["us-langley-1"].result.available) > 0 : local.datadog_realm != "oc1")
@@ -1428,6 +1429,7 @@ module "regional_deployment_us_luke_1" {
   compartment_ocid               = module.compartment.id
   subnet_ocid                    = lookup(local.region_to_subnet_ocid_map, "us-luke-1", "")
   datadog_site                   = var.datadog_site
+  custom_datadog_site            = var.custom_datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
   create_regional_vault          = var.enable_regional_vaults && "us-luke-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "us-luke-1") ? tonumber(data.external.vault_quota["us-luke-1"].result.available) > 0 : local.datadog_realm != "oc1")
@@ -1460,6 +1462,7 @@ module "regional_deployment_us_gov_ashburn_1" {
   compartment_ocid               = module.compartment.id
   subnet_ocid                    = lookup(local.region_to_subnet_ocid_map, "us-gov-ashburn-1", "")
   datadog_site                   = var.datadog_site
+  custom_datadog_site            = var.custom_datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
   create_regional_vault          = var.enable_regional_vaults && "us-gov-ashburn-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "us-gov-ashburn-1") ? tonumber(data.external.vault_quota["us-gov-ashburn-1"].result.available) > 0 : local.datadog_realm != "oc1")
@@ -1492,6 +1495,7 @@ module "regional_deployment_us_gov_chicago_1" {
   compartment_ocid               = module.compartment.id
   subnet_ocid                    = lookup(local.region_to_subnet_ocid_map, "us-gov-chicago-1", "")
   datadog_site                   = var.datadog_site
+  custom_datadog_site            = var.custom_datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
   create_regional_vault          = var.enable_regional_vaults && "us-gov-chicago-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "us-gov-chicago-1") ? tonumber(data.external.vault_quota["us-gov-chicago-1"].result.available) > 0 : local.datadog_realm != "oc1")
@@ -1524,6 +1528,7 @@ module "regional_deployment_us_gov_phoenix_1" {
   compartment_ocid               = module.compartment.id
   subnet_ocid                    = lookup(local.region_to_subnet_ocid_map, "us-gov-phoenix-1", "")
   datadog_site                   = var.datadog_site
+  custom_datadog_site            = var.custom_datadog_site
   api_key_secret_id              = local.api_key_secret_id
   datadog_api_key                = var.datadog_api_key
   create_regional_vault          = var.enable_regional_vaults && "us-gov-phoenix-1" != local.home_region_name && (contains(keys(data.external.vault_quota), "us-gov-phoenix-1") ? tonumber(data.external.vault_quota["us-gov-phoenix-1"].result.available) > 0 : local.datadog_realm != "oc1")
