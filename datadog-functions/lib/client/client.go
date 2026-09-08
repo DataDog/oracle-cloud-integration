@@ -147,6 +147,39 @@ func NewDatadogClientWithSite() (DatadogClient, string, error) {
 	return client, site, err
 }
 
+// IntakeURL builds the Datadog intake URL for the given host prefix (e.g.
+// "cloudplatform-intake", "http-intake.logs", "ocimetrics-intake") and API path
+// (e.g. "/api/v2/logs"). site is the value resolved from DD_SITE by the caller.
+//
+// When CUSTOM_DD_SITE is set, it provides the full host base that follows the
+// (dashed) prefix; the prefix's dots become dashes so the whole host stays under
+// a single wildcard certificate (e.g. *.mrf.datadoghq.com) without provisioning a
+// per-customer certificate:
+//
+//	{prefix-with-dashes}-{CUSTOM_DD_SITE}{path}
+//
+// e.g. CUSTOM_DD_SITE=customerA.mrf.datadoghq.com:
+//
+//	cloudplatform-intake-customerA.mrf.datadoghq.com/api/v2/cloudchanges
+//	http-intake-logs-customerA.mrf.datadoghq.com/api/v2/logs
+//
+// Otherwise the standard dot-joined form is used:
+//
+//	{prefix}.{DD_SITE}{path}
+func IntakeURL(prefix, path, site string) string {
+	if custom := strings.TrimSpace(os.Getenv("CUSTOM_DD_SITE")); custom != "" {
+		// CUSTOM_DD_SITE is a host base, not a URL. Strip any scheme a user may
+		// have pasted (e.g. "https://...") and any trailing slashes so the result
+		// is a well-formed host, not a malformed URL.
+		custom = strings.TrimPrefix(custom, "https://")
+		custom = strings.TrimPrefix(custom, "http://")
+		custom = strings.Trim(custom, "/")
+		dashed := strings.ReplaceAll(prefix, ".", "-")
+		return fmt.Sprintf("https://%s-%s%s", dashed, custom, path)
+	}
+	return fmt.Sprintf("https://%s.%s%s", prefix, site, path)
+}
+
 func NewDatadogClientWithTenancyAndSite() (DatadogClient, string, string, error) {
 	tenancyOCID := os.Getenv("TENANCY_OCID")
 	if tenancyOCID == "" {
@@ -197,11 +230,11 @@ var handleServerErrorPayload = func(ctx context.Context, message []byte, intakeU
 // data type, returning an error if the type cannot be determined.
 func backfillBucketName(intakeURL string) (string, error) {
 	switch {
-	case strings.Contains(intakeURL, "ocimetrics"):
+	case strings.Contains(intakeURL, "/api/v2/ocimetrics"):
 		return "dd-metrics-backfill", nil
-	case strings.Contains(intakeURL, "cloudchanges"):
+	case strings.Contains(intakeURL, "/api/v2/cloudchanges"):
 		return "dd-events-backfill", nil
-	case strings.Contains(intakeURL, "logs"):
+	case strings.Contains(intakeURL, "/api/v2/logs"):
 		return "dd-logs-backfill", nil
 	default:
 		return "", fmt.Errorf("unrecognized intake url %q", intakeURL)

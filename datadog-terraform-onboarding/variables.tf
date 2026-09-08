@@ -42,6 +42,12 @@ variable "datadog_site" {
   description = "The Datadog site to send data to (e.g., datadoghq.com, datadoghq.eu)"
 }
 
+variable "custom_datadog_site" {
+  type        = string
+  description = "Optional custom intake host base (e.g. customerA.mrf.datadoghq.com). Only set if DNS-failover is optin for the customer org"
+  default     = ""
+}
+
 #*************************************
 #         Advanced Usage Variables
 #*************************************

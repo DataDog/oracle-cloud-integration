@@ -33,16 +33,24 @@ locals {
 }
 
 locals {
-  config = {
-    "DD_SITE"                  = var.datadog_site,
-    "HOME_REGION"              = local.vault_region,
-    "API_KEY_SECRET_OCID"      = local.api_key_secret_id
-    "DATADOG_TAGS"             = "",
-    "EXCLUDE"                  = "{}",
-    "DD_BATCH_SIZE"            = "1000",
-    "TENANCY_OCID"             = var.tenancy_ocid,
-    "DETAILED_LOGGING_ENABLED" = "false"
-  }
+  # CUSTOM_DD_SITE is only included when set. The OCI provider suppresses
+  # empty-string values in the config map from its diff, so a key present
+  # with "" cannot clear a previously-set value on re-apply. Making the key
+  # conditionally absent instead produces a real structural diff (key removed)
+  # that the provider honors, allowing CUSTOM_DD_SITE to be unset later.
+  config = merge(
+    {
+      "DD_SITE"                  = var.datadog_site,
+      "HOME_REGION"              = local.vault_region,
+      "API_KEY_SECRET_OCID"      = local.api_key_secret_id
+      "DATADOG_TAGS"             = "",
+      "EXCLUDE"                  = "{}",
+      "DD_BATCH_SIZE"            = "1000",
+      "TENANCY_OCID"             = var.tenancy_ocid,
+      "DETAILED_LOGGING_ENABLED" = "false"
+    },
+    var.custom_datadog_site != "" ? { "CUSTOM_DD_SITE" = var.custom_datadog_site } : {}
+  )
 }
 
 locals {

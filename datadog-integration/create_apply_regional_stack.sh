@@ -15,6 +15,7 @@ HOME_REGION="${10}"
 DEFINED_TAGS="${11}"
 ENABLE_REGIONAL_VAULTS="${12}"
 STACK_DEFINED_TAGS="${13}"
+CUSTOM_DD_SITE="${14}"
 
 DEFINED_TAGS_ARGS=()
 if [[ "$STACK_DEFINED_TAGS" != "{}" ]]; then
@@ -44,7 +45,8 @@ VARIABLES_JSON=$(jq -n \
   --arg subnet_ocid "$SUBNET_OCID" \
   --arg defined_tags "$DEFINED_TAGS" \
   --arg enable_regional_vaults "$ENABLE_REGIONAL_VAULTS" \
-  '{tenancy_ocid: $tenancy_ocid, region: $region, compartment_ocid: $compartment_ocid, datadog_site: $datadog_site, api_key_secret_id: $api_key_secret_id, home_region: $home_region, region_key: $region_key, subnet_ocid: $subnet_ocid, defined_tags: $defined_tags, enable_regional_vaults: $enable_regional_vaults}')
+  --arg custom_datadog_site "$CUSTOM_DD_SITE" \
+  '{tenancy_ocid: $tenancy_ocid, region: $region, compartment_ocid: $compartment_ocid, datadog_site: $datadog_site, api_key_secret_id: $api_key_secret_id, home_region: $home_region, region_key: $region_key, subnet_ocid: $subnet_ocid, defined_tags: $defined_tags, enable_regional_vaults: $enable_regional_vaults, custom_datadog_site: $custom_datadog_site}')
 
 if [[ -z "$STACK_IDS" ]]; then
   echo "No stack found in the compartment by the name $STACK_NAME in region $REGION. Creating..."
