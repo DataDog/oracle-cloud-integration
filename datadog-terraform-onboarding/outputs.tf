@@ -44,7 +44,12 @@ output "regional_resources" {
     length(module.regional_deployment_eu_madrid_3) > 0 ? { "eu-madrid-3" = module.regional_deployment_eu_madrid_3[0].output_ids } : {},
     length(module.regional_deployment_eu_turin_1) > 0 ? { "eu-turin-1" = module.regional_deployment_eu_turin_1[0].output_ids } : {},
     length(module.regional_deployment_af_casablanca_1) > 0 ? { "af-casablanca-1" = module.regional_deployment_af_casablanca_1[0].output_ids } : {},
-    length(module.regional_deployment_ap_kulai_2) > 0 ? { "ap-kulai-2" = module.regional_deployment_ap_kulai_2[0].output_ids } : {}
+    length(module.regional_deployment_ap_kulai_2) > 0 ? { "ap-kulai-2" = module.regional_deployment_ap_kulai_2[0].output_ids } : {},
+    length(module.regional_deployment_us_langley_1) > 0 ? { "us-langley-1" = module.regional_deployment_us_langley_1[0].output_ids } : {},
+    length(module.regional_deployment_us_luke_1) > 0 ? { "us-luke-1" = module.regional_deployment_us_luke_1[0].output_ids } : {},
+    length(module.regional_deployment_us_gov_ashburn_1) > 0 ? { "us-gov-ashburn-1" = module.regional_deployment_us_gov_ashburn_1[0].output_ids } : {},
+    length(module.regional_deployment_us_gov_chicago_1) > 0 ? { "us-gov-chicago-1" = module.regional_deployment_us_gov_chicago_1[0].output_ids } : {},
+    length(module.regional_deployment_us_gov_phoenix_1) > 0 ? { "us-gov-phoenix-1" = module.regional_deployment_us_gov_phoenix_1[0].output_ids } : {}
   )
 }
 
