@@ -17,7 +17,7 @@ This folder contains definitions for all of the function images used by the Data
 
 ### Prerequisites
 
-1. **OCI CLI** installed and configured (`~/.oci/config`) for the target tenancy. The realm (OC1 commercial, OC2 US Gov, OC3 US DoD, OC4 UK Sovereign) is inferred automatically from the OCI CLI's region-subscription list.
+1. **OCI CLI** installed and configured (`~/.oci/config`) for the target tenancy. The realm (OC1 commercial, OC2 US Gov, OC3 US DoD) is inferred automatically from the OCI CLI's region-subscription list.
 2. **jq** installed.
 3. **Docker buildx** installed (`docker buildx version`).
 4. **Push access** to OCIR in every target region.
