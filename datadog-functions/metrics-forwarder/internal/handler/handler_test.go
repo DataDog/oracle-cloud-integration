@@ -34,6 +34,25 @@ func (m MockFnContext) Header() http.Header                    { return nil }
 func (m MockFnContext) ContentType() string                    { return "" }
 func (m MockFnContext) TracingContextData() fdk.TracingContext { return nil }
 
+func TestMyHandler_VersionCheck(t *testing.T) {
+	original := Version
+	Version = "v1.2.3-test"
+	t.Cleanup(func() { Version = original })
+
+	// Deliberately no TENANCY_OCID/DD_SITE set: a version check must never
+	// touch the Datadog client, so this must succeed regardless.
+	input := bytes.NewBufferString(`{"version_check":"true"}`)
+	output := &bytes.Buffer{}
+	MyHandler(getContext(), input, output)
+
+	var resp fnResponse
+	err := json.Unmarshal(output.Bytes(), &resp)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "success", resp.Status)
+	assert.Equal(t, "v1.2.3-test", resp.Version)
+}
+
 func TestMyHandler(t *testing.T) {
 	testCases := []struct {
 		name            string

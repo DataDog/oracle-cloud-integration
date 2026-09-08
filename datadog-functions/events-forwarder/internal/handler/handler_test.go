@@ -64,6 +64,22 @@ func runHandler(t *testing.T, body string) fnResponse {
 	return resp
 }
 
+func TestMyHandler_VersionCheck(t *testing.T) {
+	original := Version
+	Version = "v1.2.3-test"
+	t.Cleanup(func() { Version = original })
+
+	// Deliberately not calling withTestClient: a version check must never
+	// touch the Datadog client, so this must succeed with no env vars set.
+	resp := runHandler(t, `{"version_check":"true"}`)
+	if resp.Status != "success" {
+		t.Fatalf("status = %q, want success (resp=%+v)", resp.Status, resp)
+	}
+	if resp.Version != "v1.2.3-test" {
+		t.Fatalf("version = %q, want %q", resp.Version, "v1.2.3-test")
+	}
+}
+
 func TestMyHandler_ArrayPayload(t *testing.T) {
 	withTestClient(t)
 

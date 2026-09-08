@@ -60,6 +60,7 @@ build_and_push_image() {
   echo "Building and pushing multi-arch image ${IMAGE_PATH} to $REGISTRY..."
   docker buildx build -f ${DOCKER_FILE} \
     --platform linux/amd64,linux/arm64 \
+    --build-arg TAG="${TAG}" \
     --tag "${IMAGE_PATH}:${TAG}" \
     --tag "${IMAGE_PATH}:latest" \
     --push \

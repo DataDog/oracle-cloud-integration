@@ -13,11 +13,24 @@ import (
 
 var datadogClientFunc = client.NewDatadogClientWithTenancyAndSite
 
+// Version is set once by main() at startup from the build-stamped image tag,
+// so hubmanager's version-check invocation can read back what's actually
+// running here.
+var Version = "unknown"
+
 func MyHandler(ctx context.Context, in io.Reader, out io.Writer) {
 	raw, err := io.ReadAll(in)
 	if err != nil {
 		log.Printf("Error reading event batch: %v", err)
 		writeResponse(out, "error", "", err)
+		return
+	}
+
+	// Version check: answer directly from memory, before touching Vault or
+	// Datadog at all, so hubmanager's check can never be delayed or blocked
+	// by either being slow or unavailable.
+	if client.IsVersionCheckTrigger(raw) {
+		writeVersionResponse(out, Version)
 		return
 	}
 

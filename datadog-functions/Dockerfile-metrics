@@ -3,11 +3,12 @@ WORKDIR /app
 COPY lib/ lib/
 COPY metrics-forwarder/ metrics-forwarder/
 ARG TARGETARCH
+ARG TAG=unknown
 
 # Enable Go modules & build with optimizations
 WORKDIR /app/metrics-forwarder
 RUN go mod tidy  && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -ldflags="-s -w" -o func .
+    CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -ldflags="-s -w -X main.Version=${TAG}" -o func .
 
 FROM scratch
 
