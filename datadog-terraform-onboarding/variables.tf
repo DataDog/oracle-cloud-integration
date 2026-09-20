@@ -33,7 +33,7 @@ variable "datadog_api_key" {
 
 variable "datadog_app_key" {
   type        = string
-  description = "The APP key for establishing integration with Datadog"
+  description = "A Datadog Application Key or Personal Access Token (PAT) used to register and manage this integration. PATs are the recommended option."
   sensitive   = true
 }
 
