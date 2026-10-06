@@ -38,24 +38,27 @@ type DatadogClient struct {
 // SendMessageToDatadog sends a message to Datadog (the forward path). extraHeaders
 // are merged into the request headers and can be used to pass caller-specific
 // metadata (e.g. "Dd-Oci-Tenancy-Id"). A 403 triggers an API-key refresh and one
-// retry (handled in send). On a 5xx the payload is persisted to the backfill
-// bucket so it can be replayed later (best-effort; does not change the returned
-// error).
+// retry (handled in send). Transport failures are retried once. After retries are
+// exhausted, transport failures and 5xx responses are persisted to the backfill
+// bucket (best-effort; does not change the returned error).
 func (client *DatadogClient) SendMessageToDatadog(ctx context.Context, message []byte, url string, extraHeaders ...map[string]string) error {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 	status, err := client.send(ctx, message, url, extraHeaders...)
-	if err != nil && status >= 500 && status < 600 {
-		handleServerErrorPayload(ctx, message, url)
+	if isTransportError(err) {
+		log.Printf("transport error sending to Datadog, retrying once: %v", err)
+		status, err = client.send(ctx, message, url, extraHeaders...)
+	}
+	if err != nil && (isTransportError(err) || status >= 500 && status < 600) {
+		handleRetryableErrorPayload(ctx, message, url)
 	}
 	return err
 }
 
 // replaySend sends a payload read back from a backfill bucket. Unlike
-// SendMessageToDatadog it never re-persists on a 5xx (the payload is already in
-// the bucket), so a failed replay just returns its status and error and is left
-// in place for the next run. The HTTP status lets the caller distinguish
-// throttling (429) from other failures.
+// SendMessageToDatadog it never re-persists on failure because the payload is
+// already in the bucket. The HTTP status and error let the caller decide whether
+// to retain or drop the object.
 func (client *DatadogClient) replaySend(ctx context.Context, message []byte, url string, extraHeaders ...map[string]string) (int, error) {
 	return client.send(ctx, message, url, extraHeaders...)
 }
@@ -71,6 +74,23 @@ func (client *DatadogClient) send(ctx context.Context, message []byte, url strin
 		status, err = client.sendMessage(ctx, message, url, extraHeaders...)
 	}
 	return status, err
+}
+
+type transportError struct {
+	err error
+}
+
+func (e *transportError) Error() string {
+	return e.err.Error()
+}
+
+func (e *transportError) Unwrap() error {
+	return e.err
+}
+
+func isTransportError(err error) bool {
+	var target *transportError
+	return errors.As(err, &target)
 }
 
 func (client *DatadogClient) sendMessage(ctx context.Context, message []byte, url string, extraHeaders ...map[string]string) (int, error) {
@@ -94,9 +114,7 @@ func (client *DatadogClient) sendMessage(ctx context.Context, message []byte, ur
 
 	resp, err := client.client.CallAPI(req)
 	if err != nil {
-		// No response from Datadog (network/connection error), so there's no status
-		// code — return 0 so it isn't treated as a Datadog 5xx.
-		return 0, err
+		return 0, &transportError{err: err}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		log.Printf("Error: Received non-200 response from Datadog: %d", resp.StatusCode)
@@ -107,6 +125,12 @@ func (client *DatadogClient) sendMessage(ctx context.Context, message []byte, ur
 		return resp.StatusCode, errors.New("failed to send message to Datadog")
 	}
 	return resp.StatusCode, nil
+}
+
+func newDatadogHTTPClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DisableKeepAlives = true
+	return &http.Client{Transport: transport}
 }
 
 func NewDatadogClient() (DatadogClient, error) {
@@ -120,6 +144,7 @@ func NewDatadogClient() (DatadogClient, error) {
 	}
 
 	configuration := datadog.NewConfiguration()
+	configuration.HTTPClient = newDatadogHTTPClient()
 	configuration.RetryConfiguration.EnableRetry = true
 	client := datadog.NewAPIClient(configuration)
 
@@ -189,41 +214,40 @@ func NewDatadogClientWithTenancyAndSite() (DatadogClient, string, string, error)
 	return client, tenancyOCID, site, err
 }
 
-// handleServerErrorPayload persists a payload that Datadog rejected with a 5xx to
-// a per-data-type backfill bucket so it can be replayed later. The bucket is
-// expected to already exist (provisioned out-of-band); if it does not, or the
-// data type cannot be determined, the payload is dropped (logged). This is
-// best-effort and never changes the status/error returned to the caller.
-var handleServerErrorPayload = func(ctx context.Context, message []byte, intakeURL string) {
+// handleRetryableErrorPayload persists a payload after a transport failure or 5xx
+// response so it can be replayed later. The bucket is expected to already exist
+// (provisioned out-of-band). Persistence is best-effort and never changes the
+// error returned to the caller.
+var handleRetryableErrorPayload = func(ctx context.Context, message []byte, intakeURL string) {
 	bucket, err := backfillBucketName(intakeURL)
 	if err != nil {
-		log.Printf("5xx payload dropped: %v", err)
+		log.Printf("retryable payload dropped: %v", err)
 		return
 	}
 
 	osClient, err := newObjectStorageClientFunc()
 	if err != nil {
-		log.Printf("5xx payload dropped: failed to create object storage client: %v", err)
+		log.Printf("retryable payload dropped: failed to create object storage client: %v", err)
 		return
 	}
 
 	namespace, err := getNamespace(ctx, osClient)
 	if err != nil {
-		log.Printf("5xx payload dropped: failed to resolve object storage namespace: %v", err)
+		log.Printf("retryable payload dropped: failed to resolve object storage namespace: %v", err)
 		return
 	}
 
 	if !bucketExists(ctx, osClient, namespace, bucket) {
-		log.Printf("5xx payload dropped: backfill bucket %q does not exist", bucket)
+		log.Printf("retryable payload dropped: backfill bucket %q does not exist", bucket)
 		return
 	}
 
 	objectName := backfillObjectName()
 	if err := putObject(ctx, osClient, namespace, bucket, objectName, message); err != nil {
-		log.Printf("5xx payload dropped: failed to write object %q to bucket %q: %v", objectName, bucket, err)
+		log.Printf("retryable payload dropped: failed to write object %q to bucket %q: %v", objectName, bucket, err)
 		return
 	}
-	log.Printf("5xx payload persisted to bucket %q as object %q", bucket, objectName)
+	log.Printf("retryable payload persisted to bucket %q as object %q", bucket, objectName)
 }
 
 // backfillBucketName maps a Datadog intake URL to the backfill bucket for that
@@ -345,7 +369,7 @@ func IsBackfillTrigger(raw []byte) bool {
 type BackfillSummary struct {
 	Replayed       int // objects delivered to Datadog (whether or not the delete then succeeded)
 	Skipped        int // objects that could not be read; left in place for the next run
-	Dropped        int // objects Datadog rejected with a non-429/5xx error; deleted and skipped
+	Dropped        int // objects rejected with a non-transport/429/5xx error; deleted and skipped
 	DeleteFailures int // objects delivered but not deleted; re-sent next run (at-least-once)
 }
 
@@ -362,11 +386,11 @@ const backfillConcurrency = 5
 // Backfill drains this region's backfill bucket for the given intake URL, replaying
 // each stored batch to Datadog and deleting it on success. Objects are processed by
 // a bounded pool of backfillConcurrency workers. It runs until the bucket is empty,
-// the function times out, or a 429/5xx replay error cancels the run (those objects
-// are left in the bucket for the next run). A replay that fails with any other
-// status is treated as a bad point: the object is dropped (deleted) and the run
-// continues, mirroring how the forward path drops non-5xx failures. It returns a
-// BackfillSummary of what happened, also on error.
+// the function times out, or a transport/429/5xx replay error cancels the run
+// (those objects are left in the bucket for the next run). A replay that fails
+// with any other status is treated as a bad point: the object is dropped (deleted)
+// and the run continues. It returns a BackfillSummary of what happened, also on
+// error.
 func (client *DatadogClient) Backfill(ctx context.Context, intakeURL string, extraHeaders ...map[string]string) (BackfillSummary, error) {
 	bucket, err := backfillBucketName(intakeURL)
 	if err != nil {
@@ -426,16 +450,15 @@ func (client *DatadogClient) Backfill(ctx context.Context, intakeURL string, ext
 					if ctx.Err() != nil {
 						return // run already canceled; leave this object for the next run
 					}
-					if status == http.StatusTooManyRequests || (status >= 500 && status < 600) {
-						// Datadog can't take it right now (throttled or server error).
+					if isTransportError(err) || status == http.StatusTooManyRequests || (status >= 500 && status < 600) {
+						// Datadog can't take it right now (transport, throttling, or server error).
 						// Leave the object in place and stop the run; hubmanager will
 						// invoke again shortly.
 						markFatal(fmt.Errorf("backfill: replay failed for object %q, stopping run: %w", name, err))
 						return
 					}
 					// Any other error (e.g. a rejected/bad payload) isn't going to
-					// succeed on retry, so drop the point and continue — mirroring how
-					// the forward path drops non-5xx failures.
+					// succeed on retry, so drop the point and continue.
 					log.Printf("backfill: dropping object %q after non-retryable replay error: %v", name, err)
 					if derr := deleteObject(ctx, osClient, namespace, bucket, name); derr != nil {
 						log.Printf("backfill: failed to delete dropped object %q: %v", name, derr)
