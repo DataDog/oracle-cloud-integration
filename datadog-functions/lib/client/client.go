@@ -38,18 +38,18 @@ type DatadogClient struct {
 // SendMessageToDatadog sends a message to Datadog (the forward path). extraHeaders
 // are merged into the request headers and can be used to pass caller-specific
 // metadata (e.g. "Dd-Oci-Tenancy-Id"). A 403 triggers an API-key refresh and one
-// retry (handled in send). Transport failures are retried once. After retries are
-// exhausted, transport failures and 5xx responses are persisted to the backfill
-// bucket (best-effort; does not change the returned error).
+// retry (handled in send). Transport failures and 408 responses are retried once.
+// After retries are exhausted, transport failures, 408s, and 5xx responses are
+// persisted to the backfill bucket (best-effort; does not change the returned error).
 func (client *DatadogClient) SendMessageToDatadog(ctx context.Context, message []byte, url string, extraHeaders ...map[string]string) error {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 	status, err := client.send(ctx, message, url, extraHeaders...)
-	if isTransportError(err) {
-		log.Printf("transport error sending to Datadog, retrying once: %v", err)
+	if isTransportError(err) || status == http.StatusRequestTimeout {
+		log.Printf("retryable error sending to Datadog, retrying once: status=%d error=%v", status, err)
 		status, err = client.send(ctx, message, url, extraHeaders...)
 	}
-	if err != nil && (isTransportError(err) || status >= 500 && status < 600) {
+	if err != nil && (isTransportError(err) || status == http.StatusRequestTimeout || status >= 500 && status < 600) {
 		handleRetryableErrorPayload(ctx, message, url)
 	}
 	return err
@@ -214,8 +214,8 @@ func NewDatadogClientWithTenancyAndSite() (DatadogClient, string, string, error)
 	return client, tenancyOCID, site, err
 }
 
-// handleRetryableErrorPayload persists a payload after a transport failure or 5xx
-// response so it can be replayed later. The bucket is expected to already exist
+// handleRetryableErrorPayload persists a payload after a transport failure, 408,
+// or 5xx response so it can be replayed later. The bucket is expected to already exist
 // (provisioned out-of-band). Persistence is best-effort and never changes the
 // error returned to the caller.
 var handleRetryableErrorPayload = func(ctx context.Context, message []byte, intakeURL string) {
@@ -369,7 +369,7 @@ func IsBackfillTrigger(raw []byte) bool {
 type BackfillSummary struct {
 	Replayed       int // objects delivered to Datadog (whether or not the delete then succeeded)
 	Skipped        int // objects that could not be read; left in place for the next run
-	Dropped        int // objects rejected with a non-transport/429/5xx error; deleted and skipped
+	Dropped        int // objects rejected with a non-transport/408/429/5xx error; deleted and skipped
 	DeleteFailures int // objects delivered but not deleted; re-sent next run (at-least-once)
 }
 
@@ -386,7 +386,7 @@ const backfillConcurrency = 5
 // Backfill drains this region's backfill bucket for the given intake URL, replaying
 // each stored batch to Datadog and deleting it on success. Objects are processed by
 // a bounded pool of backfillConcurrency workers. It runs until the bucket is empty,
-// the function times out, or a transport/429/5xx replay error cancels the run
+// the function times out, or a transport/408/429/5xx replay error cancels the run
 // (those objects are left in the bucket for the next run). A replay that fails
 // with any other status is treated as a bad point: the object is dropped (deleted)
 // and the run continues. It returns a BackfillSummary of what happened, also on
@@ -450,8 +450,8 @@ func (client *DatadogClient) Backfill(ctx context.Context, intakeURL string, ext
 					if ctx.Err() != nil {
 						return // run already canceled; leave this object for the next run
 					}
-					if isTransportError(err) || status == http.StatusTooManyRequests || (status >= 500 && status < 600) {
-						// Datadog can't take it right now (transport, throttling, or server error).
+					if isTransportError(err) || status == http.StatusRequestTimeout || status == http.StatusTooManyRequests || (status >= 500 && status < 600) {
+						// Datadog can't take it right now (transport, timeout, throttling, or server error).
 						// Leave the object in place and stop the run; hubmanager will
 						// invoke again shortly.
 						markFatal(fmt.Errorf("backfill: replay failed for object %q, stopping run: %w", name, err))

@@ -121,6 +121,39 @@ func TestSendMessagePersistsTransportErrorAfterRetry(t *testing.T) {
 	mockClient.AssertNumberOfCalls(t, "CallAPI", 2)
 }
 
+func TestSendMessageRetriesRequestTimeout(t *testing.T) {
+	var persisted bool
+	orig := handleRetryableErrorPayload
+	handleRetryableErrorPayload = func(context.Context, []byte, string) { persisted = true }
+	defer func() { handleRetryableErrorPayload = orig }()
+
+	c, _ := getTestDatadogClient()
+	mockClient := c.client.(*MockAPIClient)
+	mockClient.On("CallAPI", mock.Anything).Return(okResponse(http.StatusRequestTimeout), nil).Once()
+	mockClient.On("CallAPI", mock.Anything).Return(okResponse(http.StatusAccepted), nil).Once()
+
+	err := c.SendMessageToDatadog(context.TODO(), []byte(`{}`), "https://x/api/v2/logs")
+	assert.NoError(t, err)
+	assert.False(t, persisted)
+	mockClient.AssertNumberOfCalls(t, "CallAPI", 2)
+}
+
+func TestSendMessagePersistsRequestTimeoutAfterRetry(t *testing.T) {
+	var persisted bool
+	orig := handleRetryableErrorPayload
+	handleRetryableErrorPayload = func(context.Context, []byte, string) { persisted = true }
+	defer func() { handleRetryableErrorPayload = orig }()
+
+	c, _ := getTestDatadogClient()
+	mockClient := c.client.(*MockAPIClient)
+	mockClient.On("CallAPI", mock.Anything).Return(okResponse(http.StatusRequestTimeout), nil).Twice()
+
+	err := c.SendMessageToDatadog(context.TODO(), []byte(`{}`), "https://x/api/v2/logs")
+	assert.Error(t, err)
+	assert.True(t, persisted)
+	mockClient.AssertNumberOfCalls(t, "CallAPI", 2)
+}
+
 // fakeObjectStorage implements objectStorageAPI for tests. It covers both the
 // write path (HeadBucket/PutObject) and the backfill read path
 // (ListObjects/GetObject/DeleteObject), recording calls for assertions.
@@ -284,7 +317,25 @@ func TestBackfill(t *testing.T) {
 		mockClient.AssertNumberOfCalls(t, "CallAPI", 2)
 	})
 
-	t.Run("drops the point on a non-429/5xx error and continues", func(t *testing.T) {
+	t.Run("stops and leaves object on 408 after retry", func(t *testing.T) {
+		c, _ := getTestDatadogClient()
+		mockClient := c.client.(*MockAPIClient)
+		mockClient.On("CallAPI", mock.Anything).Return(okResponse(http.StatusRequestTimeout), nil).Twice()
+
+		fake := &fakeObjectStorage{
+			objects:  []string{"a.json"},
+			contents: map[string][]byte{"a.json": []byte(`{"a":1}`)},
+		}
+		defer swapOSClient(fake)()
+
+		summary, err := c.Backfill(context.TODO(), intakeURL)
+		assert.Error(t, err)
+		assert.Empty(t, fake.deletedNames, "a 408 must leave the object in the bucket")
+		assert.Zero(t, summary.Dropped)
+		mockClient.AssertNumberOfCalls(t, "CallAPI", 2)
+	})
+
+	t.Run("drops the point on a non-408/429/5xx error and continues", func(t *testing.T) {
 		c, _ := getTestDatadogClient()
 		c.client.(*MockAPIClient).On("CallAPI", mock.Anything).Return(okResponse(400), nil)
 
@@ -295,7 +346,7 @@ func TestBackfill(t *testing.T) {
 		defer swapOSClient(fake)()
 
 		summary, err := c.Backfill(context.TODO(), intakeURL)
-		assert.NoError(t, err, "a non-429/5xx error drops the point, it does not stop the run")
+		assert.NoError(t, err, "a non-408/429/5xx error drops the point, it does not stop the run")
 		assert.Equal(t, []string{"bad.json"}, fake.deletedNames, "dropped object is deleted")
 		assert.Equal(t, 1, summary.Dropped)
 		assert.Zero(t, summary.Replayed)
