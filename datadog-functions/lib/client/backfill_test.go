@@ -21,6 +21,14 @@ func okResponse(status int) *http.Response {
 	return &http.Response{StatusCode: status, Body: io.NopCloser(bytes.NewBufferString(""))}
 }
 
+func TestNewDatadogHTTPClientDisablesKeepAlives(t *testing.T) {
+	httpClient := newDatadogHTTPClient()
+	transport, ok := httpClient.Transport.(*http.Transport)
+	assert.True(t, ok)
+	assert.True(t, transport.DisableKeepAlives)
+	assert.NotNil(t, transport.Proxy)
+}
+
 // swapOSClient injects fake as the object-storage client and returns a restore func.
 func swapOSClient(fake objectStorageAPI) func() {
 	orig := newObjectStorageClientFunc
@@ -28,9 +36,8 @@ func swapOSClient(fake objectStorageAPI) func() {
 	return func() { newObjectStorageClientFunc = orig }
 }
 
-// Tier 2: the 5xx-detection contract — the forward path (SendMessageToDatadog)
-// must invoke the backfill handler only for 5xx responses.
-func TestSendMessageBackfillTriggeredOnlyOn5xx(t *testing.T) {
+// Tier 2: the retryable-failure contract for the forward path.
+func TestSendMessageBackfillTriggeredOn5xx(t *testing.T) {
 	cases := []struct {
 		name         string
 		code         int
@@ -52,11 +59,11 @@ func TestSendMessageBackfillTriggeredOnlyOn5xx(t *testing.T) {
 			var called bool
 			var gotMessage []byte
 			var gotURL string
-			orig := handleServerErrorPayload
-			handleServerErrorPayload = func(_ context.Context, message []byte, url string) {
+			orig := handleRetryableErrorPayload
+			handleRetryableErrorPayload = func(_ context.Context, message []byte, url string) {
 				called, gotMessage, gotURL = true, message, url
 			}
-			defer func() { handleServerErrorPayload = orig }()
+			defer func() { handleRetryableErrorPayload = orig }()
 
 			c, _ := getTestDatadogClient()
 			c.client.(*MockAPIClient).On("CallAPI", mock.Anything).Return(okResponse(tc.code), nil)
@@ -72,21 +79,79 @@ func TestSendMessageBackfillTriggeredOnlyOn5xx(t *testing.T) {
 	}
 }
 
-// A failure before/without a Datadog response (e.g. a network error) has no HTTP
-// status and must not be treated as a Datadog 5xx — so it is not persisted.
-func TestSendMessagePreDatadogErrorNotPersisted(t *testing.T) {
-	var called bool
-	orig := handleServerErrorPayload
-	handleServerErrorPayload = func(context.Context, []byte, string) { called = true }
-	defer func() { handleServerErrorPayload = orig }()
+func TestSendMessageRetriesTransportError(t *testing.T) {
+	var persisted bool
+	orig := handleRetryableErrorPayload
+	handleRetryableErrorPayload = func(context.Context, []byte, string) { persisted = true }
+	defer func() { handleRetryableErrorPayload = orig }()
 
 	c, _ := getTestDatadogClient()
-	c.client.(*MockAPIClient).On("CallAPI", mock.Anything).
-		Return((*http.Response)(nil), errors.New("connection refused"))
+	mockClient := c.client.(*MockAPIClient)
+	mockClient.On("CallAPI", mock.Anything).
+		Return((*http.Response)(nil), io.ErrUnexpectedEOF).Once()
+	mockClient.On("CallAPI", mock.Anything).Return(okResponse(202), nil).Once()
+
+	err := c.SendMessageToDatadog(context.TODO(), []byte(`{}`), "https://x/api/v2/logs")
+	assert.NoError(t, err)
+	assert.False(t, persisted)
+	mockClient.AssertNumberOfCalls(t, "CallAPI", 2)
+}
+
+func TestSendMessagePersistsTransportErrorAfterRetry(t *testing.T) {
+	var gotMessage []byte
+	var gotURL string
+	orig := handleRetryableErrorPayload
+	handleRetryableErrorPayload = func(_ context.Context, message []byte, url string) {
+		gotMessage, gotURL = message, url
+	}
+	defer func() { handleRetryableErrorPayload = orig }()
+
+	c, _ := getTestDatadogClient()
+	mockClient := c.client.(*MockAPIClient)
+	mockClient.On("CallAPI", mock.Anything).
+		Return((*http.Response)(nil), io.ErrUnexpectedEOF).Twice()
+
+	payload := []byte(`{"message":"test"}`)
+	const intakeURL = "https://x/api/v2/logs"
+	err := c.SendMessageToDatadog(context.TODO(), payload, intakeURL)
+
+	assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
+	assert.Equal(t, payload, gotMessage)
+	assert.Equal(t, intakeURL, gotURL)
+	mockClient.AssertNumberOfCalls(t, "CallAPI", 2)
+}
+
+func TestSendMessageRetriesRequestTimeout(t *testing.T) {
+	var persisted bool
+	orig := handleRetryableErrorPayload
+	handleRetryableErrorPayload = func(context.Context, []byte, string) { persisted = true }
+	defer func() { handleRetryableErrorPayload = orig }()
+
+	c, _ := getTestDatadogClient()
+	mockClient := c.client.(*MockAPIClient)
+	mockClient.On("CallAPI", mock.Anything).Return(okResponse(http.StatusRequestTimeout), nil).Once()
+	mockClient.On("CallAPI", mock.Anything).Return(okResponse(http.StatusAccepted), nil).Once()
+
+	err := c.SendMessageToDatadog(context.TODO(), []byte(`{}`), "https://x/api/v2/logs")
+	assert.NoError(t, err)
+	assert.False(t, persisted)
+	mockClient.AssertNumberOfCalls(t, "CallAPI", 2)
+}
+
+func TestSendMessagePersistsRequestTimeoutAfterRetry(t *testing.T) {
+	var persisted bool
+	orig := handleRetryableErrorPayload
+	handleRetryableErrorPayload = func(context.Context, []byte, string) { persisted = true }
+	defer func() { handleRetryableErrorPayload = orig }()
+
+	c, _ := getTestDatadogClient()
+	mockClient := c.client.(*MockAPIClient)
+	mockClient.On("CallAPI", mock.Anything).Return(okResponse(http.StatusRequestTimeout), nil).Twice()
 
 	err := c.SendMessageToDatadog(context.TODO(), []byte(`{}`), "https://x/api/v2/logs")
 	assert.Error(t, err)
-	assert.False(t, called, "a pre-Datadog error must not be persisted as a 5xx")
+	assert.True(t, persisted)
+	mockClient.AssertNumberOfCalls(t, "CallAPI", 2)
 }
 
 // fakeObjectStorage implements objectStorageAPI for tests. It covers both the
@@ -158,8 +223,8 @@ func (f *fakeObjectStorage) DeleteObject(_ context.Context, req objectstorage.De
 	return objectstorage.DeleteObjectResponse{}, f.deleteErr
 }
 
-// Tier 3: the persist flow inside handleServerErrorPayload (the write path).
-func TestHandleServerErrorPayload(t *testing.T) {
+// Tier 3: the persist flow inside handleRetryableErrorPayload (the write path).
+func TestHandleRetryableErrorPayload(t *testing.T) {
 	cases := []struct {
 		name       string
 		url        string
@@ -180,7 +245,7 @@ func TestHandleServerErrorPayload(t *testing.T) {
 			fake := &fakeObjectStorage{headErr: tc.headErr, putErr: tc.putErr}
 			defer swapOSClient(fake)()
 
-			handleServerErrorPayload(context.TODO(), []byte(`{"k":"v"}`), tc.url)
+			handleRetryableErrorPayload(context.TODO(), []byte(`{"k":"v"}`), tc.url)
 
 			if tc.wantPut {
 				assert.Len(t, fake.putCalls, 1)
@@ -233,7 +298,44 @@ func TestBackfill(t *testing.T) {
 		assert.Zero(t, summary.Replayed)
 	})
 
-	t.Run("drops the point on a non-429/5xx error and continues", func(t *testing.T) {
+	t.Run("stops and leaves object on transport failure after retry", func(t *testing.T) {
+		c, _ := getTestDatadogClient()
+		mockClient := c.client.(*MockAPIClient)
+		mockClient.On("CallAPI", mock.Anything).
+			Return((*http.Response)(nil), io.ErrUnexpectedEOF).Twice()
+
+		fake := &fakeObjectStorage{
+			objects:  []string{"a.json"},
+			contents: map[string][]byte{"a.json": []byte(`{"a":1}`)},
+		}
+		defer swapOSClient(fake)()
+
+		summary, err := c.Backfill(context.TODO(), intakeURL)
+		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
+		assert.Empty(t, fake.deletedNames, "a transport failure must leave the object in the bucket")
+		assert.Zero(t, summary.Dropped)
+		mockClient.AssertNumberOfCalls(t, "CallAPI", 2)
+	})
+
+	t.Run("stops and leaves object on 408 after retry", func(t *testing.T) {
+		c, _ := getTestDatadogClient()
+		mockClient := c.client.(*MockAPIClient)
+		mockClient.On("CallAPI", mock.Anything).Return(okResponse(http.StatusRequestTimeout), nil).Twice()
+
+		fake := &fakeObjectStorage{
+			objects:  []string{"a.json"},
+			contents: map[string][]byte{"a.json": []byte(`{"a":1}`)},
+		}
+		defer swapOSClient(fake)()
+
+		summary, err := c.Backfill(context.TODO(), intakeURL)
+		assert.Error(t, err)
+		assert.Empty(t, fake.deletedNames, "a 408 must leave the object in the bucket")
+		assert.Zero(t, summary.Dropped)
+		mockClient.AssertNumberOfCalls(t, "CallAPI", 2)
+	})
+
+	t.Run("drops the point on a non-408/429/5xx error and continues", func(t *testing.T) {
 		c, _ := getTestDatadogClient()
 		c.client.(*MockAPIClient).On("CallAPI", mock.Anything).Return(okResponse(400), nil)
 
@@ -244,7 +346,7 @@ func TestBackfill(t *testing.T) {
 		defer swapOSClient(fake)()
 
 		summary, err := c.Backfill(context.TODO(), intakeURL)
-		assert.NoError(t, err, "a non-429/5xx error drops the point, it does not stop the run")
+		assert.NoError(t, err, "a non-408/429/5xx error drops the point, it does not stop the run")
 		assert.Equal(t, []string{"bad.json"}, fake.deletedNames, "dropped object is deleted")
 		assert.Equal(t, 1, summary.Dropped)
 		assert.Zero(t, summary.Replayed)
