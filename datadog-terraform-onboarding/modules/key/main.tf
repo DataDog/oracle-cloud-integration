@@ -3,7 +3,7 @@ terraform {
   required_providers {
     oci = {
       source  = "oracle/oci"
-      version = ">=7.1.0"
+      version = "~> 8.1"
     }
     tls = {
       source  = "hashicorp/tls"
@@ -64,6 +64,7 @@ resource "oci_identity_domains_api_key" "datadog_key" {
   # 3. Old key is deleted
   lifecycle {
     create_before_destroy = true
+    ignore_changes        = [schemas]
   }
 }
 
