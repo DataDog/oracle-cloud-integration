@@ -64,6 +64,7 @@ resource "oci_identity_domains_api_key" "datadog_key" {
   # 3. Old key is deleted
   lifecycle {
     create_before_destroy = true
+    ignore_changes        = [schemas]
   }
 }
 
