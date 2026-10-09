@@ -3,7 +3,7 @@ terraform {
   required_providers {
     oci = {
       source  = "oracle/oci"
-      version = ">=7.1.0"
+      version = "~> 8.1"
       # This module accepts an OCI provider configuration passed from the parent
       # to enable region-specific resource deployment
       configuration_aliases = [oci]
