@@ -1,11 +1,13 @@
 package formatter
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var singleLogEntry = map[string]any{
@@ -112,4 +114,102 @@ func TestProcessLogEntry(t *testing.T) {
 			assert.Equal(t, tt.expected, results)
 		})
 	}
+}
+
+// streamingEnvelope builds the Service Connector Hub streaming envelope (the
+// shape delivered when the source is OCI Streaming) wrapping an inner log
+// entry, with the inner JSON base64-encoded in the "value" field.
+func streamingEnvelope(inner map[string]any) map[string]any {
+	encoded := base64.StdEncoding.EncodeToString(mustJSON(inner))
+	return map[string]any{
+		"streamPool": "ocid1.streampool.oc1..test",
+		"stream":     "ocid1.stream.oc1..test",
+		"partition":  "0",
+		"key":        "",
+		"value":      encoded,
+		"offset":     "0",
+		"timestamp":  "2024-01-15T10:00:00.000Z",
+	}
+}
+
+func mustJSON(v any) []byte {
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
+func TestUnwrapStreamingMessages_DecodesEnvelope(t *testing.T) {
+	inner := deepCopyMap(singleLogEntry)
+	logs := []map[string]any{streamingEnvelope(inner)}
+
+	got, err := UnwrapStreamingMessages(logs)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, singleLogEntry, got[0])
+}
+
+func TestUnwrapStreamingMessages_PassesPlainEntriesThrough(t *testing.T) {
+	// A plain (non-streaming) log entry has a "data" field and no "value"
+	// envelope; it must be returned unchanged.
+	plain := deepCopyMap(singleLogEntry)
+	logs := []map[string]any{plain}
+
+	got, err := UnwrapStreamingMessages(logs)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, singleLogEntry, got[0])
+}
+
+func TestUnwrapStreamingMessages_MixedBatch(t *testing.T) {
+	plain := deepCopyMap(singleLogEntry)
+	plain["id"] = "plain"
+	streamed := streamingEnvelope(deepCopyMap(singleLogEntry))
+	// ensure the inner entry is distinguishable from the plain one
+	streamedInner := deepCopyMap(singleLogEntry)
+	streamedInner["id"] = "streamed"
+	streamed["value"] = base64.StdEncoding.EncodeToString(mustJSON(streamedInner))
+
+	got, err := UnwrapStreamingMessages([]map[string]any{plain, streamed})
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	assert.Equal(t, "plain", got[0]["id"])
+	assert.Equal(t, "streamed", got[1]["id"])
+}
+
+func TestUnwrapStreamingMessages_InvalidBase64(t *testing.T) {
+	logs := []map[string]any{{"value": "!!!not-base64!!!"}}
+	_, err := UnwrapStreamingMessages(logs)
+	assert.Error(t, err)
+}
+
+func TestUnwrapStreamingMessages_InvalidJSON(t *testing.T) {
+	// base64 of "not-json" decodes fine but isn't valid JSON.
+	logs := []map[string]any{{"value": base64.StdEncoding.EncodeToString([]byte("not-json"))}}
+	_, err := UnwrapStreamingMessages(logs)
+	assert.Error(t, err)
+}
+
+func TestUnwrapStreamingMessages_EmptyValue(t *testing.T) {
+	logs := []map[string]any{{"value": base64.StdEncoding.EncodeToString([]byte(""))}}
+	_, err := UnwrapStreamingMessages(logs)
+	assert.Error(t, err)
+}
+
+// TestProcessLogEntry_StreamingEnvelope verifies the end-to-end fix: a
+// streaming envelope, once unwrapped, produces the same LogPayload as the
+// inner log entry would have directly.
+func TestProcessLogEntry_StreamingEnvelope(t *testing.T) {
+	os.Setenv("DATADOG_TAGS", "env:prod,version:1.0")
+
+	inner := deepCopyMap(singleLogEntry)
+	unwrapped, err := UnwrapStreamingMessages([]map[string]any{streamingEnvelope(inner)})
+	require.NoError(t, err)
+
+	lf, err := NewLogFormatter()
+	require.NoError(t, err)
+
+	result := lf.ProcessLogEntry(unwrapped[0])
+	assert.Equal(t, expectedSingleLogEntry, result)
 }
