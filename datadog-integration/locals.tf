@@ -100,6 +100,15 @@ locals {
 
   actual_user_name  = (var.existing_user_id == null || var.existing_user_id == "") ? local.user_name : null
   actual_group_name = (var.existing_group_id == null || var.existing_group_id == "") ? local.user_group_name : null
+
+  # Inputs that decide which identity resources and compartment the stack owns.
+  # Changing them after apply orphans those resources, so they are locked post-apply.
+  immutable_inputs = {
+    compartment_id    = var.compartment_id != null ? var.compartment_id : ""
+    domain_id         = var.domain_id != null ? var.domain_id : ""
+    existing_user_id  = var.existing_user_id != null ? var.existing_user_id : ""
+    existing_group_id = var.existing_group_id != null ? var.existing_group_id : ""
+  }
 }
 
 # Variables for regions

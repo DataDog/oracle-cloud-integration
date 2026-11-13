@@ -1,3 +1,23 @@
+# Records immutable_inputs at first apply; ignore_changes keeps that snapshot frozen.
+resource "terraform_data" "immutable_inputs" {
+  input = local.immutable_inputs
+
+  lifecycle {
+    ignore_changes = [input]
+  }
+}
+
+# Fails the plan, before anything is modified, if an immutable input differs from its snapshot.
+resource "terraform_data" "immutable_inputs_check" {
+  lifecycle {
+    precondition {
+      # Compare only snapshotted keys so adding a key later doesn't block existing stacks.
+      condition     = alltrue([for k, v in terraform_data.immutable_inputs.output : v == lookup(local.immutable_inputs, k, v)])
+      error_message = "These variables cannot be changed after the stack has been applied: ${join(", ", [for k, v in terraform_data.immutable_inputs.output : k if v != lookup(local.immutable_inputs, k, v)])}. Revert them to their original values, or destroy this stack and create a new one with the new values."
+    }
+  }
+}
+
 # Validate user and group configurations
 resource "null_resource" "user_group_validation" {
 

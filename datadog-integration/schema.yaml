@@ -168,6 +168,7 @@ variables:
     description: |
       Select a Compartment in which all Datadog QuickStack resources will be created.
       <strong>(Recommended): If left blank, a new Compartment will be created.</strong>
+      <strong>Cannot be changed after the stack is applied.</strong> To use a different value, destroy this stack and create a new one.
     type: oci:identity:compartment:id
     required: false
     default: null
@@ -178,6 +179,7 @@ variables:
     type: string
     description: |
       Provide the OCID of an existing OCI User for Datadog authentication. The OCI User must be a member of the specified Group.
+      <strong>Cannot be changed after the stack is applied.</strong> To use a different value, destroy this stack and create a new one.
     required: true
     default: null
     visible: ${choose_user}
@@ -187,6 +189,7 @@ variables:
     type: string
     description: |
       Provide the OCID of an existing OCI Group for Datadog authentication.
+      <strong>Cannot be changed after the stack is applied.</strong> To use a different value, destroy this stack and create a new one.
     required: true
     default: null
     visible: ${choose_user}
@@ -197,6 +200,7 @@ variables:
     description: |
       Provide the OCID of the Identity Domain to use for the Datadog QuickStart stack.
       <strong>(Recommended): If left blank, the current Identity Domain will be used.</strong>
+      <strong>Cannot be changed after the stack is applied.</strong> To use a different value, destroy this stack and create a new one.
     required: false
     default: null
     visible:
