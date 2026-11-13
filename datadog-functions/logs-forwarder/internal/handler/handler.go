@@ -151,6 +151,16 @@ func formatLogs(ctx context.Context, rawLogs io.Reader, formattedLogs chan<- for
 		logs = []map[string]any{singleLog}
 	}
 
+	// When the source is OCI Streaming (e.g. cross-tenancy audit log forwarding
+	// via a stream), Service Connector Hub delivers each message in a base64
+	// envelope whose "value" field holds the real log JSON. Unwrap it before
+	// formatting so the log fields are populated instead of forwarded empty.
+	unwrapped, err := formatter.UnwrapStreamingMessages(logs)
+	if err != nil {
+		return fmt.Errorf("failed to unwrap streaming messages: %w", err)
+	}
+	logs = unwrapped
+
 	lf, err := formatter.NewLogFormatter()
 	if err != nil {
 		return fmt.Errorf("failed to create log formatter: %w", err)
