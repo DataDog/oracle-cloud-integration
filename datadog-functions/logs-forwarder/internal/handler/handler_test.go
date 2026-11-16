@@ -5,6 +5,7 @@ import (
 	"context"
 	"datadog-functions/lib/client"
 	"datadog-functions/logs-forwarder/internal/formatter"
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"testing"
@@ -135,6 +136,37 @@ func TestFormatLogs(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "streaming envelope unwrapped to log entry",
+			// Service Connector Hub delivers a base64 "value" envelope when the
+			// source is OCI Streaming. formatLogs must unwrap it before formatting.
+			input: func() string {
+				inner := map[string]any{
+					"message": "log1", "source": "test", "time": "2024-01-01T00:00:00Z",
+					"type": "test.log", "data": map[string]any{}, "oracle": map[string]any{},
+				}
+				encoded := base64.StdEncoding.EncodeToString(mustMarshal(inner))
+				envelope := map[string]any{
+					"streamPool": "ocid1.streampool.oc1..test",
+					"stream":     "ocid1.stream.oc1..test",
+					"value":      encoded,
+				}
+				b, _ := json.Marshal([]map[string]any{envelope})
+				return string(b)
+			}(),
+			want: []formatter.LogPayload{
+				{
+					OCISource: "test",
+					Timestamp: "2024-01-01T00:00:00Z",
+					Data:      map[string]any{},
+					DDSource:  "oci.logs",
+					Service:   "oci",
+					Type:      "test.log",
+					Oracle:    map[string]any{},
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name:    "invalid JSON format",
 			input:   `123`,
 			want:    nil,
@@ -163,4 +195,12 @@ func TestFormatLogs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func mustMarshal(v any) []byte {
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return b
 }

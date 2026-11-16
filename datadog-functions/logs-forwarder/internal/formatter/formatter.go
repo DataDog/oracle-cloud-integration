@@ -1,6 +1,9 @@
 package formatter
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 )
@@ -73,6 +76,46 @@ func getTags() string {
 	}
 
 	return tags
+}
+
+// unwrapStreamingMessages decodes the OCI Streaming envelope that Service
+// Connector Hub delivers when the source is a stream. Each envelope's "value"
+// field is base64-encoded JSON containing the real cloud event / log entry;
+// the fields the formatter reads (source, time, data, oracle, type) live
+// inside that encoded value, not at the top level. Without unwrapping, those
+// fields are absent and the log is forwarded empty.
+//
+// Messages that are already plain log entries — i.e. have no "value" field or
+// already carry a "data" field — are passed through unchanged, so non-streaming
+// (Logging) sources keep working as before.
+func UnwrapStreamingMessages(logs []map[string]any) ([]map[string]any, error) {
+	out := make([]map[string]any, 0, len(logs))
+	for i, log := range logs {
+		// A streaming envelope carries the payload in a base64 "value" string
+		// and has no top-level "data" field. Anything else is treated as an
+		// already-decoded log entry.
+		value, hasValue := log["value"].(string)
+		_, hasData := log["data"]
+		if !hasValue || hasData {
+			out = append(out, log)
+			continue
+		}
+
+		decoded, err := base64.StdEncoding.DecodeString(value)
+		if err != nil {
+			return nil, fmt.Errorf("streaming message %d: failed to base64-decode value: %w", i, err)
+		}
+		if len(decoded) == 0 {
+			return nil, fmt.Errorf("streaming message %d: decoded value is empty", i)
+		}
+
+		var entry map[string]any
+		if err := json.Unmarshal(decoded, &entry); err != nil {
+			return nil, fmt.Errorf("streaming message %d: decoded value is not valid JSON: %w", i, err)
+		}
+		out = append(out, entry)
+	}
+	return out, nil
 }
 
 func getFieldValue(log map[string]any, field string, isMap bool) any {
